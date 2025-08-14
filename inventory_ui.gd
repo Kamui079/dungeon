@@ -58,14 +58,11 @@ func update_display():
 		if bag.has(i):
 			var item_data = bag[i]
 			icon_rect.texture = item_data.item.icon
-			# Check if this slot is currently being dragged
-			var is_dragging = false
-			if slot_node.has_method("get") and slot_node.get("is_dragging") != null:
-				is_dragging = slot_node.is_dragging
-			icon_rect.visible = not is_dragging
+			# Always show icons for items in bag - dragging is handled by the slot itself
+			icon_rect.visible = true
 			if item_data.quantity > 1:
 				quantity_label.text = str(item_data.quantity)
-				quantity_label.visible = not is_dragging
+				quantity_label.visible = true
 			else:
 				quantity_label.visible = false
 		else:

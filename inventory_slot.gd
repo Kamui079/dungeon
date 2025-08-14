@@ -3,11 +3,30 @@ extends Panel
 var slot_index: int = -1
 var player_inventory: Node
 var is_dragging: bool = false
+var tooltip: Control = null
 
 func _ready():
 	slot_index = get_index()
 	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
 	mouse_filter = MOUSE_FILTER_STOP
+	
+	# Find or create tooltip (delayed to avoid setup conflicts)
+	call_deferred("_find_or_create_tooltip")
+
+func _find_or_create_tooltip():
+	"""Find existing tooltip or create a new one"""
+	# Look for existing tooltip in the scene tree
+	tooltip = get_tree().get_first_node_in_group("ItemTooltip")
+	
+	# If no tooltip exists, create one
+	if not tooltip:
+		var tooltip_scene = load("res://UI/item_tooltip.tscn")
+		if tooltip_scene:
+			tooltip = tooltip_scene.instantiate()
+			tooltip.add_to_group("ItemTooltip")
+			# Use call_deferred to avoid the "Parent node is busy" error
+			get_tree().root.add_child.call_deferred(tooltip)
+			print("Created new tooltip instance")
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
 	if player_inventory and player_inventory.bag.has(slot_index):
@@ -65,3 +84,14 @@ func _gui_input(event: InputEvent):
 		if player_inventory and player_inventory.bag.has(slot_index):
 			player_inventory.handle_right_click(slot_index, "")
 			get_viewport().set_input_as_handled()
+
+func _mouse_entered():
+	"""Show tooltip when mouse enters the slot"""
+	if tooltip and player_inventory and player_inventory.bag.has(slot_index) and not is_dragging:
+		var item_data = player_inventory.bag[slot_index]
+		tooltip.show_tooltip(item_data.item)
+
+func _mouse_exited():
+	"""Hide tooltip when mouse exits the slot"""
+	if tooltip:
+		tooltip.hide_tooltip()
