@@ -290,76 +290,19 @@ func try_interact():
 	print("=== END INTERACTION DEBUG ===")
 
 func receive_item(item: Resource) -> bool:
-	print("=== RECEIVE_ITEM DEBUG ===")
-	print("Received item: ", item.name)
-	print("Item type: ", item.get_class())
-	print("_inventory is null: ", _inventory == null)
-	
-	if _inventory == null:
-		print("No inventory found!")
-		print("Checking for PlayerInventory node...")
-		var player_inv = get_node_or_null("PlayerInventory")
-		if player_inv:
-			print("PlayerInventory node found: ", player_inv.name)
-			_inventory = player_inv
+	if _inventory and _inventory.has_method("add_item_to_bag"):
+		var remaining_quantity = _inventory.add_item_to_bag(item, 1)
+		if remaining_quantity == 0:
+			print("Item added to inventory: ", item.name)
+			# The inventory will emit a signal, so no need to call refresh here directly
+			return true
 		else:
-			print("ERROR: No PlayerInventory node found!")
+			print("Could not add item to inventory (full?): ", item.name)
 			return false
-	
-	print("_inventory type: ", _inventory.get_class())
-	print("_inventory has add_item method: ", _inventory.has_method("add_item"))
-	print("_inventory script: ", _inventory.script)
-	
-	# Test what properties the inventory actually has
-	print("=== INVENTORY PROPERTY TEST ===")
-	print("_inventory.get_property_list():")
-	var props = _inventory.get_property_list()
-	for prop in props:
-		print("  - ", prop.name, " (", prop.type, ")")
-	
-	# Try to add item to inventory
-	print("About to call _inventory.add_item...")
-	print("Item to add: ", item)
-	print("Quantity: 1")
-	
-	# Check if the inventory has the items array - use get() instead of has()
-	var items_array = _inventory.get("items")
-	if items_array != null:
-		print("_inventory items array: ", items_array)
-		print("Items array size: ", items_array.size())
-		
-		# Test if we can access the array safely
-		print("Testing array access...")
-		var test_size = items_array.size()
-		print("Array size accessed successfully: ", test_size)
-		
 	else:
-		print("ERROR: Could not get items array from inventory!")
-		return false
-	
-	print("About to call add_item method...")
-	var result = _inventory.add_item(item, 1)
-	print("add_item result: ", result)
-	
-	if result == 0:  # Successfully added
-		print("Item added to inventory: ", item.name)
-		_refresh_inventory_ui()
-		print("=== RECEIVE_ITEM SUCCESS ===")
-		return true
-	else:
-		print("Failed to add item to inventory: ", item.name)
-		print("=== RECEIVE_ITEM FAILED ===")
+		printerr("Player has no valid inventory to receive items.")
 		return false
 
-func _refresh_inventory_ui():
-	var existing_ui: Node = get_tree().get_first_node_in_group("InventoryUIGroup")
-	if existing_ui != null:
-		if existing_ui.has_method("refresh_display"):
-			existing_ui.refresh_display()
-		else:
-			print("Inventory UI doesn't have refresh_display method")
-	else:
-		print("No inventory UI found in group")
 
 # Combat methods
 func take_damage(amount: int):
