@@ -1,0 +1,76 @@
+[gd_scene load_steps=12 format=3 uid="uid://3bjx3edc46mw"]
+
+[ext_resource type="Script" uid="uid://xerxi770axkc" path="res://dungeon.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://character_body_3d.tscn" id="2_player"]
+[ext_resource type="ArrayMesh" uid="uid://8lw25uf4k15s" path="res://Models/wallfloor1.obj" id="3_level_mesh"]
+[ext_resource type="PackedScene" path="res://chest.tscn" id="20_chest_scene"]
+[ext_resource type="PackedScene" path="res://enemies/big_rat.tscn" id="21_big_rat_scene"]
+[ext_resource type="Script" uid="uid://ieyuyrjtdciv" path="res://combat_manager.gd" id="22_combat_manager"]
+[ext_resource type="PackedScene" uid="uid://bqxvxqxqxqxqx" path="res://UI/CombatUI.tscn" id="23_combat_ui_scene"]
+[ext_resource type="PackedScene" uid="uid://dfxhvjmv27gqh" path="res://UI/EquipmentUI.tscn" id="24_equipment_ui_scene"]
+
+[sub_resource type="StandardMaterial3D" id="3_wall_material"]
+albedo_color = Color(0.6, 0.6, 0.6, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="2_floor_material"]
+albedo_color = Color(0.4, 0.4, 0.4, 1)
+roughness = 0.8
+
+[sub_resource type="ConcavePolygonShape3D" id="1_level_collision"]
+data = PackedVector3Array(-1.4998, -1.4997, -12.5552, -1.4998, -1.4997, -1.3458, -1.4998, 1.4997, -12.5552, -1.4998, 1.4997, -12.5552, -1.4998, -1.4997, -1.3458, -1.4998, 1.4997, -1.3458, 1.4994, -1.4997, -12.5552, -1.4998, -1.4997, -12.5552, 1.4994, 1.4997, -12.5552, 1.4994, 1.4997, -12.5552, -1.4998, -1.4997, -12.5552, -1.4998, 1.4997, -12.5552, 1.4994, -1.4997, 12.5552, 1.4994, -1.4997, 2.044, 1.4994, 1.4997, 12.5552, 1.4994, 1.4997, 12.5552, 1.4994, -1.4997, 2.044, 1.4994, 1.4997, 2.044, -1.4998, -1.4997, 12.5552, 1.4994, -1.4997, 12.5552, -1.4998, 1.4997, 12.5552, -1.4998, 1.4997, 12.5552, 1.4994, -1.4997, 12.5552, 1.4994, 1.4997, 12.5552, 1.4994, 1.4997, 12.5552, 1.4994, 1.4997, 2.044, -1.4998, 1.4997, 12.5552, -1.4998, 1.4997, 12.5552, 1.4994, 1.4997, 2.044, -1.4998, 1.4997, 2.044, -13.4997, 1.4997, 2.044, -1.4998, 1.4997, 2.044, -13.4997, 1.4997, -1.3458, -13.4997, 1.4997, -1.3458, -1.4998, 1.4997, 2.044, -1.4998, 1.4997, -1.3458, 1.4994, 1.4997, 2.044, 1.4994, 1.4997, -1.3458, -1.4998, 1.4997, 2.044, -1.4998, 1.4997, 2.044, 1.4994, 1.4997, -1.3458, -1.4998, 1.4997, -1.3458, 13.4997, 1.4997, 2.044, 1.4994, 1.4997, -1.3458, 1.4994, 1.4997, 2.044, 13.4997, 1.4997, -1.3458, 1.4994, 1.4997, -1.3458, 13.4997, 1.4997, 2.044, 1.4994, 1.4997, -1.3458, 1.4994, 1.4997, -12.5552, -1.4998, 1.4997, -1.3458, -1.4998, 1.4997, -1.3458, 1.4994, 1.4997, -12.5552, -1.4998, 1.4997, -12.5552, -1.4998, -1.4997, 2.044, -1.4998, -1.4997, 12.5552, -1.4998, 1.4997, 2.044, -1.4998, 1.4997, 2.044, -1.4998, -1.4997, 12.5552, -1.4998, 1.4997, 12.5552, 1.4994, -1.4997, -1.3458, 1.4994, -1.4997, -12.5552, 1.4994, 1.4997, -1.3458, 1.4994, 1.4997, -1.3458, 1.4994, -1.4997, -12.5552, 1.4994, 1.4997, -12.5552, -13.4997, 1.4997, -1.3458, -1.4998, 1.4997, -1.3458, -13.4997, -1.4997, -1.3458, -13.4997, -1.4997, -1.3458, -1.4998, 1.4997, -1.3458, -1.4998, -1.4997, -1.3458, -13.4997, -1.4997, -1.3458, -13.4997, -1.4997, 2.044, -13.4997, 1.4997, -1.3458, -13.4997, 1.4997, -1.3458, -13.4997, -1.4997, 2.044, -13.4997, 1.4997, 2.044, -13.4997, -1.4997, 2.044, -1.4998, -1.4997, 2.044, -13.4997, 1.4997, 2.044, -13.4997, 1.4997, 2.044, -1.4998, -1.4997, 2.044, -1.4998, 1.4997, 2.044, 13.4997, -1.4997, 2.044, 13.4997, -1.4997, -1.3458, 13.4997, 1.4997, 2.044, 13.4997, 1.4997, 2.044, 13.4997, -1.4997, -1.3458, 13.4997, 1.4997, -1.3458, 13.4997, -1.4997, -1.3458, 1.4994, -1.4997, -1.3458, 13.4997, 1.4997, -1.3458, 13.4997, 1.4997, -1.3458, 1.4994, -1.4997, -1.3458, 1.4994, 1.4997, -1.3458, 13.4997, 1.4997, 2.044, 1.4994, 1.4997, 2.044, 13.4997, -1.4997, 2.044, 13.4997, -1.4997, 2.044, 1.4994, 1.4997, 2.044, 1.4994, -1.4997, 2.044, -1.4998, -1.4997, 12.5552, -1.4998, -1.4997, 2.044, 1.4994, -1.4997, 12.5552, 1.4994, -1.4997, 12.5552, -1.4998, -1.4997, 2.044, 1.4994, -1.4997, 2.044, 13.4997, -1.4997, 2.044, 1.4994, -1.4997, 2.044, 13.4997, -1.4997, -1.3458, 13.4997, -1.4997, -1.3458, 1.4994, -1.4997, 2.044, 1.4994, -1.4997, -1.3458, -1.4998, -1.4997, 2.044, -1.4998, -1.4997, -1.3458, 1.4994, -1.4997, 2.044, 1.4994, -1.4997, 2.044, -1.4998, -1.4997, -1.3458, 1.4994, -1.4997, -1.3458, -13.4997, -1.4997, 2.044, -1.4998, -1.4997, -1.3458, -1.4998, -1.4997, 2.044, -13.4997, -1.4997, -1.3458, -1.4998, -1.4997, -1.3458, -13.4997, -1.4997, 2.044, -1.4998, -1.4997, -1.3458, -1.4998, -1.4997, -12.5552, 1.4994, -1.4997, -1.3458, 1.4994, -1.4997, -1.3458, -1.4998, -1.4997, -12.5552, 1.4994, -1.4997, -12.5552)
+
+[node name="Dungeon" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0231514, -0.988477, -0.0180228)
+
+[node name="LevelMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00109923, -0.00823307, -0.00316572)
+mesh = ExtResource("3_level_mesh")
+surface_material_override/0 = SubResource("3_wall_material")
+surface_material_override/1 = SubResource("2_floor_material")
+
+[node name="LevelCollision" type="StaticBody3D" parent="."]
+
+[node name="LevelCollisionShape" type="CollisionShape3D" parent="LevelCollision"]
+shape = SubResource("1_level_collision")
+
+[node name="LeftWingLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.1897, 2, 0)
+light_color = Color(1, 0.9, 0.7, 1)
+light_energy = 1.2
+
+[node name="RightWingLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.1169, 0.774904, 0.301183)
+light_color = Color(1, 0.9, 0.7, 1)
+light_energy = 1.2
+
+[node name="FrontWingLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -9.72244)
+light_color = Color(1, 0.9, 0.7, 1)
+light_energy = 1.2
+
+[node name="BackWingLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 9.66886)
+light_color = Color(1, 0.9, 0.7, 1)
+light_energy = 1.2
+
+[node name="CenterLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.632392, 0)
+light_color = Color(1, 0.9, 0.7, 1)
+light_energy = 0.8
+
+[node name="Chest" parent="." instance=ExtResource("20_chest_scene")]
+transform = Transform3D(0.549844, 0, 0, 0, 0.549844, 0, 0, 0, 0.549844, 11.0844, -1.52831, 0.177985)
+
+[node name="BigRat" parent="." instance=ExtResource("21_big_rat_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, -1.2, 0)
+
+[node name="CombatManager" type="Node" parent="."]
+script = ExtResource("22_combat_manager")
+
+[node name="CombatUI" parent="." instance=ExtResource("23_combat_ui_scene")]
+
+[node name="EquipmentUI" parent="." instance=ExtResource("24_equipment_ui_scene")]

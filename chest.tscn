@@ -1,0 +1,49 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://chest.gd" id="1_chest_script"]
+[ext_resource type="Mesh" path="res://Models/chest1.obj" id="2_chest_mesh"]
+[ext_resource type="Texture2D" path="res://Models/chestwood/wood-90-black_diffuse.jpg" id="3_wood_diffuse"]
+[ext_resource type="Texture2D" path="res://Models/chestwood/wood-90_normal.jpg" id="4_wood_normal"]
+[ext_resource type="Texture2D" path="res://Models/chestwood/wood-90_bump.jpg" id="5_wood_bump"]
+[ext_resource type="Texture2D" path="res://Models/chestbrass/Brass_old_Base Color.jpeg" id="6_brass_diffuse"]
+[ext_resource type="Texture2D" path="res://Models/chestbrass/Brass_old_Normal.jpeg" id="7_brass_normal"]
+[ext_resource type="Texture2D" path="res://Models/chestbrass/Brass_old_Roughness.jpeg" id="8_brass_roughness"]
+[ext_resource type="Resource" uid="uid://b1y1vk7rg3o5q" path="res://Consumables/SmallHealingPotion.tres" id="9_healing_potion"]
+[ext_resource type="Resource" uid="uid://d1beypjd3j066" path="res://Consumables/SmallManaPotion.tres" id="10_mana_potion"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_chest_collision"]
+size = Vector3(2.0, 1.5, 1.5)
+
+[sub_resource type="StandardMaterial3D" id="chest_wood_material"]
+albedo_texture = ExtResource("3_wood_diffuse")
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="chest_brass_material"]
+albedo_texture = ExtResource("6_brass_diffuse")
+metallic = 1.0
+roughness = 0.2
+
+[node name="Chest" type="Node3D" groups=["Chest"]]
+script = ExtResource("1_chest_script")
+item_pool = Array[Resource]([ExtResource("9_healing_potion"), ExtResource("10_mana_potion")])
+ensure_at_least_one = true
+destroy_after_open = false
+
+[node name="ChestMesh" type="MeshInstance3D" parent="."]
+mesh = ExtResource("2_chest_mesh")
+surface_material_override/0 = SubResource("chest_wood_material")
+surface_material_override/1 = SubResource("chest_brass_material")
+
+[node name="ChestCollision" type="StaticBody3D" parent="."]
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ChestCollision"]
+shape = SubResource("BoxShape3D_chest_collision")
+
+[node name="InteractionArea" type="Area3D" parent="." groups=["Chest"]]
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea"]
+shape = SubResource("BoxShape3D_chest_collision")

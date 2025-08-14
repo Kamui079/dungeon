@@ -1,0 +1,37 @@
+[gd_scene load_steps=4 format=3 uid="uid://character_scene"]
+
+[ext_resource type="Script" path="res://character_body_3d.gd" id="1_character_script"]
+[ext_resource type="Script" path="res://spring_arm_3d.gd" id="2_spring_arm_script"]
+[ext_resource type="Script" path="res://inventory.gd" id="3_inventory_script"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+radius = 0.5
+height = 2.0
+
+[node name="CharacterBody3D" type="CharacterBody3D" groups=["Player"]]
+collision_layer = 1
+collision_mask = 3
+floor_max_angle = 1.39626
+safe_margin = 0.02
+script = ExtResource("1_character_script")
+
+[node name="PlayerInventory" type="Node" parent="."]
+script = ExtResource("3_inventory_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+shape = SubResource("CapsuleShape3D_1")
+
+[node name="SpringArm3D" type="SpringArm3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+collision_mask = 0
+script = ExtResource("2_spring_arm_script")
+
+[node name="Camera3D" type="Camera3D" parent="SpringArm3D" groups=["player"]]
+transform = Transform3D(0.999616, 0, -0.0276949, 0, 1, 0, 0.0276949, 0, 0.999616, -0.0089369, 0, 1.0415)
+
+[node name="InteractionArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea"]
+shape = SubResource("CapsuleShape3D_1")

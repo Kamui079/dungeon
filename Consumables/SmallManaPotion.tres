@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Item" load_steps=3 format=3 uid="uid://d1beypjd3j066"]
+
+[ext_resource type="Texture2D" uid="uid://b5kg7svvxp4jt" path="res://Models/minormanapotion.png" id="1_h2mai"]
+[ext_resource type="Script" uid="uid://ciejkhwjufuco" path="res://Inventory/item.gd" id="2_to4d5"]
+
+[resource]
+resource_name = "Small Mana Potion"
+script = ExtResource("2_to4d5")
+icon = ExtResource("1_h2mai")
+name = "Small Mana Potion"
+description = "Recovers 20 mana"
+item_type = 0
+max_stack = 20
+drop_chance = 100.0
+rarity = 0
+consumable_type = 1
+amount = 20
+custom_effect = ""
+equipment_slot = ""
+stats = {}

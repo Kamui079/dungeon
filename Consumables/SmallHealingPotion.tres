@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Item" load_steps=3 format=3 uid="uid://b1y1vk7rg3o5q"]
+
+[ext_resource type="Texture2D" uid="uid://cixni4wsfyole" path="res://Models/minorhealthpotion.png" id="1_ktgxa"]
+[ext_resource type="Script" uid="uid://ciejkhwjufuco" path="res://Inventory/item.gd" id="2_ko7gi"]
+
+[resource]
+resource_name = "Small Healing Potion"
+script = ExtResource("2_ko7gi")
+icon = ExtResource("1_ktgxa")
+name = "Small Healing Potion"
+description = "Recovers 20 health"
+item_type = 0
+max_stack = 20
+drop_chance = 100.0
+rarity = 0
+consumable_type = 0
+amount = 20
+custom_effect = ""
+equipment_slot = ""
+stats = {}
