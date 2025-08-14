@@ -2,11 +2,10 @@ extends Control
 
 @export var items_container: Control
 
-var inventory_slots: Array = []
+var inventory_slots: Array[Control] = []
 var player_inventory: Node
 
 func _ready():
-	# Wait for the PlayerInventory node to be ready
 	await get_tree().process_frame
 	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
 	if player_inventory:
@@ -19,17 +18,14 @@ func _ready():
 		printerr("Items container not assigned in the editor for InventoryUI!")
 		return
 
-	# Find all item slots dynamically from the assigned container
 	for i in range(items_container.get_child_count()):
-		var slot = items_container.get_child(i)
-		if slot is TextureRect:
-			inventory_slots.append(slot)
-			slot.set_meta("slot_index", i) # Store the index for later reference
-			# Make sure the control's Mouse -> Filter is set to Pass or Stop in the editor
-			slot.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot))
+		var slot_node = items_container.get_child(i)
+		if slot_node is Control:
+			inventory_slots.append(slot_node)
+			slot_node.set_meta("slot_index", i)
+			slot_node.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot_node))
 
 	_update_display()
-	# Start hidden
 	hide()
 
 func _input(event):
@@ -39,38 +35,57 @@ func _input(event):
 
 func toggle_panel():
 	visible = not visible
-	if visible:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	else:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if visible else Input.MOUSE_MODE_CAPTURED
 
 func _on_inventory_changed():
 	_update_display()
 
 func _update_display():
-	if not player_inventory:
-		return
+	if not player_inventory: return
 
 	var bag = player_inventory.get_bag()
 	for i in range(inventory_slots.size()):
 		var slot_node = inventory_slots[i]
-
-		# Assuming there's a child node for quantity text, e.g., named "QuantityLabel"
-		var quantity_label = slot_node.get_node_or_null("QuantityLabel") as Label
+		var icon_rect = _get_or_create_icon_rect(slot_node)
+		var quantity_label = _get_or_create_quantity_label(slot_node)
 
 		if bag.has(i):
 			var item_data = bag[i]
-			slot_node.texture = item_data.item.icon
-			if quantity_label:
-				if item_data.quantity > 1:
-					quantity_label.text = str(item_data.quantity)
-					quantity_label.show()
-				else:
-					quantity_label.hide()
-		else:
-			slot_node.texture = null
-			if quantity_label:
+			icon_rect.texture = item_data.item.icon
+			if item_data.quantity > 1:
+				quantity_label.text = str(item_data.quantity)
+				quantity_label.show()
+			else:
 				quantity_label.hide()
+		else:
+			icon_rect.texture = null
+			quantity_label.hide()
+
+func _get_or_create_icon_rect(slot_node: Control) -> TextureRect:
+	var icon_rect = slot_node.get_node_or_null("Icon") as TextureRect
+	if not icon_rect:
+		icon_rect = TextureRect.new()
+		icon_rect.name = "Icon"
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		slot_node.add_child(icon_rect)
+		icon_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return icon_rect
+
+func _get_or_create_quantity_label(slot_node: Control) -> Label:
+	var label = slot_node.get_node_or_null("QuantityLabel") as Label
+	if not label:
+		label = Label.new()
+		label.name = "QuantityLabel"
+		slot_node.add_child(label)
+		# Basic positioning for the label (bottom right)
+		label.set_anchor(SIDE_LEFT, 1.0)
+		label.set_anchor(SIDE_TOP, 1.0)
+		label.set_anchor(SIDE_RIGHT, 1.0)
+		label.set_anchor(SIDE_BOTTOM, 1.0)
+		label.set_offset(SIDE_LEFT, -30) # Adjust as needed
+		label.set_offset(SIDE_TOP, -20)  # Adjust as needed
+	return label
 
 # --- Drag and Drop ---
 
