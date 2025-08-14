@@ -13,7 +13,7 @@ func _ready():
 	await get_tree().process_frame
 	
 	# Find all item slots dynamically
-	var items_container = get_node("InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items")
+	var items_container = get_node("Panel/MarginContainer/VBoxContainer/Items")
 	if items_container:
 		print("Found items container: ", items_container.name)
 		
