@@ -2,7 +2,7 @@ extends Control
 
 @export var items_container: Control
 
-var inventory_slots: Array[Control] = []
+var inventory_slots: Array[TextureRect] = []
 var player_inventory: Node
 
 func _ready():
@@ -20,7 +20,7 @@ func _ready():
 
 	for i in range(items_container.get_child_count()):
 		var slot_node = items_container.get_child(i)
-		if slot_node is Control:
+		if slot_node is TextureRect:
 			inventory_slots.append(slot_node)
 			slot_node.set_meta("slot_index", i)
 			slot_node.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot_node))
@@ -46,46 +46,13 @@ func _update_display():
 	var bag = player_inventory.get_bag()
 	for i in range(inventory_slots.size()):
 		var slot_node = inventory_slots[i]
-		var icon_rect = _get_or_create_icon_rect(slot_node)
-		var quantity_label = _get_or_create_quantity_label(slot_node)
 
 		if bag.has(i):
 			var item_data = bag[i]
-			icon_rect.texture = item_data.item.icon
-			if item_data.quantity > 1:
-				quantity_label.text = str(item_data.quantity)
-				quantity_label.show()
-			else:
-				quantity_label.hide()
+			slot_node.texture = item_data.item.icon
+			# Note: Quantity label logic removed for simplicity, can be re-added later.
 		else:
-			icon_rect.texture = null
-			quantity_label.hide()
-
-func _get_or_create_icon_rect(slot_node: Control) -> TextureRect:
-	var icon_rect = slot_node.get_node_or_null("Icon") as TextureRect
-	if not icon_rect:
-		icon_rect = TextureRect.new()
-		icon_rect.name = "Icon"
-		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		slot_node.add_child(icon_rect)
-		icon_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	return icon_rect
-
-func _get_or_create_quantity_label(slot_node: Control) -> Label:
-	var label = slot_node.get_node_or_null("QuantityLabel") as Label
-	if not label:
-		label = Label.new()
-		label.name = "QuantityLabel"
-		slot_node.add_child(label)
-		# Basic positioning for the label (bottom right)
-		label.set_anchor(SIDE_LEFT, 1.0)
-		label.set_anchor(SIDE_TOP, 1.0)
-		label.set_anchor(SIDE_RIGHT, 1.0)
-		label.set_anchor(SIDE_BOTTOM, 1.0)
-		label.set_offset(SIDE_LEFT, -30) # Adjust as needed
-		label.set_offset(SIDE_TOP, -20)  # Adjust as needed
-	return label
+			slot_node.texture = null
 
 # --- Drag and Drop ---
 
@@ -101,7 +68,7 @@ func get_drag_data(from_slot_node):
 		return { "source": "bag", "from_slot": slot_index }
 	return null
 
-func can_drop_data(_at_position, data, to_slot_node):
+func can_drop_data(_at_position, data, _to_slot_node):
 	return data is Dictionary and data.has("source")
 
 func drop_data(_at_position, data, to_slot_node):
