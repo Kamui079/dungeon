@@ -130,16 +130,6 @@ func _input(event):
 		get_tree().quit()
 		return
 		
-	# Toggle inventory with TAB
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
-		toggle_inventory()
-		return
-		
-	# Toggle equipment UI with C
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
-		toggle_equipment()
-		return
-		
 	# Mouse look
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * mouse_sensitivity)
@@ -187,49 +177,6 @@ func handle_movement(delta):
 	
 	move_and_slide()
 
-func toggle_inventory():
-	var ui: Node = get_tree().get_first_node_in_group("InventoryUI")
-	print("DEBUG: Looking for InventoryUI group...")
-	print("DEBUG: Found UI: ", ui)
-	if ui != null:
-		print("DEBUG: UI visible before toggle: ", ui.visible)
-		if ui.visible:
-			ui.hide()
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		else:
-			ui.show()
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-			# Refresh inventory display
-			if _inventory != null and ui.has_method("update_display"):
-				ui.update_display(_inventory.items)
-		print("Inventory UI toggled: ", ui.visible)
-		print("DEBUG: UI visible after toggle: ", ui.visible)
-	else:
-		print("ERROR: No Inventory UI found!")
-		print("DEBUG: All nodes in InventoryUI group: ", get_tree().get_nodes_in_group("InventoryUI"))
-
-func toggle_equipment():
-	"""Toggle the equipment UI visibility"""
-	print("DEBUG: toggle_equipment() called")
-	var equipment_ui_root = get_node_or_null("EquipmentUI")
-	print("DEBUG: EquipmentUI root found: ", equipment_ui_root)
-	if equipment_ui_root:
-		var equipment_ui = equipment_ui_root.get_node_or_null("EquipmentRoot")
-		print("DEBUG: EquipmentRoot found: ", equipment_ui)
-		if equipment_ui:
-			print("DEBUG: EquipmentRoot visible before toggle: ", equipment_ui.visible)
-			if equipment_ui.visible:
-				equipment_ui.hide()
-				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-			else:
-				equipment_ui.show()
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-			print("Equipment UI toggled: ", equipment_ui.visible)
-			print("DEBUG: EquipmentRoot visible after toggle: ", equipment_ui.visible)
-		else:
-			print("ERROR: EquipmentRoot not found!")
-	else:
-		print("ERROR: EquipmentUI not found!")
 
 func try_interact():
 	print("=== TRY_INTERACT CALLED ===")
