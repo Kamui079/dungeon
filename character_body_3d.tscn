@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://character_body_3d.gd" id="1_character_script"]
 [ext_resource type="Script" path="res://spring_arm_3d.gd" id="2_spring_arm_script"]
-[ext_resource type="Script" path="res://inventory.gd" id="3_inventory_script"]
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.5
 height = 2.0
@@ -13,9 +12,6 @@ collision_mask = 3
 floor_max_angle = 1.39626
 safe_margin = 0.02
 script = ExtResource("1_character_script")
-
-[node name="PlayerInventory" type="Node" parent="."]
-script = ExtResource("3_inventory_script")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
