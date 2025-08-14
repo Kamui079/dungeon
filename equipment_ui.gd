@@ -1,19 +1,22 @@
 extends Control
 
 @export_group("Slot References")
-@export var helmet_slot: Control
-@export var necklace_slot: Control
-@export var cloak_slot: Control
-@export var chest_slot: Control
-@export var gloves_slot: Control
-@export var boots_slot: Control
-@export var ring1_slot: Control
-@export var ring2_slot: Control
+@export var helmet_slot: Panel
+@export var necklace_slot: Panel
+@export var cloak_slot: Panel
+@export var chest_slot: Panel
+@export var gloves_slot: Panel
+@export var boots_slot: Panel
+@export var ring1_slot: Panel
+@export var ring2_slot: Panel
 
 var player_inventory: Node
 var slot_nodes: Dictionary = {}
 
 func _ready():
+	# Wait for the next frame to ensure all nodes are properly initialized
+	await get_tree().process_frame
+	
 	slot_nodes = {
 		"helmet": helmet_slot, "necklace": necklace_slot, "cloak": cloak_slot,
 		"chest": chest_slot, "gloves": gloves_slot, "boots": boots_slot,
@@ -22,7 +25,9 @@ func _ready():
 
 	add_to_group("EquipmentUI")
 
+	# Wait another frame to ensure the export variables are properly assigned
 	await get_tree().process_frame
+	
 	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
 	if player_inventory:
 		player_inventory.connect("inventory_changed", _on_inventory_changed)
@@ -69,7 +74,7 @@ func _update_display():
 		else:
 			icon_rect.texture = null
 
-func _get_or_create_icon_rect(slot_node: Control) -> TextureRect:
+func _get_or_create_icon_rect(slot_node: Panel) -> TextureRect:
 	var icon_rect = slot_node.get_node_or_null("Icon") as TextureRect
 	if not icon_rect:
 		icon_rect = TextureRect.new()

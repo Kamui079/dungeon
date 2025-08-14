@@ -20,10 +20,12 @@ func _ready():
 
 	for i in range(items_container.get_child_count()):
 		var slot_node = items_container.get_child(i)
+		print("Found slot node ", i, ": ", slot_node.name, " of type: ", slot_node.get_class())
 		if slot_node is Control:
 			inventory_slots.append(slot_node)
 			slot_node.set_meta("slot_index", i)
-			slot_node.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot_node))
+			print("Added slot ", i, " to inventory_slots array")
+			# Note: Individual slots now handle their own drag and drop via the inventory_slot.gd script
 
 	_update_display()
 	hide()
@@ -67,31 +69,4 @@ func _get_or_create_icon_rect(slot_node: Control) -> TextureRect:
 		icon_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	return icon_rect
 
-# --- Drag and Drop ---
-
-func get_drag_data(from_slot_node):
-	var slot_index = from_slot_node.get_meta("slot_index")
-	if player_inventory.get_bag().has(slot_index):
-		var item_data = player_inventory.get_bag()[slot_index]
-
-		var drag_preview = TextureRect.new()
-		drag_preview.texture = item_data.item.icon
-		set_drag_preview(drag_preview)
-
-		return { "source": "bag", "from_slot": slot_index }
-	return null
-
-func can_drop_data(_at_position, data, _to_slot_node):
-	return data is Dictionary and data.has("source")
-
-func drop_data(_at_position, data, to_slot_node):
-	var to_slot_index = to_slot_node.get_meta("slot_index")
-	player_inventory.handle_drop_data(data, to_slot_index, "")
-
-# --- Right Click ---
-
-func _on_slot_gui_input(event: InputEvent, slot_node):
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		var slot_index = slot_node.get_meta("slot_index")
-		if player_inventory.get_bag().has(slot_index):
-			player_inventory.handle_right_click(slot_index, "")
+# Note: Drag and drop and right-click functionality is now handled by individual inventory slots via the inventory_slot.gd script

@@ -1,31 +1,59 @@
-[gd_scene load_steps=2 format=3 uid="uid://dfxhvjmv27gqh"]
+[gd_scene load_steps=4 format=3 uid="uid://dfxhvjmv27gqh"]
 
 [ext_resource type="Script" path="res://equipment_ui.gd" id="1_equipment_ui"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_yoshc"]
+content_margin_left = 15.0
+content_margin_top = 15.0
+content_margin_right = 15.0
+content_margin_bottom = 15.0
+bg_color = Color(0.05, 0.07, 0.09, 0.92)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.2, 0.3, 0.35, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot"]
+bg_color = Color(0.1, 0.1, 0.1, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.5, 0.5, 1)
+
 [node name="EquipmentUI" type="CanvasLayer"]
-visible = false
 
 [node name="EquipmentRoot" type="Control" parent="."]
 layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -450.0
+offset_right = 400.0
+offset_bottom = 450.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_equipment_ui")
+
+[node name="Panel" type="Panel" parent="EquipmentRoot"]
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_equipment_ui")
+theme_override_styles/panel = SubResource("StyleBoxFlat_yoshc")
 
-[node name="EquipmentPanel" type="Panel" parent="EquipmentRoot"]
-layout_mode = 0
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -150.0
-offset_right = 200.0
-offset_bottom = 150.0
-
-[node name="EquipmentPanel#VBoxContainer" type="VBoxContainer" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="EquipmentRoot/Panel"]
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -36,179 +64,240 @@ offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="EquipmentPanel_VBoxContainer#TitleLabel" type="Label" parent="."]
+[node name="TitleLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer"]
+layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "EQUIPMENT"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer#HSeparator1" type="HSeparator" parent="."]
+[node name="HSeparator1" type="HSeparator" parent="EquipmentRoot/Panel/VBoxContainer"]
+layout_mode = 2
 
-[node name="EquipmentPanel_VBoxContainer#MainContainer" type="HBoxContainer" parent="."]
+[node name="MainContainer" type="HBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer"]
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer#CharacterContainer" type="VBoxContainer" parent="."]
+[node name="CharacterContainer" type="VBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer"]
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer#CharacterLabel" type="Label" parent="."]
+[node name="CharacterLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer"]
+layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "CHARACTER"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer#CharacterDisplay" type="VBoxContainer" parent="."]
+[node name="CharacterDisplay" type="VBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer"]
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#HelmetSlot" type="Control" parent="."]
+[node name="HelmetSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
+layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_HelmetSlot#HelmetLabel" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
+[node name="HelmetLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/HelmetSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "Helmet"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#NecklaceSlot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_NecklaceSlot#NecklaceLabel" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Necklace"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#CloakSlot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_CloakSlot#CloakLabel" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Cloak"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#ChestSlot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_ChestSlot#ChestLabel" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Chest"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#GlovesSlot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_GlovesSlot#GlovesLabel" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Gloves"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#BootsSlot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_BootsSlot#BootsLabel" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Boots"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay#RingSlots" type="HBoxContainer" parent="."]
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_RingSlots#Ring1Slot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_RingSlots_Ring1Slot#Ring1Label" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Ring 1"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_RingSlots#Ring2Slot" type="Control" parent="."]
-custom_minimum_size = Vector2(80, 100)
-layout_mode = 3
-anchors_preset = 0
-size_flags_horizontal = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_CharacterContainer_CharacterDisplay_RingSlots_Ring2Slot#Ring2Label" type="Label" parent="."]
-offset_right = 80.0
-offset_bottom = 23.0
-text = "Ring 2"
-horizontal_alignment = 1
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer#HSeparator2" type="VSeparator" parent="."]
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer#StatsContainer" type="VBoxContainer" parent="."]
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer#StatsLabel" type="Label" parent="."]
-theme_override_font_sizes/font_size = 18
-text = "EQUIPMENT BONUSES"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer#StatsList" type="VBoxContainer" parent="."]
+[node name="NecklaceSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="NecklaceLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/NecklaceSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Necklace"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CloakSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="CloakLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/CloakSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Cloak"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ChestSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="ChestLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/ChestSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Chest"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GlovesSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="GlovesLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/GlovesSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Gloves"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BootsSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="BootsLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/BootsSlot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Boots"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RingSlots" type="HBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Ring1Slot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="Ring1Label" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots/Ring1Slot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Ring 1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Ring2Slot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots"]
+custom_minimum_size = Vector2(80, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="Ring2Label" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots/Ring2Slot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Ring 2"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HSeparator2" type="VSeparator" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer"]
+layout_mode = 2
+
+[node name="StatsContainer" type="VBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer"]
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/separation = 8
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#StrengthBonus" type="Label" parent="."]
+[node name="StatsLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "STATS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StatsList" type="VBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 5
+
+[node name="StrengthBonus" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
 text = "Strength: +0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#DexterityBonus" type="Label" parent="."]
+[node name="DexterityBonus" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
 text = "Dexterity: +0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#IntelligenceBonus" type="Label" parent="."]
+[node name="IntelligenceBonus" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
 text = "Intelligence: +0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#SpeedBonus" type="Label" parent="."]
+[node name="SpeedBonus" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
 text = "Speed: +0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#CunningBonus" type="Label" parent="."]
+[node name="CunningBonus" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
 text = "Cunning: +0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#SpellPowerBonus" type="Label" parent="."]
+[node name="SpellPowerBonus" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
 text = "Spell Power: +0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer_MainContainer_StatsContainer_StatsList#ArmorInfo" type="Label" parent="."]
-text = "Total Armor: 0"
+[node name="ArmorInfo" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer/StatsList"]
+layout_mode = 2
+text = "Armor: 0"
 horizontal_alignment = 1
 
-[node name="EquipmentPanel_VBoxContainer#HSeparator3" type="HSeparator" parent="."]
+[node name="HSeparator3" type="HSeparator" parent="EquipmentRoot/Panel/VBoxContainer"]
+layout_mode = 2
 
-[node name="EquipmentPanel_VBoxContainer#CloseButton" type="Button" parent="."]
+[node name="CloseButton" type="Button" parent="EquipmentRoot/Panel/VBoxContainer"]
+layout_mode = 2
 size_flags_horizontal = 3
 text = "Close (ESC)"

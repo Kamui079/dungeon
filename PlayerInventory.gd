@@ -39,7 +39,7 @@ func add_item_to_bag(item: Resource, quantity: int = 1) -> int:
 	var remaining_quantity = quantity
 
 	# First, try to stack with existing items
-	if item.has("max_stack") and item.max_stack > 1:
+	if item.max_stack > 1:
 		for slot_index in bag:
 			var slot_data = bag[slot_index]
 			if slot_data.item.resource_path == item.resource_path:
@@ -53,7 +53,7 @@ func add_item_to_bag(item: Resource, quantity: int = 1) -> int:
 
 	# If there's still quantity left, find empty slots
 	if remaining_quantity > 0:
-		var stack_to_add = item.max_stack if item.has("max_stack") else 1
+		var stack_to_add = item.max_stack
 		while remaining_quantity > 0:
 			var found_slot = false
 			for i in range(MAX_BAG_SLOTS):
@@ -103,7 +103,7 @@ func handle_right_click(bag_slot: int, equipment_slot: String):
 func _get_item_slot_name(item: Resource) -> String:
 	if item.has_method("get_slot_name"):
 		return item.get_slot_name()
-	if item.has("equipment_slot"):
+	if item.equipment_slot != "":
 		return item.equipment_slot
 	return ""
 

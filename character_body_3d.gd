@@ -46,9 +46,9 @@ func _ready():
 	stats._update_combat_chances()
 	stats._recalculate_max_stats()
 	
-	# Start with full health and mana
-	stats.health = stats.max_health
-	stats.mana = stats.max_mana
+	# Start with 90% health and mana for potion testing
+	stats.health = int(stats.max_health * 0.9)
+	stats.mana = int(stats.max_mana * 0.9)
 	
 	# Emit signals to update UI
 	stats.emit_signal("health_changed", stats.health, stats.max_health)
@@ -249,6 +249,17 @@ func receive_item(item: Resource) -> bool:
 	else:
 		printerr("Player has no valid inventory to receive items.")
 		return false
+
+# Add methods for potion consumption
+func heal(amount: int) -> void:
+	if stats:
+		stats.heal(amount)
+		print("Player healed for ", amount, " HP. Current HP: ", stats.health, "/", stats.max_health)
+
+func restore_mana(amount: int) -> void:
+	if stats:
+		stats.restore_mana(amount)
+		print("Player restored ", amount, " MP. Current MP: ", stats.mana, "/", stats.max_mana)
 
 
 # Combat methods

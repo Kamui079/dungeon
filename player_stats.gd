@@ -101,8 +101,10 @@ func _ready():
 	# Calculate initial experience requirement
 	_calculate_exp_requirement()
 	
-	# Calculate initial max stats
-	_recalculate_max_stats()
+	# Calculate initial max stats (only once during initialization)
+	if not _initialized:
+		_recalculate_max_stats()
+		_initialized = true
 	
 	# Don't automatically set health/mana here - let the player controller do it
 	# after all stats are properly initialized
@@ -179,6 +181,8 @@ func _calculate_scaled_multiplier(stat_value: int, base_per_point: float, soft_c
 
 # Stat recalculation methods
 var _recalculating_stats: bool = false  # Guard against recursive calls
+var _initialized: bool = false  # Guard against multiple initializations
+var _setting_initial_values: bool = false  # Guard against triggering recalculation when setting initial values
 
 func _recalculate_max_stats():
 	"""Recalculate max health and mana based on current stats"""
@@ -202,8 +206,17 @@ func _recalculate_max_stats():
 	max_mana = base_mana + mana_bonus + intelligence_bonus
 	
 	# Ensure current values don't exceed new maximums
-	health = min(health, max_health)
-	mana = min(mana, max_mana)
+	if not _setting_initial_values:
+		health = min(health, max_health)
+		mana = min(mana, max_mana)
+	
+	# Set health and mana to 90% for testing potions (after max stats are calculated)
+	if level == 1 and not _initialized:  # Only set on first load
+		_setting_initial_values = true
+		health = int(max_health * 0.9)
+		mana = int(max_mana * 0.9)
+		_setting_initial_values = false
+		# Don't set _initialized here as it's used for the _ready() function
 	
 	print("Stats recalculated - Max HP: ", max_health, " Max MP: ", max_mana)
 	
