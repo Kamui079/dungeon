@@ -1,184 +1,175 @@
 class_name PlayerInventory
 extends Node
 
-# Signal emitted when the bag or equipment changes
 signal inventory_changed
 
-# The player's main inventory
-# Dictionary format: { slot_index: { "item": ItemResource, "quantity": int } }
 var bag: Dictionary = {}
+var equipment: Dictionary = { "helmet": null, "necklace": null, "cloak": null, "chest": null, "gloves": null, "boots": null, "ring1": null, "ring2": null }
+const MAX_BAG_SLOTS = 24
 
-# The player's equipped items
-# Dictionary format: { "slot_name": { "item": ItemResource, "quantity": 1 } }
-var equipment: Dictionary = {
-	"helmet": {},
-	"necklace": {},
-	"cloak": {},
-	"chest": {},
-	"gloves": {},
-	"boots": {},
-	"ring1": {},
-	"ring2": {}
-}
-
-const MAX_BAG_SLOTS = 20
+# Bag dragging support
+var is_dragging_from_bag: bool = false
+var dragged_bag_item: Resource = null
+var dragged_bag_slot: int = -1
 
 func _ready():
 	add_to_group("PlayerInventory")
-	print("PlayerInventory is ready.")
 
-# --- Public API ---
-
-func get_bag() -> Dictionary:
-	return bag
-
-func get_equipment() -> Dictionary:
-	return equipment
+func get_bag() -> Dictionary: return bag
+func get_equipment() -> Dictionary: return equipment
 
 func add_item_to_bag(item: Resource, quantity: int = 1) -> int:
 	var remaining_quantity = quantity
-
-	# First, try to stack with existing items
 	if item.max_stack > 1:
-		for slot_index in bag:
-			var slot_data = bag[slot_index]
-			if slot_data.item.resource_path == item.resource_path:
-				var can_add = item.max_stack - slot_data.quantity
+		for i in range(MAX_BAG_SLOTS):
+			if bag.has(i) and bag[i].item.resource_path == item.resource_path:
+				var can_add = item.max_stack - bag[i].quantity
 				if can_add > 0:
 					var amount_to_add = min(remaining_quantity, can_add)
-					slot_data.quantity += amount_to_add
+					bag[i].quantity += amount_to_add
 					remaining_quantity -= amount_to_add
-					if remaining_quantity <= 0:
-						break
-
-	# If there's still quantity left, find empty slots
+					if remaining_quantity <= 0: break
 	if remaining_quantity > 0:
-		var stack_to_add = item.max_stack
-		while remaining_quantity > 0:
-			var found_slot = false
-			for i in range(MAX_BAG_SLOTS):
-				if not bag.has(i):
-					var amount_in_new_stack = min(remaining_quantity, stack_to_add)
-					bag[i] = { "item": item, "quantity": amount_in_new_stack }
-					remaining_quantity -= amount_in_new_stack
-					found_slot = true
-					break
-			if not found_slot:
-				# No more empty slots
-				break
-
-	inventory_changed.emit()
+		for i in range(MAX_BAG_SLOTS):
+			if not bag.has(i):
+				var amount_in_new_stack = min(remaining_quantity, item.max_stack)
+				bag[i] = { "item": item, "quantity": amount_in_new_stack }
+				remaining_quantity -= amount_in_new_stack
+				if remaining_quantity <= 0: break
+	inventory_changed.emit() # This line was missing from the version you were running
 	return remaining_quantity
 
-# --- UI Interaction Handlers ---
-
-func handle_drop_data(data: Dictionary, to_bag_slot: int, to_equipment_slot: String):
-	var source = data.source
-
-	if source == "bag":
-		var from_bag_slot = data.from_slot
-		if to_bag_slot != -1:
-			_move_item_in_bag(from_bag_slot, to_bag_slot)
-		elif to_equipment_slot != "":
-			_swap_bag_and_equipment(from_bag_slot, to_equipment_slot)
-
-	elif source == "equipment":
-		var from_equipment_slot = data.from_slot
-		if to_bag_slot != -1:
-			_unequip_item_to_bag(from_equipment_slot, to_bag_slot)
-		elif to_equipment_slot != "":
-			_swap_equipment_slots(from_equipment_slot, to_equipment_slot)
-
 func handle_right_click(bag_slot: int, equipment_slot: String):
-	if bag_slot != -1:
-		_equip_item_from_bag(bag_slot)
-	elif equipment_slot != "":
+	if bag_slot != -1 and bag.has(bag_slot):
+		var item_resource = bag[bag_slot].item
+		if item_resource.item_type == Item.ITEM_TYPE.CONSUMABLE: _consume_item(bag_slot)
+		else: _equip_item_from_bag(bag_slot)
+	elif equipment_slot != "" and equipment.has(equipment_slot) and equipment[equipment_slot] != null:
 		for i in range(MAX_BAG_SLOTS):
 			if not bag.has(i):
 				_unequip_item_to_bag(equipment_slot, i)
 				break
-
-# --- Internal Logic ---
-
+func handle_drop_data(data: Dictionary, to_bag_slot: int, to_equipment_slot: String):
+	var source = data.get("source"); var from_slot = data.get("from_slot")
+	if source == "bag" and to_bag_slot != -1: _move_item_in_bag(from_slot, to_bag_slot)
+	elif source == "bag" and to_equipment_slot != "": _swap_bag_and_equipment(from_slot, to_equipment_slot)
+	elif source == "equipment" and to_bag_slot != -1: _unequip_item_to_bag(from_slot, to_bag_slot)
+	elif source == "equipment" and to_equipment_slot != "": _swap_equipment_slots(from_slot, to_equipment_slot)
+func _consume_item(bag_slot: int):
+	var item_resource = bag[bag_slot].item; var player_node = get_parent()
+	if item_resource.use(player_node):
+		bag[bag_slot].quantity -= 1
+		if bag[bag_slot].quantity <= 0: bag.erase(bag_slot)
+		inventory_changed.emit()
+func _move_item_in_bag(from_slot: int, to_slot: int):
+	if from_slot == to_slot or not bag.has(from_slot): return
+	var from_item = bag[from_slot]
+	if bag.has(to_slot):
+		var to_item = bag[to_slot]; bag[to_slot] = from_item; bag[from_slot] = to_item
+	else:
+		bag.erase(from_slot); bag[to_slot] = from_item
+	inventory_changed.emit()
 func _get_item_slot_name(item: Resource) -> String:
-	if item.has_method("get_slot_name"):
+	if item and item.has_method("get_slot_name"):
 		return item.get_slot_name()
-	if item.equipment_slot != "":
+	elif item and item.has("equipment_slot"):
 		return item.equipment_slot
 	return ""
-
-func _move_item_in_bag(from_slot: int, to_slot: int):
-	if from_slot == to_slot or not bag.has(from_slot):
-		return
-
-	var item_to_move = bag[from_slot]
-	if bag.has(to_slot):
-		var other_item = bag[to_slot]
-		bag[to_slot] = item_to_move
-		bag[from_slot] = other_item
-	else:
-		bag[to_slot] = item_to_move
-		bag.erase(from_slot)
-
-	inventory_changed.emit()
-
 func _equip_item_from_bag(bag_slot: int):
-	if not bag.has(bag_slot):
-		return
-
+	if not bag.has(bag_slot): return
 	var item_to_equip_data = bag[bag_slot]
 	var equipment_slot_name = _get_item_slot_name(item_to_equip_data.item)
-
-	if equipment.has(equipment_slot_name):
-		_swap_bag_and_equipment(bag_slot, equipment_slot_name)
-
-func _unequip_item_to_bag(equipment_slot_name: String, bag_slot: int):
-	if not equipment.has(equipment_slot_name) or equipment[equipment_slot_name].is_empty():
+	if equipment.has(equipment_slot_name): _swap_bag_and_equipment(bag_slot, equipment_slot_name)
+func _unequip_item_to_bag(equipment_slot_name: String, to_bag_slot: int):
+	if not equipment.has(equipment_slot_name) or equipment[equipment_slot_name] == null: return
+	if bag.has(to_bag_slot): return
+	var item_to_unequip = equipment[equipment_slot_name]
+	equipment[equipment_slot_name] = null; bag[to_bag_slot] = { "item": item_to_unequip, "quantity": 1 }
+	inventory_changed.emit()
+func _swap_bag_and_equipment(bag_slot: int, equipment_slot_name: String):
+	if not bag.has(bag_slot): return
+	var item_in_bag = bag[bag_slot]
+	var slot_name = _get_item_slot_name(item_in_bag.item)
+	print("Attempting to equip item from bag slot ", bag_slot, " to equipment slot ", equipment_slot_name)
+	print("Item slot name: ", slot_name)
+	print("Target equipment slot: ", equipment_slot_name)
+	if slot_name != equipment_slot_name: 
+		print("Slot mismatch! Cannot equip ", slot_name, " in ", equipment_slot_name, " slot")
 		return
-
-	var equipped_item_data = equipment[equipment_slot_name]
-
-	if bag.has(bag_slot):
-		var item_in_bag_data = bag[bag_slot]
-		if _get_item_slot_name(item_in_bag_data.item) == equipment_slot_name:
-			bag[bag_slot] = equipped_item_data
-			equipment[equipment_slot_name] = item_in_bag_data
-		# else: can't swap, so do nothing.
-	else:
-		bag[bag_slot] = equipped_item_data
-		equipment[equipment_slot_name] = {}
-
+	var item_in_equipment = equipment[equipment_slot_name]
+	equipment[equipment_slot_name] = item_in_bag.item
+	if item_in_equipment == null: bag.erase(bag_slot)
+	else: bag[bag_slot] = { "item": item_in_equipment, "quantity": 1 }
+	print("Successfully equipped item to ", equipment_slot_name, " slot")
+	inventory_changed.emit()
+func _swap_equipment_slots(from_slot: String, to_slot: String):
+	if not equipment.has(from_slot) or not equipment.has(to_slot): return
+	var from_item = equipment[from_slot]; var to_item = equipment[to_slot]
+	equipment[from_slot] = to_item; equipment[to_slot] = from_item
 	inventory_changed.emit()
 
-func _swap_bag_and_equipment(bag_slot: int, equipment_slot_name: String):
-	if not bag.has(bag_slot) or not equipment.has(equipment_slot_name):
+# Bag dragging methods
+func start_bag_drag(bag_slot: int):
+	if bag.has(bag_slot):
+		is_dragging_from_bag = true
+		dragged_bag_item = bag[bag_slot].item
+		dragged_bag_slot = bag_slot
+		print("Started dragging ", dragged_bag_item.name, " from bag slot ", bag_slot)
+
+func clear_bag_drag():
+	is_dragging_from_bag = false
+	dragged_bag_item = null
+	dragged_bag_slot = -1
+
+func get_is_dragging_from_bag() -> bool:
+	return is_dragging_from_bag
+
+func get_dragged_bag_item() -> Resource:
+	return dragged_bag_item
+
+func get_dragged_bag_slot() -> int:
+	return dragged_bag_slot
+
+func equip_item_from_bag(item: Resource, equipment_slot: String):
+	"""Equip an item directly from bag drag to equipment slot"""
+	if not equipment.has(equipment_slot):
+		print("Invalid equipment slot: ", equipment_slot)
 		return
+	
+	# Remove item from bag
+	if dragged_bag_slot != -1 and bag.has(dragged_bag_slot):
+		bag.erase(dragged_bag_slot)
+	
+	# Equip item
+	equipment[equipment_slot] = item
+	print("Equipped ", item.name, " to ", equipment_slot, " slot")
+	
+	# Clear drag state
+	clear_bag_drag()
+	
+	# Emit signal
+	inventory_changed.emit()
 
-	var item_in_bag_data = bag[bag_slot]
-	var equipped_item_data = equipment[equipment_slot_name]
-
-	if _get_item_slot_name(item_in_bag_data.item) == equipment_slot_name:
-		equipment[equipment_slot_name] = item_in_bag_data
-		if equipped_item_data.is_empty():
-			bag.erase(bag_slot)
-		else:
-			bag[bag_slot] = equipped_item_data
-
-		inventory_changed.emit()
-
-func _swap_equipment_slots(from_slot: String, to_slot: String):
+func _move_equipment_item(from_slot: String, to_slot: String):
+	"""Move an equipment item from one slot to another"""
 	if not equipment.has(from_slot) or not equipment.has(to_slot):
 		return
-
-	var item1_data = equipment[from_slot]
-	var item2_data = equipment[to_slot]
-
-	# Check if the items can be swapped (e.g. rings)
-	if not item1_data.is_empty() and _get_item_slot_name(item1_data.item) != to_slot:
+	
+	var item = equipment[from_slot]
+	if item == null:
 		return
-	if not item2_data.is_empty() and _get_item_slot_name(item2_data.item) != from_slot:
-		return
-
-	equipment[to_slot] = item1_data
-	equipment[from_slot] = item2_data
+	
+	# Check if the target slot can accept this item
+	if item.has_method("get_slot_name"):
+		var required_slot = item.get_slot_name()
+		if required_slot != to_slot:
+			print("Cannot move ", item.name, " to ", to_slot, " slot (requires ", required_slot, ")")
+			return
+	
+	# Move the item
+	equipment[from_slot] = null
+	equipment[to_slot] = item
+	print("Moved ", item.name, " from ", from_slot, " to ", to_slot)
+	
+	# Emit signal
 	inventory_changed.emit()

@@ -1,7 +1,7 @@
-[gd_scene load_steps=10 format=3 uid="uid://d30oabdug2dhr"]
+[gd_scene load_steps=9 format=3 uid="uid://d30oabdug2dhr"]
 
 [ext_resource type="Script" uid="uid://ccrav4x4puxru" path="res://inventory_ui.gd" id="1_y5lm6"]
-[ext_resource type="Script" uid="uid://bqxxvmmv4pv10" path="res://inventory_slot.gd" id="2_inventory_slot"]
+[ext_resource type="PackedScene" uid="uid://cxswewbwrhjts" path="res://InventorySlot.tscn" id="3_xx4js"]
 
 [sub_resource type="Theme" id="Theme_u6ka6"]
 
@@ -33,213 +33,135 @@ font_color = Color(0.9, 0.9, 0.9, 1)
 
 [sub_resource type="Theme" id="Theme_f1pcy"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_inventory_slot"]
-bg_color = Color(0.15, 0.15, 0.15, 0.9)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.4, 0.4, 0.4, 0.8)
-
 [node name="InventoryUI" type="CanvasLayer"]
 
-[node name="InventoryRoot" type="Control" parent="." node_paths=PackedStringArray("items_container")]
+[node name="InventoryUIRoot" type="Control" parent="." node_paths=PackedStringArray("items_container")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_y5lm6")
 items_container = NodePath("Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items")
 
-[node name="Panel" type="Panel" parent="InventoryRoot"]
+[node name="Panel" type="Panel" parent="InventoryUIRoot"]
 layout_mode = 1
 anchors_preset = -1
 anchor_top = 0.6
 anchor_right = 0.28
 anchor_bottom = 1.0
+mouse_filter = 2
 theme = SubResource("Theme_u6ka6")
 theme_override_styles/panel = SubResource("StyleBoxFlat_4amvt")
 
-[node name="Panel#MarginContainer" type="MarginContainer" parent="InventoryRoot/Panel"]
+[node name="Panel#MarginContainer" type="MarginContainer" parent="InventoryUIRoot/Panel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme = SubResource("Theme_y5lm6")
 theme_override_constants/margin_left = 50
 theme_override_constants/margin_top = 30
 theme_override_constants/margin_right = 3
 theme_override_constants/margin_bottom = 8
 
-[node name="Panel_MarginContainer#VBoxContainer" type="VBoxContainer" parent="InventoryRoot/Panel/Panel#MarginContainer"]
+[node name="Panel_MarginContainer#VBoxContainer" type="VBoxContainer" parent="InventoryUIRoot/Panel/Panel#MarginContainer"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="Panel_MarginContainer_VBoxContainer#Title" type="Label" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer"]
+[node name="Panel_MarginContainer_VBoxContainer#Title" type="Label" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer"]
 layout_mode = 2
 text = "INVENTORY"
 label_settings = SubResource("LabelSettings_ceoxi")
 horizontal_alignment = 1
 
-[node name="Panel_MarginContainer_VBoxContainer#Spacer" type="Control" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer"]
+[node name="Panel_MarginContainer_VBoxContainer#Spacer" type="Control" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer"]
 custom_minimum_size = Vector2(0, 3)
 layout_mode = 2
+mouse_filter = 2
 
-[node name="Panel_MarginContainer_VBoxContainer#Items" type="GridContainer" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer"]
+[node name="Panel_MarginContainer_VBoxContainer#Items" type="GridContainer" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer"]
 layout_mode = 2
+mouse_filter = 2
 theme = SubResource("Theme_f1pcy")
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
 columns = 6
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot1" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot2" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel2" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot3" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel3" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot4" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel4" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot5" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel5" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot6" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel6" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot7" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel7" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot8" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel8" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot9" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel9" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot10" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel10" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot11" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel11" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot12" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel12" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot13" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel13" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot14" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel14" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot15" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel15" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot16" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel16" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot17" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel17" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot18" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel18" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot19" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel19" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot20" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel20" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot21" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel21" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot22" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel22" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot23" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
+[node name="Panel23" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
 
-[node name="Panel_MarginContainer_VBoxContainer_Items#ItemSlot24" type="Panel" parent="InventoryRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items"]
-custom_minimum_size = Vector2(64, 64)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_inventory_slot")
-script = ExtResource("2_inventory_slot")
-
-[node name="Panel#CloseButton" type="TextureButton" parent="InventoryRoot/Panel/Panel#MarginContainer"]
-custom_minimum_size = Vector2(24, 24)
+[node name="Panel24" parent="InventoryUIRoot/Panel/Panel#MarginContainer/Panel_MarginContainer#VBoxContainer/Panel_MarginContainer_VBoxContainer#Items" instance=ExtResource("3_xx4js")]
 layout_mode = 2

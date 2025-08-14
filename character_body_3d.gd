@@ -1,7 +1,5 @@
 extends CharacterBody3D
 
-class_name PlayerController
-
 # Input Configuration
 @export var move_speed := 5.0
 @export var jump_force := 6.0
@@ -9,457 +7,302 @@ class_name PlayerController
 @export var camera_height := 1.6
 
 # Inventory System
-@export var inventory_node: NodePath
 var _inventory: Node = null
 
 # Movement Vars
 var _gravity := 20.0
 var _y_velocity := 0.0
 var _can_interact := false
-var is_frozen: bool = false  # Flag to prevent movement during combat
+var is_frozen: bool = false
 @onready var camera: Camera3D = $SpringArm3D/Camera3D
 @onready var stats: PlayerStats = PlayerStats.new()
 
 func _ready():
-	# Set up player components
+	# Player Stats and Data Setup
 	add_child(stats)
-
-	# Create and add the PlayerInventory node
-	# This node holds all data for the player's bag and equipment
 	_inventory = PlayerInventory.new()
-	_inventory.name = "PlayerInventory" # Set a name for easier debugging
+	_inventory.name = "PlayerInventory"
 	add_child(_inventory)
 	
-	# Player starts at level 1 with base stats
-	# Level 1 = 5 stat points to distribute
-	# Player gets: 3 health, 1 mana, 1 strength, 1 intelligence, 1 speed (balanced build)
-	stats.set_health(3)      # Increased survivability (was 1)
-	stats.set_mana(1)        # Basic spell casting
-	stats.set_strength(1)    # Basic melee damage
-	stats.set_intelligence(1) # Basic spell power
-	stats.set_spell_power(0) # No bonus spell power
-	stats.set_dexterity(2)   # Increased dodge/crit chance (was 0)
-	stats.set_cunning(0)     # No bonus spell crit/parry
-	stats.set_speed(1)       # Basic speed
-	
-	# Update combat chances and recalculate max stats
-	stats._update_combat_chances()
-	stats._recalculate_max_stats()
-	
-	# Start with 90% health and mana for potion testing
-	stats.health = int(stats.max_health * 0.9)
-	stats.mana = int(stats.max_mana * 0.9)
-	
-	# Emit signals to update UI
+	# Your stat initialization code
+	stats.set_health(3); stats.set_mana(1); stats.set_strength(1); stats.set_intelligence(1)
+	stats.set_spell_power(0); stats.set_dexterity(2); stats.set_cunning(0); stats.set_speed(1)
+	stats._update_combat_chances(); stats._recalculate_max_stats()
+	stats.health = int(stats.max_health * 0.9); stats.mana = int(stats.max_mana * 0.9)
 	stats.emit_signal("health_changed", stats.health, stats.max_health)
 	stats.emit_signal("mana_changed", stats.mana, stats.max_mana)
-	# Ensure player group membership for interaction scripts
+	
 	if not is_in_group("Player"):
 		add_to_group("Player")
 	
-	# Input setup
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	
-	# Add HUD and connect
+	# HUD Setup
 	var hud_scene: PackedScene = preload("res://UI/HUD.tscn")
 	var hud: HUD = hud_scene.instantiate()
 	add_child(hud)
-	stats.health_changed.connect(hud.set_health)
-	stats.mana_changed.connect(hud.set_mana)
-	stats.spirit_changed.connect(hud.set_spirit)
-	# initialize bars
-	hud.set_health(stats.health, stats.max_health)
-	hud.set_mana(stats.mana, stats.max_mana)
-	hud.set_spirit(stats.spirit, 10)
-	
-	# Connect spirit changes to combat UI if it exists
+	stats.health_changed.connect(hud.set_health); stats.mana_changed.connect(hud.set_mana)
+	stats.spirit_changed.connect(hud.set_spirit); hud.set_health(stats.health, stats.max_health)
+	hud.set_mana(stats.mana, stats.max_mana); hud.set_spirit(stats.spirit, 10)
 	stats.spirit_changed.connect(_on_spirit_changed)
 	
-	# Ensure an Inventory UI exists and is connected
-	var existing_ui: Node = get_tree().get_first_node_in_group("InventoryUI")
-	print("DEBUG: Looking for existing InventoryUI...")
-	print("DEBUG: Found existing UI: ", existing_ui)
-	if existing_ui == null:
-		print("DEBUG: Creating new InventoryUI...")
-		var ui_scene: PackedScene = preload("res://Consumables/Inventory_UI.tscn")
-		var ui: CanvasLayer = ui_scene.instantiate()
-		add_child(ui)
-		print("DEBUG: InventoryUI added to player, path: ", ui.get_path())
-		# If the UI supports an inventory_node, wire it to our PlayerInventory (path from UI's perspective)
-		if _inventory != null:
-			ui.set("inventory_node", ui.get_path_to(_inventory))
-	else:
-		print("Inventory UI already exists!")
+	# --- THIS IS THE CORRECTED UI SETUP ---
 	
-	# Add Equipment UI
-	var equipment_ui_scene: PackedScene = preload("res://UI/EquipmentUI.tscn")
-	var equipment_ui_root: CanvasLayer = equipment_ui_scene.instantiate()
-	add_child(equipment_ui_root)
+	# 1. Instance the Normal Inventory UI
+	var inventory_ui_scene: PackedScene = preload("res://Consumables/Inventory_UI.tscn") #<-- CHECK THIS PATH
+	var inventory_ui_instance = inventory_ui_scene.instantiate()
+	add_child(inventory_ui_instance)
 	
-	# Get the Control child that has the script
-	var equipment_ui: Control = equipment_ui_root.get_node("EquipmentRoot")
-	if equipment_ui:
-		print("Equipment UI added to player!")
-		# Store reference to equipment UI for later use
-		equipment_ui_root.set_meta("equipment_ui", equipment_ui)
-	else:
-		print("ERROR: Could not find EquipmentRoot in EquipmentUI!")
+	# --- THIS IS THE FIX ---
+	# First, we get the correct child node that has the script...
+	# !! IMPORTANT: Make sure your node is named "InventoryUIRoot" !!
+	var inventory_ui_control = inventory_ui_instance.get_node("InventoryUIRoot")
+	# ...then we set the variable on that node.
+	if _inventory and inventory_ui_control:
+		inventory_ui_control.player_inventory = _inventory
 
+	# 2. Instance the Equipment UI
+	var equipment_ui_scene: PackedScene = preload("res://UI/EquipmentUI.tscn")
+	var equipment_ui_instance = equipment_ui_scene.instantiate()
+	add_child(equipment_ui_instance)
+	
+	# This part was already correct: it gets the child node "EquipmentRoot" first.
+	if _inventory:
+		var equipment_ui_control = equipment_ui_instance.get_node("EquipmentRoot")
+		if equipment_ui_control:
+			equipment_ui_control.player_inventory = _inventory
+	
+	# Add starter equipment for testing
+	_add_starter_equipment()
+
+# --- Getter Methods ---
+func get_stats() -> PlayerStats:
+	if not stats:
+		stats = PlayerStats.new(); add_child(stats)
+		stats.set_health(1); stats.set_mana(1); stats.set_strength(1); stats.set_intelligence(1)
+		stats.set_spell_power(0); stats.set_dexterity(0); stats.set_cunning(0); stats.set_speed(1)
+		stats._update_combat_chances(); stats._recalculate_max_stats()
+		stats.health = stats.max_health; stats.mana = stats.max_mana
+	return stats
+
+func get_spirit() -> int:
+	if has_method("get_stats") and get_stats(): return get_stats().spirit
+	return 0
+
+# --- Movement and Input Processing ---
 func _physics_process(delta):
-	# If frozen (in combat), don't process movement
-	if is_frozen:
-		return
-		
+	if is_frozen: return
 	handle_movement(delta)
 	
-	# Interaction (support default ui_accept and optional interact if present)
 	var interact_pressed: bool = Input.is_action_just_pressed("ui_accept")
 	if !interact_pressed and InputMap.has_action("interact"):
 		interact_pressed = Input.is_action_just_pressed("interact")
-	if interact_pressed:
-		print("Interact pressed (Frame ", Engine.get_frames_drawn(), ")")
-		try_interact()
+	if interact_pressed: try_interact()
 
 func _input(event):
-	# If frozen (in combat), don't process input
-	if is_frozen:
-		return
-		
-	# Quit on ESC
+	if is_frozen: return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		get_tree().quit()
-		return
-		
-	# Mouse look
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * mouse_sensitivity)
 		if is_instance_valid(camera):
 			camera.rotate_x(-event.relative.y * mouse_sensitivity)
 			camera.rotation.x = clamp(camera.rotation.x, -PI/4, PI/4)
-			camera.rotation.y = 0.0
-			camera.rotation.z = 0.0
+			camera.rotation.y = 0.0; camera.rotation.z = 0.0
 
 func handle_movement(delta):
-	# Get input direction
 	var input_dir = Input.get_vector("move_left", "move_right", "move_backwards", "move_forward")
 	var direction = (transform.basis * Vector3(input_dir.x, 0, -input_dir.y)).normalized()
 	
-	# Safety check: prevent extreme movement values
-	if direction.length() > 10.0:
-		print("WARNING: Extreme movement direction detected! Resetting...")
-		direction = Vector3.ZERO
-	
-	# Gravity
 	if is_on_floor():
-		if _y_velocity < 0.0:
-			_y_velocity = 0.0
-	else:
-		_y_velocity -= _gravity * delta
+		if _y_velocity < 0.0: _y_velocity = 0.0
+	else: _y_velocity -= _gravity * delta
 	
-	# Safety check: prevent extreme velocity values
-	if _y_velocity > 100.0 or _y_velocity < -100.0:
-		print("WARNING: Extreme Y velocity detected! Resetting...")
-		_y_velocity = 0.0
+	if Input.is_action_just_pressed("jump") and is_on_floor(): _y_velocity = jump_force
 	
-	# Jumping
-	if Input.is_action_just_pressed("jump") and is_on_floor():
-		_y_velocity = jump_force
-		print("Jump pressed")
-	
-	velocity.x = direction.x * move_speed
-	velocity.z = direction.z * move_speed
-	velocity.y = _y_velocity
-	
-	# Safety check: prevent extreme velocity values
-	if velocity.length() > 50.0:
-		print("WARNING: Extreme velocity detected! Resetting...")
-		velocity = Vector3.ZERO
-	
+	velocity.x = direction.x * move_speed; velocity.z = direction.z * move_speed; velocity.y = _y_velocity
 	move_and_slide()
 
-
 func try_interact():
-	print("=== TRY_INTERACT CALLED ===")
-	
 	var space_state = get_world_3d().direct_space_state
-	if !is_instance_valid(camera):
-		print("ERROR: Camera not valid!")
-		return
-	
-	# Use sphere query to detect chests within range instead of forward raycast
-	var interaction_radius = 3.0
-	var player_pos = global_position
-	
-	# Create a sphere query to find all objects within range
+	if !is_instance_valid(camera): return
+	var interaction_radius = 3.0; var player_pos = global_position
 	var sphere_query = PhysicsShapeQueryParameters3D.new()
 	var sphere_shape = SphereShape3D.new()
 	sphere_shape.radius = interaction_radius
 	sphere_query.shape = sphere_shape
 	sphere_query.transform = Transform3D(Basis(), player_pos)
-	sphere_query.collision_mask = 2  # Only detect layer 2 (chest)
-	
+	sphere_query.collision_mask = 2
 	var sphere_results = space_state.intersect_shape(sphere_query)
-	
-	print("=== SPHERE QUERY DEBUG ===")
-	print("Found ", sphere_results.size(), " objects within ", interaction_radius, " units")
-	
-	# Check each object found within range
 	for result in sphere_results:
-		var collider = result.collider
-		print("Checking collider: ", collider.name, " (", collider.get_class(), ")")
-		print("Collider groups: ", collider.get_groups())
-		
-		# Find the actual chest node (could be the collider itself or its parent)
-		var chest_node = collider
-		
-		# If the collider is an Area3D or StaticBody3D, look for the parent chest
-		if collider is Area3D or collider is StaticBody3D:
-			# Look up the hierarchy to find the chest node
-			while chest_node != null and not chest_node.has_method("interact_with_player"):
-				chest_node = chest_node.get_parent()
-				if chest_node == null:
-					break
-		
-		# Check if we found a valid chest node
+		var collider = result.collider; var chest_node = collider
+		while chest_node != null and not chest_node.has_method("interact_with_player"):
+			chest_node = chest_node.get_parent()
+			if chest_node == null: break
 		if chest_node and chest_node.has_method("interact_with_player"):
-			# Check distance to the chest
-			var distance_to_chest = global_position.distance_to(chest_node.global_position)
-			if distance_to_chest <= interaction_radius:
-				print("Found chest: ", chest_node.name, " at distance: ", distance_to_chest)
-				chest_node.interact_with_player(self)
-				return
-			else:
-				print("Chest too far away! Distance: ", distance_to_chest, " (max: ", interaction_radius, ")")
-		else:
-			print("No valid chest node found with interact_with_player method")
-	
-	print("No chests found within range or no valid chest nodes")
-	print("=== END INTERACTION DEBUG ===")
+			if global_position.distance_to(chest_node.global_position) <= interaction_radius:
+				chest_node.interact_with_player(self); return
 
 func receive_item(item: Resource) -> bool:
 	if _inventory and _inventory.has_method("add_item_to_bag"):
 		var remaining_quantity = _inventory.add_item_to_bag(item, 1)
-		if remaining_quantity == 0:
-			print("Item added to inventory: ", item.name)
-			# The inventory will emit a signal, so no need to call refresh here directly
-			return true
-		else:
-			print("Could not add item to inventory (full?): ", item.name)
-			return false
-	else:
-		printerr("Player has no valid inventory to receive items.")
-		return false
+		return remaining_quantity == 0
+	printerr("Player has no valid inventory to receive items.")
+	return false
 
-# Add methods for potion consumption
-func heal(amount: int) -> void:
-	if stats:
-		stats.heal(amount)
-		print("Player healed for ", amount, " HP. Current HP: ", stats.health, "/", stats.max_health)
+func heal(amount: int):
+	if stats: stats.heal(amount)
+func restore_mana(amount: int):
+	if stats: stats.restore_mana(amount)
 
-func restore_mana(amount: int) -> void:
-	if stats:
-		stats.restore_mana(amount)
-		print("Player restored ", amount, " MP. Current MP: ", stats.mana, "/", stats.max_mana)
-
-
-# Combat methods
+# --- Combat Methods ---
 func take_damage(amount: int):
-	if not stats:
-		return
+	if not stats: return
 	stats.take_damage(amount)
-	
-	# Update combat UI with new status if in combat
 	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
 	if combat_manager and combat_manager.has_method("_update_combat_ui_status"):
 		combat_manager._update_combat_ui_status()
-	
 	if stats.health <= 0:
-		# End combat if player dies
 		if combat_manager and combat_manager.has_method("end_combat"):
 			combat_manager.end_combat()
-		else:
-			# Fallback: respawn at full health if no combat manager
-			stats.health = stats.max_health
-
+		else: stats.health = stats.max_health
 func get_basic_attack_damage() -> int:
-	# Basic attack damage: weapon damage or 1-3 (punch) + strength bonus
-	# TODO: Check if weapon equipped and return weapon damage
-	# For now, return base punch damage with strength multiplier
-	if not stats:
-		return 1
+	if not stats: return 1
 	var base_damage = randi_range(1, 3)
-	var final_damage = int(base_damage * stats.get_melee_damage_multiplier())
-	return final_damage
-
-func get_basic_attack_damage_type() -> String:
-	# Basic attack damage type: weapon type or "blunt" (punch)
-	# TODO: Check if weapon equipped and return weapon damage type
-	# For now, return blunt for punch
-	return "blunt"
-
-func get_spell_damage_type() -> String:
-	# Spell damage type: always "fire" for fireball
-	return "fire"
-
+	return int(base_damage * stats.get_melee_damage_multiplier())
+func get_basic_attack_damage_type() -> String: return "blunt"
+func get_spell_damage_type() -> String: return "fire"
 func get_special_attack_damage() -> int:
-	# Haymaker damage: 8-12 (more powerful than basic) + strength bonus
 	var base_damage = randi_range(8, 12)
-	var final_damage = int(base_damage * stats.get_melee_damage_multiplier())
-	return final_damage
-
-func get_special_attack_damage_type() -> String:
-	# Haymaker damage type: always "blunt"
-	return "blunt"
-
-func get_special_attack_name() -> String:
-	# Special attack name: "Haymaker"
-	return "Haymaker"
-
-func get_special_attack_cost() -> int:
-	# Haymaker spirit cost: 3
-	return 3
-
-func get_spirit() -> int:
-	# Get current spirit points
-	if has_method("get_stats") and get_stats():
-		return get_stats().spirit
-	return 0
-
-func can_use_special_attack() -> bool:
-	# Check if player has enough spirit for special attack
-	return get_spirit() >= get_special_attack_cost()
-
+	return int(base_damage * stats.get_melee_damage_multiplier())
+func get_special_attack_damage_type() -> String: return "blunt"
+func get_special_attack_name() -> String: return "Haymaker"
+func get_special_attack_cost() -> int: return 3
+func can_use_special_attack() -> bool: return get_spirit() >= get_special_attack_cost()
 func get_spell_damage() -> int:
-	# Fireball damage: 13-18 (ranged magical attack) + intelligence/spell power bonus
 	var base_damage = randi_range(13, 18)
-	var final_damage = int(base_damage * stats.get_spell_damage_multiplier())
-	return final_damage
-
-func get_fire_ignite_chance() -> float:
-	# Base 35% chance for fire attacks to ignite
-	return 35.0
-
+	return int(base_damage * stats.get_spell_damage_multiplier())
+func get_fire_ignite_chance() -> float: return 35.0
 func is_fire_attack(attack_type: String) -> bool:
-	# Check if this attack type is fire-based
 	match attack_type:
-		"fireball", "fire_weapon_basic", "fire_weapon_special":
-			return true
-		_:
-			return false
-
-func is_defending() -> bool:
-	# Check if player is currently defending
-	return false  # Will be set by combat system
-
+		"fireball", "fire_weapon_basic", "fire_weapon_special": return true
+		_: return false
+func is_defending() -> bool: return false
 func set_physics_process_enabled(enabled: bool):
-	# Player set_physics_process_enabled called
-	if enabled:
-		set_physics_process_internal(true)
-		is_frozen = false
-		# Player physics process ENABLED, unfrozen
-	else:
-		set_physics_process_internal(false)
-		is_frozen = true
-		# Player physics process DISABLED, frozen
-		
-		# When entering combat, face the nearest enemy
-		face_nearest_enemy()
-	
-	# Also control input processing
+	set_physics_process_internal(enabled)
+	is_frozen = not enabled
 	set_process_input(enabled)
-	# Player input processing
-	
-	# Control mouse mode for combat
-	if enabled:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		# Mouse mode: CAPTURED (normal gameplay)
+	if enabled: Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		# Mouse mode: VISIBLE (combat mode)
+		face_nearest_enemy()
 
-func _on_chest_detected():
-	_can_interact = true
-	# Chest detected - can interact!
-
-func _on_chest_lost():
-	_can_interact = false
-	# Chest lost - cannot interact
-
+# --- Signal Connections & Helpers ---
+func _on_chest_detected(): _can_interact = true
+func _on_chest_lost(): _can_interact = false
 func _on_interaction_area_body_entered(body):
-	if body.is_in_group("Interactable"):
-		_can_interact = true
-		# Can interact with body
-
+	if body.is_in_group("Interactable"): _can_interact = true
 func _on_interaction_area_body_exited(body):
-	if body.is_in_group("Interactable"):
-		_can_interact = false
-		# Left interaction range
-
-func get_stats() -> PlayerStats:
-	if not stats:
-		# Creating new stats
-		stats = PlayerStats.new()
-		add_child(stats)
-		# Re-initialize with default values
-		stats.set_health(1)
-		stats.set_mana(1)
-		stats.set_strength(1)
-		stats.set_intelligence(1)
-		stats.set_spell_power(0)
-		stats.set_dexterity(0)
-		stats.set_cunning(0)
-		stats.set_speed(1)
-		stats._update_combat_chances()
-		stats._recalculate_max_stats()
-		stats.health = stats.max_health
-		stats.mana = stats.max_mana
-		# Player stats recreated
-	return stats
-
+	if body.is_in_group("Interactable"): _can_interact = false
 func _on_spirit_changed(spirit_points: int):
-	# Update combat UI spirit display if it exists
 	var combat_ui = get_tree().get_first_node_in_group("CombatUI")
 	if combat_ui and combat_ui.has_method("update_spirit_display"):
 		combat_ui.update_spirit_display(spirit_points)
-
-# Combat facing methods
 func face_nearest_enemy():
-	# Find all enemies in the scene
 	var enemies = get_tree().get_nodes_in_group("Enemy")
-	if enemies.size() == 0:
-		return
-	
-	# Find the closest enemy
-	var nearest_enemy = null
-	var nearest_distance = 999999.0
-	
+	if enemies.is_empty(): return
+	var nearest_enemy = null; var nearest_distance = INF
 	for enemy in enemies:
 		if enemy.has_method("get_stats") and enemy.get_stats().health > 0:
 			var distance = global_position.distance_to(enemy.global_position)
 			if distance < nearest_distance:
-				nearest_distance = distance
-				nearest_enemy = enemy
-	
-	if nearest_enemy:
-		face_target(nearest_enemy)
-
+				nearest_distance = distance; nearest_enemy = enemy
+	if nearest_enemy: face_target(nearest_enemy)
 func face_target(target: Node):
-	if not target:
-		return
-	
-	# Calculate direction to target
+	if not target: return
 	var direction = (target.global_position - global_position).normalized()
-	
-	# Only rotate around Y axis (don't tilt up/down)
 	direction.y = 0
-	direction = direction.normalized()
-	
-	if direction != Vector3.ZERO:
-		# Calculate rotation to face target
+	if direction.is_normalized():
 		var target_rotation = atan2(direction.x, direction.z)
-		
-		# Smoothly rotate to face target
 		var tween = create_tween()
 		tween.tween_property(self, "rotation:y", target_rotation, 0.3)
 		
-		# Player facing target at rotation
+		# Add this function to the very end of character_body_3d.gd
+func _unhandled_input(event: InputEvent):
+	if event is InputEventMouseButton and event.pressed:
+		print("--- UNHANDLED MOUSE CLICK DETECTED ---")
+		print("Button: ", event.button_index, " at position: ", event.position)
+
+func _add_starter_equipment():
+	"""Add starter equipment items to the player's inventory for testing"""
+	if not _inventory:
+		printerr("No inventory available for starter equipment")
+		return
+	
+	# Create starter helmet
+	var helmet = Equipment.new()
+	helmet.name = "Leather Cap"
+	helmet.description = "A simple leather cap that provides basic protection."
+	helmet.item_type = Item.ITEM_TYPE.EQUIPMENT
+	helmet.equipment_slot = "helmet"
+	helmet.slot = Equipment.EQUIP_SLOT.HEAD
+	helmet.armor_value = 2
+	helmet.stat_bonuses = {"dexterity": 1, "strength": 1}
+	helmet.rarity = Item.RARITY.COMMON
+	helmet.max_stack = 1
+	# Load helmet icon
+	var helmet_icon = preload("res://Models/armor.png/icons/ffffff/transparent/1x1/lorc/crested-helmet.png")
+	helmet.icon = helmet_icon
+	
+	# Create starter chest armor
+	var chest_armor = Equipment.new()
+	chest_armor.name = "Leather Vest"
+	chest_armor.description = "A basic leather vest offering modest protection."
+	chest_armor.item_type = Item.ITEM_TYPE.EQUIPMENT
+	chest_armor.equipment_slot = "chest"
+	chest_armor.slot = Equipment.EQUIP_SLOT.CHEST
+	chest_armor.armor_value = 3
+	chest_armor.stat_bonuses = {"strength": 2, "health": 20}
+	chest_armor.rarity = Item.RARITY.COMMON
+	chest_armor.max_stack = 1
+	# Load chest armor icon
+	var chest_icon = preload("res://Models/armor.png/icons/ffffff/transparent/1x1/lorc/leather-vest.png")
+	chest_armor.icon = chest_icon
+	
+	# Create starter gloves
+	var gloves = Equipment.new()
+	gloves.name = "Leather Gloves"
+	gloves.description = "Simple leather gloves for hand protection."
+	gloves.item_type = Item.ITEM_TYPE.EQUIPMENT
+	gloves.equipment_slot = "gloves"
+	gloves.slot = Equipment.EQUIP_SLOT.HANDS
+	gloves.armor_value = 1
+	gloves.stat_bonuses = {"dexterity": 2, "spell_power": 1}
+	gloves.rarity = Item.RARITY.COMMON
+	gloves.max_stack = 1
+	# Load gloves icon
+	var gloves_icon = preload("res://Models/armor.png/icons/ffffff/transparent/1x1/lorc/mailed-fist.png")
+	gloves.icon = gloves_icon
+	
+	# Create starter boots
+	var boots = Equipment.new()
+	boots.name = "Leather Boots"
+	boots.description = "Basic leather boots for foot protection."
+	boots.item_type = Item.ITEM_TYPE.EQUIPMENT
+	boots.equipment_slot = "boots"
+	boots.slot = Equipment.EQUIP_SLOT.FEET
+	boots.armor_value = 1
+	boots.stat_bonuses = {"speed": 2, "dexterity": 1}
+	boots.rarity = Item.RARITY.COMMON
+	boots.max_stack = 1
+	# Load boots icon
+	var boots_icon = preload("res://Models/armor.png/icons/ffffff/transparent/1x1/lorc/boots.png")
+	boots.icon = boots_icon
+	
+	# Add all equipment to inventory
+	_inventory.add_item_to_bag(helmet, 1)
+	_inventory.add_item_to_bag(chest_armor, 1)
+	_inventory.add_item_to_bag(gloves, 1)
+	_inventory.add_item_to_bag(boots, 1)
+	
+	print("Added starter equipment to inventory!")

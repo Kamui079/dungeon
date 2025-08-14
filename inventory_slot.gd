@@ -3,59 +3,65 @@ extends Panel
 var slot_index: int = -1
 var player_inventory: Node
 var is_dragging: bool = false
-var drag_start_slot: int = -1
 
 func _ready():
-	# Set slot_index based on position in GridContainer
-	var grid_container = get_parent()
-	if grid_container and grid_container is GridContainer:
-		slot_index = get_index()
-		print("Auto-set slot_index to ", slot_index, " for ", name)
-	else:
-		print("Could not find GridContainer parent for ", name)
-	
-	print("Inventory slot ", slot_index, " _ready() called")
-	
-	# Get the player inventory reference
+	slot_index = get_index()
 	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
-	print("Player inventory found: ", player_inventory != null)
-	
-	# Connect to gui_input for input events
-	connect("gui_input", Callable(self, "_on_gui_input"))
-	print("Connected gui_input signal for slot ", slot_index)
-	
-	# Enable mouse filtering for this panel to receive input events
-	mouse_filter = Control.MOUSE_FILTER_STOP
-	print("Set mouse_filter to MOUSE_FILTER_STOP for slot ", slot_index)
+	mouse_filter = MOUSE_FILTER_STOP
 
-func _on_gui_input(event: InputEvent):
-	print("Slot ", slot_index, " received input event: ", event)
+func _get_drag_data(_at_position: Vector2) -> Variant:
+	if player_inventory and player_inventory.bag.has(slot_index):
+		var item_data = player_inventory.bag[slot_index]
+		
+		# Hide the original icon when dragging starts
+		var icon_rect = find_child("Icon") as TextureRect
+		if icon_rect:
+			icon_rect.visible = false
+			is_dragging = true
+		
+		var preview = TextureRect.new()
+		preview.texture = item_data.item.icon
+		preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		preview.size = Vector2(64, 64)
+		
+		# Fix the drag preview positioning
+		# Set the pivot to the center of the preview
+		preview.pivot_offset = preview.size / 2.0
+		
+		# Create a control node to properly position the preview
+		var preview_container = Control.new()
+		preview_container.size = preview.size
+		preview_container.add_child(preview)
+		
+		# Position the preview with negative offset to compensate for Godot's default positioning
+		# This makes the item appear exactly on the cursor
+		preview.position = Vector2(-32, -32)  # Half the size to center on cursor
+		
+		set_drag_preview(preview_container)
+		return { "source": "bag", "from_slot": slot_index }
+		
+	return null
+
+func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+	return data is Dictionary and data.has("source")
+
+func _drop_data(_at_position: Vector2, data: Variant):
+	player_inventory.handle_drop_data(data, slot_index, "")
+	# Reset dragging state after drop
+	is_dragging = false
+
+func _gui_input(event: InputEvent):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed == false:
+		# Check if this was a drag that was cancelled (mouse released without dropping)
+		if is_dragging and not player_inventory.get_is_dragging_from_bag():
+			# Show the icon again if drag was cancelled
+			var icon_rect = find_child("Icon") as TextureRect
+			if icon_rect:
+				icon_rect.visible = true
+			is_dragging = false
 	
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		# Right-click to consume items
-		print("Right-click on slot ", slot_index)
-		if player_inventory and slot_index >= 0:
+		if player_inventory and player_inventory.bag.has(slot_index):
 			player_inventory.handle_right_click(slot_index, "")
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		# Left-click to start drag
-		print("Left-click on slot ", slot_index)
-		if player_inventory and slot_index >= 0:
-			var bag = player_inventory.get_bag()
-			if bag.has(slot_index):
-				var item_data = bag[slot_index]
-				if item_data and item_data.item:
-					is_dragging = true
-					drag_start_slot = slot_index
-					print("Starting drag from slot ", slot_index)
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		# Left-click release to end drag
-		print("Left-click release on slot ", slot_index)
-		if is_dragging and drag_start_slot != slot_index:
-			# Move item from drag_start_slot to current slot
-			if player_inventory and drag_start_slot >= 0 and slot_index >= 0:
-				var drag_data = { "source": "bag", "from_slot": drag_start_slot }
-				player_inventory.handle_drop_data(drag_data, slot_index, "")
-				print("Dropped item from slot ", drag_start_slot, " to slot ", slot_index)
-		
-		is_dragging = false
-		drag_start_slot = -1
+			get_viewport().set_input_as_handled()

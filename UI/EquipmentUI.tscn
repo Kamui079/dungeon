@@ -28,7 +28,7 @@ border_color = Color(0.5, 0.5, 0.5, 1)
 
 [node name="EquipmentUI" type="CanvasLayer"]
 
-[node name="EquipmentRoot" type="Control" parent="."]
+[node name="EquipmentRoot" type="Control" parent="." node_paths=PackedStringArray("helmet_slot", "necklace_slot", "cloak_slot", "chest_slot", "gloves_slot", "boots_slot", "ring1_slot", "ring2_slot")]
 layout_mode = 3
 anchors_preset = 8
 anchor_left = 0.5
@@ -42,6 +42,14 @@ offset_bottom = 450.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_equipment_ui")
+helmet_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/HelmetSlot")
+necklace_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/NecklaceSlot")
+cloak_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/CloakSlot")
+chest_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/ChestSlot")
+gloves_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/GlovesSlot")
+boots_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/BootsSlot")
+ring1_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots/Ring1Slot")
+ring2_slot = NodePath("Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots/Ring2Slot")
 
 [node name="Panel" type="Panel" parent="EquipmentRoot"]
 layout_mode = 1
@@ -100,7 +108,8 @@ theme_override_constants/separation = 10
 [node name="HelmetSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
 [node name="HelmetLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/HelmetSlot"]
@@ -117,7 +126,8 @@ vertical_alignment = 1
 [node name="NecklaceSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
 [node name="NecklaceLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/NecklaceSlot"]
@@ -134,7 +144,8 @@ vertical_alignment = 1
 [node name="CloakSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
 [node name="CloakLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/CloakSlot"]
@@ -151,7 +162,8 @@ vertical_alignment = 1
 [node name="ChestSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
 [node name="ChestLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/ChestSlot"]
@@ -168,7 +180,8 @@ vertical_alignment = 1
 [node name="GlovesSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
 [node name="GlovesLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/GlovesSlot"]
@@ -185,7 +198,8 @@ vertical_alignment = 1
 [node name="BootsSlot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 custom_minimum_size = Vector2(80, 100)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
 
 [node name="BootsLabel" type="Label" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/BootsSlot"]
@@ -201,7 +215,8 @@ vertical_alignment = 1
 
 [node name="RingSlots" type="HBoxContainer" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay"]
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme_override_constants/separation = 10
 
 [node name="Ring1Slot" type="Panel" parent="EquipmentRoot/Panel/VBoxContainer/MainContainer/CharacterContainer/CharacterDisplay/RingSlots"]

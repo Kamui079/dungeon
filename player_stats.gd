@@ -614,3 +614,57 @@ func get_level_progress() -> Dictionary:
 func get_level() -> int:
 	"""Get the current player level"""
 	return level
+
+# Equipment stat modification methods
+func modify_stats(stat_name: String, value: int):
+	"""Modify a stat by the given value (used by equipment)"""
+	match stat_name:
+		"health":
+			health += value
+			max_health += value
+			health = clamp(health, 0, max_health)
+			emit_signal("health_changed", health, max_health)
+		"mana":
+			mana += value
+			max_mana += value
+			mana = clamp(mana, 0, max_mana)
+			emit_signal("mana_changed", mana, max_mana)
+		"strength":
+			strength += value
+			_recalculate_max_stats()
+		"intelligence":
+			intelligence += value
+			_recalculate_max_stats()
+		"spell_power":
+			spell_power += value
+		"dexterity":
+			dexterity += value
+			_update_combat_chances()
+		"cunning":
+			cunning += value
+			_update_combat_chances()
+		"speed":
+			speed += value
+			_update_combat_chances()
+	
+	emit_signal("stats_changed")
+
+func add_armor(amount: int):
+	"""Add armor value (placeholder for future armor system)"""
+	# This is a placeholder - you can implement actual armor mechanics later
+	print("Armor added: ", amount)
+
+func remove_armor(amount: int):
+	"""Remove armor value (placeholder for future armor system)"""
+	# This is a placeholder - you can implement actual armor mechanics later
+	print("Armor removed: ", amount)
+
+func add_damage(amount: int):
+	"""Add damage value (placeholder for future damage system)"""
+	# This is a placeholder - you can implement actual damage mechanics later
+	print("Damage added: ", amount)
+
+func remove_damage(amount: int):
+	"""Remove damage value (placeholder for future damage system)"""
+	# This is a placeholder - you can implement actual damage mechanics later
+	print("Damage removed: ", amount)

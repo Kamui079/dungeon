@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bqxvxqxqxqxqx"]
 
-[ext_resource type="Script" path="res://UI/combat_ui.gd" id="1_combat_ui"]
+[ext_resource type="Script" uid="uid://bme6hpjby01g7" path="res://UI/combat_ui.gd" id="1_combat_ui"]
 
 [node name="CombatUI" type="CanvasLayer"]
 script = ExtResource("1_combat_ui")
@@ -13,7 +13,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -600.0
 offset_top = -620.0
-offset_right = 0.0
 offset_bottom = -520.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CombatLogPanel"]
@@ -25,6 +24,8 @@ offset_left = 10.0
 offset_top = 10.0
 offset_right = -10.0
 offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="CombatLogLabel" type="Label" parent="CombatLogPanel/VBoxContainer"]
 layout_mode = 2
@@ -36,10 +37,11 @@ vertical_alignment = 1
 layout_mode = 2
 
 [node name="CombatLogText" type="TextEdit" parent="CombatLogPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 180)
+placeholder_text = "Combat events will appear here..."
 editable = false
 context_menu_enabled = false
 shortcut_keys_enabled = false
@@ -48,8 +50,6 @@ deselect_on_focus_loss_enabled = false
 drag_and_drop_selection_enabled = false
 virtual_keyboard_enabled = false
 middle_mouse_paste_enabled = false
-placeholder_text = "Combat events will appear here..."
-font_size = 14
 
 [node name="CombatPanel" type="Panel" parent="."]
 anchors_preset = 3
@@ -59,8 +59,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -600.0
 offset_top = -500.0
-offset_right = 0.0
-offset_bottom = 0.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CombatPanel"]
 layout_mode = 1
@@ -71,6 +69,8 @@ offset_left = 10.0
 offset_top = 10.0
 offset_right = -10.0
 offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="TitleLabel" type="Label" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
@@ -103,11 +103,9 @@ text = "⏳ ATB bar filling... (0%)"
 horizontal_alignment = 1
 
 [node name="PlayerATBBar" type="ProgressBar" parent="CombatPanel/VBoxContainer/ATBSection"]
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0, 20)
-value = 0.0
-max_value = 100.0
 show_percentage = false
 
 [node name="PlayerATBLabel" type="Label" parent="CombatPanel/VBoxContainer/ATBSection"]
@@ -116,11 +114,9 @@ text = "Player ATB"
 horizontal_alignment = 1
 
 [node name="EnemyATBBar" type="ProgressBar" parent="CombatPanel/VBoxContainer/ATBSection"]
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0, 20)
-value = 0.0
-max_value = 100.0
 show_percentage = false
 
 [node name="EnemyATBLabel" type="Label" parent="CombatPanel/VBoxContainer/ATBSection"]
@@ -144,17 +140,17 @@ vertical_alignment = 1
 [node name="BasicAttackButton" type="Button" parent="CombatPanel/VBoxContainer/ActionsSection"]
 layout_mode = 2
 size_flags_horizontal = 3
-		text = "Basic Attack"
+text = "Basic Attack"
 
 [node name="DefendButton" type="Button" parent="CombatPanel/VBoxContainer/ActionsSection"]
 layout_mode = 2
 size_flags_horizontal = 3
-		text = "Defend"
+text = "Defend"
 
 [node name="ItemButton" type="Button" parent="CombatPanel/VBoxContainer/ActionsSection"]
 layout_mode = 2
 size_flags_horizontal = 3
-		text = "Use Item"
+text = "Use Item"
 
 [node name="SpecialAttacksButton" type="Button" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
@@ -167,6 +163,7 @@ size_flags_horizontal = 3
 text = "Spells"
 
 [node name="HSeparator4" type="HSeparator" parent="CombatPanel/VBoxContainer"]
+layout_mode = 2
 
 [node name="SpecialAttacksPopup" type="Panel" parent="."]
 visible = false
@@ -189,6 +186,8 @@ offset_left = 10.0
 offset_top = 10.0
 offset_right = -10.0
 offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="TitleLabel" type="Label" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
@@ -211,8 +210,8 @@ size_flags_horizontal = 3
 [node name="HaymakerButton" type="Button" parent="SpecialAttacksPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Haymaker (15 SP)"
 tooltip_text = "A powerful haymaker punch that deals guaranteed critical damage but causes self-damage"
+text = "Haymaker (15 SP)"
 
 [node name="HSeparator2" type="HSeparator" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
@@ -243,6 +242,8 @@ offset_left = 10.0
 offset_top = 10.0
 offset_right = -10.0
 offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="TitleLabel" type="Label" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
@@ -265,8 +266,8 @@ size_flags_horizontal = 3
 [node name="FireballButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Fireball (15 MP)"
 tooltip_text = "A ranged fire spell that deals fire damage and may ignite the target"
+text = "Fireball (15 MP)"
 
 [node name="HSeparator2" type="HSeparator" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
