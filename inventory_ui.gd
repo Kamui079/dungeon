@@ -1,5 +1,7 @@
 extends Control
 
+@export var items_container: Control
+
 var inventory_slots: Array = []
 var player_inventory: Node
 
@@ -10,22 +12,37 @@ func _ready():
 	if player_inventory:
 		player_inventory.connect("inventory_changed", _on_inventory_changed)
 	else:
-		print("ERROR: PlayerInventory node not found!")
+		printerr("InventoryUI could not find PlayerInventory!")
 		return
 
-	# Find all item slots dynamically
-	var items_container = $Panel/MarginContainer/VBoxContainer/Items
+	if not items_container:
+		printerr("Items container not assigned in the editor for InventoryUI!")
+		return
+
+	# Find all item slots dynamically from the assigned container
 	for i in range(items_container.get_child_count()):
 		var slot = items_container.get_child(i)
 		if slot is TextureRect:
 			inventory_slots.append(slot)
 			slot.set_meta("slot_index", i) # Store the index for later reference
+			# Make sure the control's Mouse -> Filter is set to Pass or Stop in the editor
 			slot.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot))
-			# Drag and drop signals are connected in the editor or should be, but can be done here too
-			# Make sure the control has "Mouse -> Filter" set to "Pass" or "Stop" to receive input
 
 	_update_display()
+	# Start hidden
+	hide()
 
+func _input(event):
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		if event.keycode == KEY_I:
+			toggle_panel()
+
+func toggle_panel():
+	visible = not visible
+	if visible:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _on_inventory_changed():
 	_update_display()
@@ -37,18 +54,28 @@ func _update_display():
 	var bag = player_inventory.get_bag()
 	for i in range(inventory_slots.size()):
 		var slot_node = inventory_slots[i]
+
+		# Assuming there's a child node for quantity text, e.g., named "QuantityLabel"
+		var quantity_label = slot_node.get_node_or_null("QuantityLabel") as Label
+
 		if bag.has(i):
 			var item_data = bag[i]
 			slot_node.texture = item_data.item.icon
-			# You would also update a quantity label here if you have one
+			if quantity_label:
+				if item_data.quantity > 1:
+					quantity_label.text = str(item_data.quantity)
+					quantity_label.show()
+				else:
+					quantity_label.hide()
 		else:
 			slot_node.texture = null
-			# Clear quantity label
+			if quantity_label:
+				quantity_label.hide()
 
 # --- Drag and Drop ---
 
-func _on_get_drag_data(slot):
-	var slot_index = slot.get_meta("slot_index")
+func get_drag_data(from_slot_node):
+	var slot_index = from_slot_node.get_meta("slot_index")
 	if player_inventory.get_bag().has(slot_index):
 		var item_data = player_inventory.get_bag()[slot_index]
 
@@ -56,24 +83,20 @@ func _on_get_drag_data(slot):
 		drag_preview.texture = item_data.item.icon
 		set_drag_preview(drag_preview)
 
-		return {
-			"source": "bag",
-			"from_slot": slot_index
-		}
+		return { "source": "bag", "from_slot": slot_index }
 	return null
 
-func _on_slot_can_drop_data(slot, data):
-	# We allow the drop conceptually. The PlayerInventory will decide if it's valid.
+func can_drop_data(_at_position, data, to_slot_node):
 	return data is Dictionary and data.has("source")
 
-func _on_drop_data(slot, data):
-	var to_slot_index = slot.get_meta("slot_index")
+func drop_data(_at_position, data, to_slot_node):
+	var to_slot_index = to_slot_node.get_meta("slot_index")
 	player_inventory.handle_drop_data(data, to_slot_index, "")
 
 # --- Right Click ---
 
-func _on_slot_gui_input(event: InputEvent, slot):
+func _on_slot_gui_input(event: InputEvent, slot_node):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		var slot_index = slot.get_meta("slot_index")
+		var slot_index = slot_node.get_meta("slot_index")
 		if player_inventory.get_bag().has(slot_index):
 			player_inventory.handle_right_click(slot_index, "")
