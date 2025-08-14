@@ -21,7 +21,6 @@ func _ready():
 		for child in items_container.get_children():
 			if child is TextureRect:
 				inventory_slots.append(child)
-				child.mouse_filter = Control.MOUSE_FILTER_STOP
 				print("Found slot: ", child.name)
 		
 		print("Total slots found: ", inventory_slots.size())
@@ -78,19 +77,19 @@ func _on_drop_data(slot, data):
 	if typeof(data) != TYPE_DICTIONARY or not data.has("item_data"):
 		return
 
-	var old_item_data = slot.get_meta("item_data")
-	var new_item_data = data["item_data"]
+	var old_item = slot.get_meta("item_data")
+	var new_item = data["item_data"]
 
-	# Set the new item in the target slot
-	slot.set_meta("item_data", new_item_data)
+	# If dragged from inventory → clear original
+	if data["source"] == "inventory":
+		var from_slot = data["slot"]
+		from_slot.set_meta("item_data", old_item) if old_item else from_slot.set_meta("item_data", null)
+		_update_slot(from_slot)
+
+	# If dragged from equipment → EquipmentUI already clears
+
+	slot.set_meta("item_data", new_item)
 	_update_slot(slot)
-
-	# If the item comes from another inventory slot, move the old item there
-	if data.has("source") and data.source == "inventory":
-		if data.has("slot"):
-			var from_slot = data["slot"]
-			from_slot.set_meta("item_data", old_item_data)
-			_update_slot(from_slot)
 
 
 # ---------------------
@@ -104,34 +103,19 @@ func _on_slot_gui_input(event: InputEvent, slot):
 		
 		# Check if this is an equipment item
 		var item = item_data.get("item", null)
-		if not item:
-			return
-
-		match item.item_type:
-			Item.ITEM_TYPE.EQUIPMENT:
-				# Try to auto-equip
-				var equipment_ui = get_tree().get_first_node_in_group("EquipmentUI")
-				if equipment_ui:
-					equipment_ui.handle_inventory_right_click_equip(item_data)
-					# Remove from inventory slot
-					slot.set_meta("item_data", null)
-					_update_slot(slot)
-					print("Auto-equipped item: ", item.name)
-				else:
-					print("No equipment UI found for auto-equip")
-			Item.ITEM_TYPE.CONSUMABLE:
-				var player = get_tree().get_first_node_in_group("Player")
-				if player:
-					if item.use(player):
-						item_data["quantity"] -= 1
-						if item_data["quantity"] <= 0:
-							slot.set_meta("item_data", null)
-						_update_slot(slot)
-						print("Used consumable: ", item.name)
-					else:
-						print("Failed to use consumable: ", item.name)
-				else:
-					print("Player node not found, cannot use consumable")
+		if item and item.get("item_type") == Item.ITEM_TYPE.EQUIPMENT:
+			# Try to auto-equip
+			var equipment_ui = get_tree().get_first_node_in_group("EquipmentUI")
+			if equipment_ui:
+				equipment_ui.handle_inventory_right_click_equip(item_data)
+				# Remove from inventory slot
+				slot.set_meta("item_data", null)
+				_update_slot(slot)
+				print("Auto-equipped item: ", item.name)
+			else:
+				print("No equipment UI found for auto-equip")
+		else:
+			print("Item is not equipment, cannot auto-equip")
 
 
 # ---------------------
