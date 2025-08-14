@@ -1,174 +1,79 @@
 extends Control
 
-# Import the Item class for type checking
-const Item = preload("res://Inventory/item.gd")
-
 var inventory_slots: Array = []
+var player_inventory: Node
 
 func _ready():
-	# Add to group for other scripts to find
-	add_to_group("InventoryUI")
-	
-	# Wait one frame to ensure all nodes are ready
+	# Wait for the PlayerInventory node to be ready
 	await get_tree().process_frame
-	
+	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
+	if player_inventory:
+		player_inventory.connect("inventory_changed", _on_inventory_changed)
+	else:
+		print("ERROR: PlayerInventory node not found!")
+		return
+
 	# Find all item slots dynamically
 	var items_container = $Panel/MarginContainer/VBoxContainer/Items
-	if items_container:
-		print("Found items container: ", items_container.name)
-		
-		# Get all TextureRect children (the item slots)
-		for child in items_container.get_children():
-			if child is TextureRect:
-				inventory_slots.append(child)
-				print("Found slot: ", child.name)
-		
-		print("Total slots found: ", inventory_slots.size())
-	else:
-		print("ERROR: Could not find items container!")
-		return
-	
-	# Check if slots are properly loaded
-	if inventory_slots.size() == 0:
-		print("ERROR: No inventory slots found!")
-		return
-	
-	# Connect all slots
-	for slot in inventory_slots:
-		if slot:
+	for i in range(items_container.get_child_count()):
+		var slot = items_container.get_child(i)
+		if slot is TextureRect:
+			inventory_slots.append(slot)
+			slot.set_meta("slot_index", i) # Store the index for later reference
 			slot.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot))
-			slot.connect("get_drag_data", Callable(self, "_on_get_drag_data").bind(slot))
-			slot.connect("can_drop_data", Callable(self, "_on_slot_can_drop_data").bind(slot))
-			slot.connect("drop_data", Callable(self, "_on_drop_data").bind(slot))
-			print("Connected slot: ", slot.name)
+			# Drag and drop signals are connected in the editor or should be, but can be done here too
+			# Make sure the control has "Mouse -> Filter" set to "Pass" or "Stop" to receive input
+
+	_update_display()
+
+
+func _on_inventory_changed():
+	_update_display()
+
+func _update_display():
+	if not player_inventory:
+		return
+
+	var bag = player_inventory.get_bag()
+	for i in range(inventory_slots.size()):
+		var slot_node = inventory_slots[i]
+		if bag.has(i):
+			var item_data = bag[i]
+			slot_node.texture = item_data.item.icon
+			# You would also update a quantity label here if you have one
 		else:
-			print("ERROR: Slot is null!")
-	
-	_update_all_slots()
+			slot_node.texture = null
+			# Clear quantity label
 
+# --- Drag and Drop ---
 
-# ---------------------
-# DRAG/DROP
-# ---------------------
 func _on_get_drag_data(slot):
-	var item_data = slot.get_meta("item_data")
-	if not item_data:
-		return null
+	var slot_index = slot.get_meta("slot_index")
+	if player_inventory.get_bag().has(slot_index):
+		var item_data = player_inventory.get_bag()[slot_index]
 
-	var drag_preview = TextureRect.new()
-	drag_preview.texture = item_data["item"].icon
-	drag_preview.expand = true
-	drag_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	set_drag_preview(drag_preview)
+		var drag_preview = TextureRect.new()
+		drag_preview.texture = item_data.item.icon
+		set_drag_preview(drag_preview)
 
-	return {
-		"source": "inventory",
-		"slot": slot,
-		"item_data": item_data
-	}
+		return {
+			"source": "bag",
+			"from_slot": slot_index
+		}
+	return null
 
 func _on_slot_can_drop_data(slot, data):
-	"""Check if data can be dropped in this slot"""
-	if typeof(data) != TYPE_DICTIONARY or not data.has("item_data"):
-		return false
-	return true
+	# We allow the drop conceptually. The PlayerInventory will decide if it's valid.
+	return data is Dictionary and data.has("source")
 
 func _on_drop_data(slot, data):
-	if typeof(data) != TYPE_DICTIONARY or not data.has("item_data"):
-		return
+	var to_slot_index = slot.get_meta("slot_index")
+	player_inventory.handle_drop_data(data, to_slot_index, "")
 
-	var old_item = slot.get_meta("item_data")
-	var new_item = data["item_data"]
+# --- Right Click ---
 
-	# If dragged from inventory → clear original
-	if data["source"] == "inventory":
-		var from_slot = data["slot"]
-		from_slot.set_meta("item_data", old_item) if old_item else from_slot.set_meta("item_data", null)
-		_update_slot(from_slot)
-
-	# If dragged from equipment → EquipmentUI already clears
-
-	slot.set_meta("item_data", new_item)
-	_update_slot(slot)
-
-
-# ---------------------
-# RIGHT CLICK (optional)
-# ---------------------
 func _on_slot_gui_input(event: InputEvent, slot):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		var item_data = slot.get_meta("item_data")
-		if not item_data:
-			return
-		
-		# Check if this is an equipment item
-		var item = item_data.get("item", null)
-		if item and item.get("item_type") == Item.ITEM_TYPE.EQUIPMENT:
-			# Try to auto-equip
-			var equipment_ui = get_tree().get_first_node_in_group("EquipmentUI")
-			if equipment_ui:
-				equipment_ui.handle_inventory_right_click_equip(item_data)
-				# Remove from inventory slot
-				slot.set_meta("item_data", null)
-				_update_slot(slot)
-				print("Auto-equipped item: ", item.name)
-			else:
-				print("No equipment UI found for auto-equip")
-		else:
-			print("Item is not equipment, cannot auto-equip")
-
-
-# ---------------------
-# HELPER FUNCTION
-# ---------------------
-func add_item_to_first_empty_slot(item_data) -> bool:
-	for s in inventory_slots:
-		if s.get_meta("item_data") == null:
-			s.set_meta("item_data", item_data)
-			_update_slot(s)
-			return true
-	return false
-
-func add_item(item: Resource, quantity: int = 1) -> bool:
-	"""Add an item to the inventory"""
-	var item_data = {
-		"item": item,
-		"quantity": quantity
-	}
-	return add_item_to_first_empty_slot(item_data)
-
-func _get_inventory_items() -> Array:
-	"""Get all inventory items as an array"""
-	var items = []
-	for slot in inventory_slots:
-		var item_data = slot.get_meta("item_data")
-		items.append(item_data if item_data else {})
-	return items
-
-func _update_inventory_provider(items: Array):
-	"""Update the inventory provider with new item data"""
-	# For now, just update the display
-	update_display(items)
-
-func _update_slot(slot):
-	"""Update a specific slot's display"""
-	var item_data = slot.get_meta("item_data")
-	if item_data and item_data.has("item") and item_data["item"].icon:
-		slot.texture = item_data["item"].icon
-	else:
-		slot.texture = null
-
-func update_display(items: Array):
-	"""Update the display with an array of items"""
-	for i in range(min(items.size(), inventory_slots.size())):
-		var slot = inventory_slots[i]
-		slot.set_meta("item_data", items[i])
-		_update_slot(slot)
-
-
-# ---------------------
-# SLOT UPDATES
-# ---------------------
-func _update_all_slots():
-	for s in inventory_slots:
-		_update_slot(s)
+		var slot_index = slot.get_meta("slot_index")
+		if player_inventory.get_bag().has(slot_index):
+			player_inventory.handle_right_click(slot_index, "")
