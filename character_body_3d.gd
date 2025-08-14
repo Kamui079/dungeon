@@ -21,8 +21,14 @@ var is_frozen: bool = false  # Flag to prevent movement during combat
 @onready var stats: PlayerStats = PlayerStats.new()
 
 func _ready():
-	# Set up inventory
+	# Set up player components
 	add_child(stats)
+
+	# Create and add the PlayerInventory node
+	# This node holds all data for the player's bag and equipment
+	_inventory = PlayerInventory.new()
+	_inventory.name = "PlayerInventory" # Set a name for easier debugging
+	add_child(_inventory)
 	
 	# Player starts at level 1 with base stats
 	# Level 1 = 5 stat points to distribute
@@ -47,17 +53,6 @@ func _ready():
 	# Emit signals to update UI
 	stats.emit_signal("health_changed", stats.health, stats.max_health)
 	stats.emit_signal("mana_changed", stats.mana, stats.max_mana)
-	
-	if inventory_node and get_node_or_null(inventory_node) != null:
-		_inventory = get_node(inventory_node)
-	else:
-		# Auto-detect a PlayerInventory node
-		_inventory = get_node_or_null("PlayerInventory")
-		if _inventory == null:
-			for child in get_children():
-				if child.get("inventory") != null:
-					_inventory = child
-					break
 	# Ensure player group membership for interaction scripts
 	if not is_in_group("Player"):
 		add_to_group("Player")
