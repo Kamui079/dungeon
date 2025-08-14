@@ -2,7 +2,7 @@ extends Control
 
 @export var items_container: Control
 
-var inventory_slots: Array[TextureRect] = []
+var inventory_slots: Array[Control] = []
 var player_inventory: Node
 
 func _ready():
@@ -20,7 +20,7 @@ func _ready():
 
 	for i in range(items_container.get_child_count()):
 		var slot_node = items_container.get_child(i)
-		if slot_node is TextureRect:
+		if slot_node is Control:
 			inventory_slots.append(slot_node)
 			slot_node.set_meta("slot_index", i)
 			slot_node.connect("gui_input", Callable(self, "_on_slot_gui_input").bind(slot_node))
@@ -46,13 +46,26 @@ func _update_display():
 	var bag = player_inventory.get_bag()
 	for i in range(inventory_slots.size()):
 		var slot_node = inventory_slots[i]
+		var icon_rect = _get_or_create_icon_rect(slot_node)
+		# NOTE: Quantity Label logic is complex to add without seeing the scene.
+		# This version focuses on getting the icons correct first.
 
 		if bag.has(i):
 			var item_data = bag[i]
-			slot_node.texture = item_data.item.icon
-			# Note: Quantity label logic removed for simplicity, can be re-added later.
+			icon_rect.texture = item_data.item.icon
 		else:
-			slot_node.texture = null
+			icon_rect.texture = null
+
+func _get_or_create_icon_rect(slot_node: Control) -> TextureRect:
+	var icon_rect = slot_node.get_node_or_null("Icon") as TextureRect
+	if not icon_rect:
+		icon_rect = TextureRect.new()
+		icon_rect.name = "Icon"
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		slot_node.add_child(icon_rect)
+		icon_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return icon_rect
 
 # --- Drag and Drop ---
 
