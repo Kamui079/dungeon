@@ -15,6 +15,10 @@ run/main_scene="res://dungeon.tscn"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+TooltipManager="*res://UI/tooltip_manager.tscn"
+
 [display]
 
 window/size/viewport_width=1920

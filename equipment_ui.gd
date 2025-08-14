@@ -73,6 +73,9 @@ func _ready():
 			slot_node.slot_name = slot_name
 			slot_node.player_inventory = player_inventory
 			
+			# Manually add to group since _ready() won't be called when setting script dynamically
+			slot_node.add_to_group("EquipmentSlot")
+			
 			# Resize the slot to better fit the 64x64 icons
 			slot_node.size = Vector2(80, 80)  # 64 + 16 padding
 		else:
@@ -93,6 +96,13 @@ func _input(_event):
 
 func toggle_panel():
 	visible = not visible
+	
+	# Force cleanup tooltips when hiding equipment panel
+	if not visible:
+		var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+		if tooltip_manager:
+			tooltip_manager.force_cleanup()
+	
 	_update_cursor_mode()
 
 func _update_cursor_mode():
@@ -109,6 +119,11 @@ func _update_cursor_mode():
 
 func _on_inventory_changed():
 	"""Called when the player's inventory changes"""
+	# Force cleanup tooltips when inventory changes to prevent stuck tooltips
+	var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+	if tooltip_manager:
+		tooltip_manager.force_cleanup_on_inventory_change()
+	
 	_update_display()
 	_update_stats_display()
 
@@ -138,34 +153,39 @@ func _update_display():
 			print("Slot ", slot_name, " node is null, skipping")
 			continue
 		
-		# Get or create the icon TextureRect
-		var icon_rect = _get_or_create_icon_rect(slot_node)
-		
-		# Check if the slot has an item
-		var has_item = equipment.has(slot_name) and equipment[slot_name] != null
-		if has_item:
-			var equipment_item = equipment[slot_name]
-			if equipment_item is Equipment and equipment_item.icon != null:
-				icon_rect.texture = equipment_item.icon
-				icon_rect.visible = true
+		# Call the slot's own _update_display method if it exists
+		if slot_node.has_method("_update_display"):
+			slot_node._update_display()
+		else:
+			# Fallback to the old method if the slot doesn't have _update_display
+			# Get or create the icon TextureRect
+			var icon_rect = _get_or_create_icon_rect(slot_node)
+			
+			# Check if the slot has an item
+			var has_item = equipment.has(slot_name) and equipment[slot_name] != null
+			if has_item:
+				var equipment_item = equipment[slot_name]
+				if equipment_item is Equipment and equipment_item.icon != null:
+					icon_rect.texture = equipment_item.icon
+					icon_rect.visible = true
+				else:
+					icon_rect.texture = null
+					icon_rect.visible = false
 			else:
 				icon_rect.texture = null
 				icon_rect.visible = false
-		else:
-			icon_rect.texture = null
-			icon_rect.visible = false
-		
-		# Hide/show the slot label based on whether there's a visible icon
-		var should_hide = icon_rect.visible and icon_rect.texture != null
-		_hide_slot_label(slot_node, should_hide)
-		
-		# Debug output for all slots
-		print("Slot ", slot_name, ": has_item=", has_item, ", texture=", icon_rect.texture != null, ", icon_visible=", icon_rect.visible, ", should_hide=", should_hide)
-		if has_item:
-			var equipment_item = equipment[slot_name]
-			print("  - Equipment item: ", equipment_item.name if equipment_item else "null")
-			print("  - Equipment icon: ", equipment_item.icon if equipment_item else "null")
-			print("  - Equipment class: ", equipment_item.get_class() if equipment_item else "null")
+			
+			# Hide/show the slot label based on whether there's a visible icon
+			var should_hide = icon_rect.visible and icon_rect.texture != null
+			_hide_slot_label(slot_node, should_hide)
+			
+			# Debug output for all slots
+			print("Slot ", slot_name, ": has_item=", has_item, ", texture=", icon_rect.texture != null, ", icon_visible=", icon_rect.visible, ", should_hide=", should_hide)
+			if has_item:
+				var equipment_item = equipment[slot_name]
+				print("  - Equipment item: ", equipment_item.name if equipment_item else "null")
+				print("  - Equipment icon: ", equipment_item.icon if equipment_item else "null")
+				print("  - Equipment class: ", equipment_item.get_class() if equipment_item else "null")
 	
 	# Update stats display
 	_update_stats_display()

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://3bjx3edc46mw"]
+[gd_scene load_steps=13 format=3 uid="uid://3bjx3edc46mw"]
 
 [ext_resource type="Script" uid="uid://xerxi770axkc" path="res://dungeon.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://character_body_3d.tscn" id="2_player"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://ieyuyrjtdciv" path="res://combat_manager.gd" id="22_combat_manager"]
 [ext_resource type="PackedScene" uid="uid://bqxvxqxqxqxqx" path="res://UI/CombatUI.tscn" id="23_combat_ui_scene"]
 [ext_resource type="PackedScene" uid="uid://dfxhvjmv27gqh" path="res://UI/EquipmentUI.tscn" id="24_equipment_ui_scene"]
+[ext_resource type="PackedScene" path="res://UI/tooltip_manager.tscn" id="25_tooltip_manager"]
 
 [sub_resource type="StandardMaterial3D" id="3_wall_material"]
 albedo_color = Color(0.6, 0.6, 0.6, 1)
@@ -74,3 +75,5 @@ script = ExtResource("22_combat_manager")
 [node name="CombatUI" parent="." instance=ExtResource("23_combat_ui_scene")]
 
 [node name="EquipmentUI" parent="." instance=ExtResource("24_equipment_ui_scene")]
+
+[node name="TooltipManager" parent="." instance=ExtResource("25_tooltip_manager")]

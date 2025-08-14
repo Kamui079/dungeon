@@ -1,6 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://bqxxvmmv4pv11"]
+[gd_scene load_steps=3 format=3 uid="uid://bqxxvmmv4pv12"]
 
-[ext_resource type="Script" path="res://UI/item_tooltip.gd" id="1_4r0iv"]
+[ext_resource type="Script" path="res://UI/tooltip_manager.gd" id="1_4r0iv"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4r0iv"]
 bg_color = Color(0.1, 0.1, 0.1, 0.95)
@@ -14,14 +14,7 @@ corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
-[node name="ItemTooltip" type="Control"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
+[node name="TooltipManager" type="CanvasLayer"]
 script = ExtResource("1_4r0iv")
 
 [node name="TooltipPanel" type="Panel" parent="."]
@@ -87,3 +80,7 @@ theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 text = "Item description goes here. This can be a longer description that explains what the item does."
 horizontal_alignment = 1
 autowrap_mode = 2
+
+[node name="ShowTimer" type="Timer" parent="."]
+
+[node name="HideTimer" type="Timer" parent="."]

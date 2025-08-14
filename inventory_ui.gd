@@ -11,6 +11,8 @@ func _ready():
 	
 	if player_inventory:
 		player_inventory.inventory_changed.connect(update_display)
+		# Initialize all inventory slots with the player_inventory reference
+		_initialize_inventory_slots()
 	else:
 		printerr("InventoryUI ERROR: 'player_inventory' was not set by the player script!")
 		return
@@ -25,12 +27,39 @@ func _ready():
 	# Add to group for cursor coordination
 	add_to_group("InventoryUI")
 
+func _initialize_inventory_slots():
+	"""Initialize all inventory slots with the player_inventory reference"""
+	if not items_container:
+		return
+		
+	for i in range(items_container.get_child_count()):
+		var slot_node = items_container.get_child(i)
+		if slot_node.has_method("set_player_inventory"):
+			slot_node.set_player_inventory(player_inventory)
+			print("Initialized inventory slot ", i, " with player_inventory")
+		elif slot_node.has_method("set_meta"):
+			# Alternative method for older versions
+			slot_node.set_meta("player_inventory", player_inventory)
+			print("Set meta for inventory slot ", i, " with player_inventory")
+		
+		# Also set the slot_index if the method exists
+		if slot_node.has_method("set_slot_index"):
+			slot_node.set_slot_index(i)
+			print("Set slot_index to ", i, " for inventory slot")
+
 func _input(_event):
 	if Input.is_action_just_pressed("toggle_inventory"):
 		toggle_panel()
 
 func toggle_panel():
 	visible = not visible
+	
+	# Force cleanup tooltips when hiding inventory
+	if not visible:
+		var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+		if tooltip_manager:
+			tooltip_manager.force_cleanup()
+	
 	_update_cursor_mode()
 
 func _update_cursor_mode():
@@ -47,6 +76,11 @@ func _update_cursor_mode():
 
 func update_display():
 	if not player_inventory or not items_container: return
+	
+	# Force cleanup tooltips when inventory changes to prevent stuck tooltips
+	var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+	if tooltip_manager:
+		tooltip_manager.force_cleanup_on_inventory_change()
 	
 	var bag = player_inventory.get_bag()
 	for i in range(items_container.get_child_count()):

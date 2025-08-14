@@ -1,0 +1,5 @@
+[33mb2ec1c3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mrefactor-inventory-system[m[33m)[m feat: Integrate tooltip system with inventory and equipment slots
+[33m17cf610[m feat: Implement comprehensive inventory and equipment system with tooltips
+[33m6743ae2[m[33m ([m[1;31morigin/refactor-inventory-system[m[33m)[m ui fix
+[33m15289f4[m I've unified the UI scripts to use a robust, `Control`-based slot logic.
+[33mb50edc0[m Based on the scene information you provided, I reverted the UI script to a simpler implementation. Since the inventory slots are `TextureRect` nodes, this version sets the `.texture` property directly on them, instead of treating them as generic `Control` nodes and creating child icons inside them.

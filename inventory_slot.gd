@@ -1,32 +1,139 @@
+# InventorySlot.gd
+# A custom Panel class that handles drag and drop for inventory slots
 extends Panel
+class_name InventorySlot
 
-var slot_index: int = -1
-var player_inventory: Node
+@export var slot_index: int = 0
+@export var player_inventory: PlayerInventory
+
 var is_dragging: bool = false
-var tooltip: Control = null
+var mouse_inside: bool = false
+var last_tooltip_update_time: int = 0  # Track last tooltip update (in milliseconds)
+var tooltip_update_cooldown: int = 50  # 50ms cooldown between tooltip updates
 
 func _ready():
-	slot_index = get_index()
-	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
-	mouse_filter = MOUSE_FILTER_STOP
+	# Add to group for tooltip cleanup system
+	add_to_group("InventorySlot")
 	
-	# Find or create tooltip (delayed to avoid setup conflicts)
-	call_deferred("_find_or_create_tooltip")
+	# Set mouse filter to pass to receive input events
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	
+	# Try to get slot_index from parent container if not set
+	if slot_index == 0 and get_parent():
+		var parent_container = get_parent()
+		if parent_container is GridContainer:
+			slot_index = get_index()
+		elif parent_container.has_method("get_child_index"):
+			slot_index = parent_container.get_child_index(self)
+	
+	# Try to get player_inventory from scene tree if not set
+	if not player_inventory:
+		player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
 
-func _find_or_create_tooltip():
-	"""Find existing tooltip or create a new one"""
-	# Look for existing tooltip in the scene tree
-	tooltip = get_tree().get_first_node_in_group("ItemTooltip")
+func _gui_input(event: InputEvent):
+	# Handle mouse motion for custom tooltip detection
+	if event is InputEventMouseMotion:
+		_handle_mouse_motion(event)
 	
-	# If no tooltip exists, create one
-	if not tooltip:
-		var tooltip_scene = load("res://UI/item_tooltip.tscn")
-		if tooltip_scene:
-			tooltip = tooltip_scene.instantiate()
-			tooltip.add_to_group("ItemTooltip")
-			# Use call_deferred to avoid the "Parent node is busy" error
-			get_tree().root.add_child.call_deferred(tooltip)
-			print("Created new tooltip instance")
+	# Handle right-click
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			if player_inventory and player_inventory.bag.has(slot_index):
+				var bag_item = player_inventory.bag[slot_index]
+				if bag_item and bag_item.item:
+					player_inventory.handle_right_click(slot_index, "")  # bag_slot, empty equipment_slot
+					get_viewport().set_input_as_handled()
+
+func _handle_mouse_motion(event: InputEventMouseMotion):
+	"""Custom mouse motion handling for tooltip detection"""
+	var mouse_pos = event.position
+	
+	# Use a smaller buffer zone for more precise mouse entry/exit
+	var buffered_rect = Rect2(Vector2(-5, -5), size + Vector2(10, 10))
+	
+	# Check if mouse is inside the slot (with smaller buffer)
+	if buffered_rect.has_point(mouse_pos):
+		if not mouse_inside:
+			mouse_inside = true
+			_show_tooltip()
+	else:
+		if mouse_inside:
+			mouse_inside = false
+			_hide_tooltip()
+			return  # Exit early to prevent further processing
+	
+	# Additional safety: check if mouse is actually within the visual slot bounds
+	if mouse_inside:
+		var visual_rect = Rect2(Vector2.ZERO, size)
+		if not visual_rect.has_point(mouse_pos):
+			mouse_inside = false
+			_hide_tooltip()
+			return
+	
+	# Force tooltip update if we're inside and have an item
+	if mouse_inside and player_inventory and player_inventory.bag.has(slot_index):
+		var bag_item = player_inventory.bag[slot_index]
+		if bag_item and bag_item.item:
+			var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+			if tooltip_manager and tooltip_manager.current_item != bag_item.item:
+				# Check cooldown to prevent frequent updates
+				var current_time = Time.get_ticks_msec()
+				if current_time - last_tooltip_update_time >= tooltip_update_cooldown:
+					last_tooltip_update_time = current_time
+					_show_tooltip()
+		else: # No item in this slot, hide tooltip
+			var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+			if tooltip_manager and tooltip_manager.tooltip_visible:
+				_hide_tooltip()
+	
+	# More aggressive safety: if mouse is far from slot center, force cleanup
+	if mouse_inside:
+		var slot_center = size / 2
+		var distance_from_center = (mouse_pos - slot_center).length()
+		var max_distance = max(size.x, size.y) * 0.4  # 40% of slot size (very aggressive)
+		
+		if distance_from_center > max_distance:
+			mouse_inside = false
+			_hide_tooltip()
+
+func _show_tooltip():
+	"""Show tooltip when mouse enters the slot"""
+	# Check if inventory is visible before showing tooltip
+	var inventory_ui = get_tree().get_first_node_in_group("InventoryUI")
+	if inventory_ui and not inventory_ui.visible:
+		return
+	
+	# Check if we have an item and are not dragging
+	if player_inventory and player_inventory.bag.has(slot_index) and not is_dragging:
+		var bag_item = player_inventory.bag[slot_index]
+		if bag_item and bag_item.item:
+			# Use the tooltip manager from the scene
+			var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+			if tooltip_manager:
+				tooltip_manager.show_tooltip(bag_item.item)
+
+func _hide_tooltip():
+	"""Hide tooltip when mouse exits the slot"""
+	# Use the tooltip manager from the scene
+	var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+	if tooltip_manager:
+		tooltip_manager.hide_tooltip()
+
+func force_cleanup_tooltip():
+	"""Force cleanup tooltip when slot item changes"""
+	if mouse_inside:
+		var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
+		if tooltip_manager and tooltip_manager.tooltip_visible:
+			tooltip_manager.force_cleanup()
+			mouse_inside = false  # Reset mouse state
+
+func set_player_inventory(inv: PlayerInventory):
+	"""Set the player_inventory reference for this slot"""
+	player_inventory = inv
+
+func set_slot_index(index: int):
+	"""Set the slot_index for this slot"""
+	slot_index = index
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
 	if player_inventory and player_inventory.bag.has(slot_index):
@@ -69,29 +176,3 @@ func _drop_data(_at_position: Vector2, data: Variant):
 	player_inventory.handle_drop_data(data, slot_index, "")
 	# Reset dragging state after drop
 	is_dragging = false
-
-func _gui_input(event: InputEvent):
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed == false:
-		# Check if this was a drag that was cancelled (mouse released without dropping)
-		if is_dragging and not player_inventory.get_is_dragging_from_bag():
-			# Show the icon again if drag was cancelled
-			var icon_rect = find_child("Icon") as TextureRect
-			if icon_rect:
-				icon_rect.visible = true
-			is_dragging = false
-	
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		if player_inventory and player_inventory.bag.has(slot_index):
-			player_inventory.handle_right_click(slot_index, "")
-			get_viewport().set_input_as_handled()
-
-func _mouse_entered():
-	"""Show tooltip when mouse enters the slot"""
-	if tooltip and player_inventory and player_inventory.bag.has(slot_index) and not is_dragging:
-		var item_data = player_inventory.bag[slot_index]
-		tooltip.show_tooltip(item_data.item)
-
-func _mouse_exited():
-	"""Hide tooltip when mouse exits the slot"""
-	if tooltip:
-		tooltip.hide_tooltip()
