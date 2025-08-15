@@ -36,16 +36,13 @@ func _initialize_inventory_slots():
 		var slot_node = items_container.get_child(i)
 		if slot_node.has_method("set_player_inventory"):
 			slot_node.set_player_inventory(player_inventory)
-			print("Initialized inventory slot ", i, " with player_inventory")
 		elif slot_node.has_method("set_meta"):
 			# Alternative method for older versions
 			slot_node.set_meta("player_inventory", player_inventory)
-			print("Set meta for inventory slot ", i, " with player_inventory")
 		
 		# Also set the slot_index if the method exists
 		if slot_node.has_method("set_slot_index"):
 			slot_node.set_slot_index(i)
-			print("Set slot_index to ", i, " for inventory slot")
 
 func _input(_event):
 	if Input.is_action_just_pressed("toggle_inventory"):
@@ -90,7 +87,7 @@ func update_display():
 		if not icon_rect or not quantity_label: continue
 		
 		# Debug: Check what we're working with
-		print("Slot ", i, " - Found quantity_label: ", quantity_label.name, " current text: '", quantity_label.text, "' visible: ", quantity_label.visible)
+
 
 		if bag.has(i):
 			var item_data = bag[i]
@@ -99,7 +96,7 @@ func update_display():
 			icon_rect.visible = true
 			
 			# Debug: Print item data to see what's happening
-			print("Slot ", i, " - Item: ", item_data.item.name, " Quantity: ", item_data.quantity, " Type: ", item_data.item.item_type)
+
 			
 			# Scale up small consumable icons for better visibility
 			if item_data.item.item_type == Item.ITEM_TYPE.CONSUMABLE:
@@ -113,8 +110,7 @@ func update_display():
 				icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 				icon_rect.custom_minimum_size = Vector2(64, 64)
 			
-			# Debug: Check quantity logic
-			print("  Quantity check: ", item_data.quantity, " > 1 = ", item_data.quantity > 1)
+			
 			if item_data.quantity > 1:
 				quantity_label.text = str(item_data.quantity)
 				quantity_label.visible = true
@@ -122,7 +118,7 @@ func update_display():
 				# Unlock quantity label for stacks
 				if slot_node.has_method("_unlock_quantity_label_for_stack"):
 					slot_node._unlock_quantity_label_for_stack()
-				print("  Showing quantity: ", item_data.quantity)
+
 			else:
 				# Never show quantity labels for single items or empty slots
 				quantity_label.text = ""
@@ -131,10 +127,9 @@ func update_display():
 				# Lock down quantity label for single items
 				if slot_node.has_method("_lock_quantity_label_for_single_item"):
 					slot_node._lock_quantity_label_for_single_item()
-				print("  Hiding quantity label (quantity was: ", item_data.quantity, ")")
+
 			
-			# Debug: Verify what we set
-			print("  After setting - text: '", quantity_label.text, "' visible: ", quantity_label.visible, " alpha: ", quantity_label.modulate.a)
+
 		else:
 			icon_rect.visible = false
 			quantity_label.visible = false
@@ -145,8 +140,7 @@ func update_display():
 				slot_node._lock_quantity_label_for_single_item()
 			# Reset icon scaling when slot is empty
 			icon_rect.custom_minimum_size = Vector2(64, 64)
-			print("  Slot ", i, " is empty - cleared quantity label")
-			print("  After clearing - text: '", quantity_label.text, "' visible: ", quantity_label.visible, " alpha: ", quantity_label.modulate.a)
+
 	
 	# Final safety check: ensure single items never show quantity labels
 	await get_tree().process_frame  # Wait a frame for any other scripts to run
@@ -159,4 +153,3 @@ func update_display():
 				quantity_label.text = ""
 				quantity_label.visible = false
 				quantity_label.modulate.a = 0.0
-				print("  Final safety check - Slot ", i, " forced to hide quantity label")

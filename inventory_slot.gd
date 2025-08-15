@@ -188,10 +188,8 @@ func _setup_icon_scaling():
 		icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		icon_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	
-	# Debug: Check quantity label state
+	# Ensure quantity label starts with no text and stays hidden
 	if quantity_label:
-		print("InventorySlot ", slot_index, " - QuantityLabel text: '", quantity_label.text, "' visible: ", quantity_label.visible)
-		# Ensure quantity label starts with no text and stays hidden
 		quantity_label.text = ""
 		quantity_label.visible = false
 		# Force the label to stay hidden for single items
@@ -210,7 +208,6 @@ func _lock_quantity_label_for_single_item():
 		quantity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# Set it to ignore all input and be completely hidden
 		quantity_label.process_mode = Node.PROCESS_MODE_DISABLED
-		print("InventorySlot ", slot_index, " - Quantity label completely locked down")
 
 func _unlock_quantity_label_for_stack():
 	"""Unlock quantity label for item stacks"""
@@ -219,7 +216,6 @@ func _unlock_quantity_label_for_stack():
 		# Re-enable for stacks
 		quantity_label.process_mode = Node.PROCESS_MODE_INHERIT
 		quantity_label.mouse_filter = Control.MOUSE_FILTER_PASS
-		print("InventorySlot ", slot_index, " - Quantity label unlocked for stack")
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	return data is Dictionary and data.has("source")

@@ -51,7 +51,6 @@ var damage_calculator: DamageCalculator
 func _ready():
 	# Add this node to the CombatManager group
 	add_to_group("CombatManager")
-	print("CombatManager ready - in_combat=false")
 	damage_calculator = DamageCalculator.new()
 	
 	# Set up safety timer to prevent infinite loops
@@ -60,7 +59,6 @@ func _ready():
 	safety_timer.wait_time = 1.0  # Check every second
 	safety_timer.timeout.connect(_on_safety_timer_timeout)
 	safety_timer.start()
-	# CombatManager safety timer initialized
 
 # Safety check function
 func is_valid_3d_node(node: Node) -> bool:
@@ -74,10 +72,7 @@ func is_valid_3d_node(node: Node) -> bool:
 
 func start_combat(enemy: Node, player: Node):
 	"""Start a new combat encounter"""
-	print("=== STARTING COMBAT ===")
-	
 	if in_combat or not enemy or not player:
-		print("Combat already in progress or invalid participants!")
 		return
 	
 	# Safety check: ensure we're not storing the combat manager itself
@@ -88,7 +83,6 @@ func start_combat(enemy: Node, player: Node):
 	
 	# Safety check: ensure enemy is actually an Enemy class
 	if not enemy.has_method("get_stats") or not enemy.has_method("take_damage"):
-		print("ERROR: Enemy does not have required methods!")
 		return
 	
 	in_combat = true
@@ -102,11 +96,8 @@ func start_combat(enemy: Node, player: Node):
 	
 	# Find combat UI for logging
 	combat_ui = get_tree().get_first_node_in_group("CombatUI")
-	print("Combat UI found: ", combat_ui)
 	if combat_ui:
-		print("Combat UI has add_combat_log_entry method: ", combat_ui.has_method("add_combat_log_entry"))
-	else:
-		print("WARNING: No CombatUI found in scene!")
+		combat_ui.add_combat_log_entry("Combat started!")
 	
 	# Find HUD for spirit bar control
 	hud = get_tree().get_first_node_in_group("HUD")
@@ -117,12 +108,8 @@ func start_combat(enemy: Node, player: Node):
 				hud = child
 				break
 	
-	print("HUD found: ", hud)
 	if hud and hud.has_method("show_spirit_bar"):
 		hud.show_spirit_bar()
-		print("Spirit bar shown!")
-	else:
-		print("WARNING: No HUD found or missing show_spirit_bar method!")
 	
 	# Log combat start
 	_log_combat_event("⚔️ Combat started! " + enemy.enemy_name + " vs " + player.name)
@@ -175,8 +162,6 @@ func start_combat(enemy: Node, player: Node):
 
 func _initialize_atb_system():
 	"""Initialize the Active Time Battle system"""
-	print("=== INITIALIZING ATB SYSTEM ===")
-	
 	# Reset ATB progress and state
 	player_atb_progress = 0.0
 	enemy_atb_progress = 0.0
@@ -187,8 +172,6 @@ func _initialize_atb_system():
 	enemy_atb_start_time = 0.0
 	player_atb_duration = 10.0
 	enemy_atb_duration = 10.0
-	
-	print("ATB System initialized!")
 
 func _start_first_turn():
 	"""Start the first turn based on speed stats"""
@@ -204,33 +187,23 @@ func _start_first_turn():
 	var player_speed = player_stats.speed
 	var enemy_speed = enemy_stats.speed
 	
-	print("=== FIRST TURN DETERMINATION ===")
-	print("Player speed: ", player_speed)
-	print("Enemy speed: ", enemy_speed)
-	
 	# Start ATB timers immediately for both player and enemy
 	_start_atb_timers()
 	
 	# Determine who goes first based on speed
 	if player_speed >= enemy_speed:
-		print("Player goes first (higher or equal speed)")
 		# Don't start player turn immediately - let ATB system handle it
 		# Just set the initial turn type
 		turn_type = "player"
 		current_actor = current_player
 	else:
-		print("Enemy goes first (higher speed)")
 		# Don't start enemy turn immediately - let ATB system handle it
 		# Just set the initial turn type
 		turn_type = "enemy"
 		current_actor = current_enemy
-	
-	print("Initial turn type set to: ", turn_type)
-	print("ATB system will automatically start the first turn when ready")
 
 func _start_player_turn():
 	"""Start the player's turn"""
-	print("🚀 STARTING PLAYER TURN")
 	turn_type = "player"
 	current_actor = current_player
 	waiting_for_action = true
@@ -240,11 +213,9 @@ func _start_player_turn():
 	
 	# Check if there's a queued action to execute immediately
 	if player_action_queued:
-		print("🎯 Executing queued action at start of player turn!")
 		_execute_queued_player_action()
 		return
 	
-	print("=== PLAYER TURN STARTED ===")
 	_log_turn_start(current_player, "player")
 	
 	# Emit turn changed signal
@@ -252,7 +223,6 @@ func _start_player_turn():
 
 func _start_enemy_turn():
 	"""Start the enemy's turn"""
-	print("🚀 STARTING ENEMY TURN")
 	turn_type = "enemy"
 	current_actor = current_enemy
 	waiting_for_action = false
@@ -261,9 +231,7 @@ func _start_enemy_turn():
 	# Give passive spirit regeneration (2 points per turn)
 	if current_enemy and current_enemy.has_method("gain_spirit"):
 		current_enemy.gain_spirit(2)
-		print("✨ Enemy gained 2 passive spirit points for turn start")
 	
-	print("=== ENEMY TURN STARTED ===")
 	_log_turn_start(current_enemy, "enemy")
 	
 	# Emit turn changed signal
@@ -274,17 +242,13 @@ func _start_enemy_turn():
 
 func _start_atb_timers():
 	"""Start the ATB timers for both player and enemy"""
-	print("=== STARTING ATB TIMERS ===")
-	
 	if not current_player or not current_enemy:
-		print("ERROR: No current player or enemy!")
 		return
 	
 	var player_stats = current_player.get_stats()
 	var enemy_stats = current_enemy.get_stats()
 	
 	if not player_stats or not enemy_stats:
-		print("ERROR: No player or enemy stats!")
 		return
 	
 	# Calculate ATB fill time based on speed (faster = shorter time)
@@ -304,22 +268,11 @@ func _start_atb_timers():
 	var player_atb_time = base_atb_time * player_speed_multiplier
 	var enemy_atb_time = base_atb_time * enemy_speed_multiplier
 	
-	print("ATB Times - Base: ", base_atb_time, "s")
-	print("Player speed: ", player_speed, " (", (1.0 - player_speed_multiplier) * 100, "% faster)")
-	print("Enemy speed: ", enemy_speed, " (", (1.0 - enemy_speed_multiplier) * 100, "% faster)")
-	print("Player ATB time: ", player_atb_time, "s")
-	print("Enemy ATB time: ", enemy_atb_time, "s")
-	
 	# Store ATB start times and duration for each entity
 	player_atb_start_time = Time.get_ticks_msec() / 1000.0
 	enemy_atb_start_time = Time.get_ticks_msec() / 1000.0
 	player_atb_duration = player_atb_time
 	enemy_atb_duration = enemy_atb_time
-	
-	print("Player ATB start time: ", player_atb_start_time, "s")
-	print("Enemy ATB start time: ", enemy_atb_start_time, "s")
-	print("Player ATB duration: ", player_atb_duration, "s")
-	print("Enemy ATB duration: ", enemy_atb_duration, "s")
 	
 	# Reset progress
 	player_atb_progress = 0.0
@@ -330,8 +283,6 @@ func _start_atb_timers():
 
 func _start_atb_progress_updates():
 	"""Start updating ATB progress bars"""
-	print("=== STARTING ATB PROGRESS UPDATES ===")
-	
 	# Clean up any existing timer first
 	if atb_progress_timer and is_instance_valid(atb_progress_timer):
 		atb_progress_timer.queue_free()
@@ -343,11 +294,9 @@ func _start_atb_progress_updates():
 	add_child(atb_progress_timer)
 	atb_progress_timer.wait_time = 0.033  # ~30 FPS for smooth progress updates
 	atb_progress_timer.timeout.connect(_update_atb_progress)
-	print("Created new ATB progress timer")
 	
 	# Start the timer
 	atb_progress_timer.start()
-	print("ATB progress timer started with wait time: ", atb_progress_timer.wait_time, "s")
 	
 	# Store the start time for safety checks using meta
 	set_meta("atb_timer_start_time", Time.get_ticks_msec() / 1000.0)
@@ -359,7 +308,6 @@ func _update_atb_progress():
 	
 	# Safety check: ensure we have valid references
 	if not current_player or not current_enemy:
-		print("⚠️ ATB update: Missing player or enemy reference")
 		return
 	
 	# Safety check: prevent ATB from running indefinitely
@@ -370,7 +318,6 @@ func _update_atb_progress():
 		
 		# If timer has been running for more than 60 seconds, something is wrong
 		if timer_age > 60.0:
-			print("⚠️ ATB timer running too long (", timer_age, "s), stopping for safety")
 			atb_progress_timer.stop()
 			return
 	
@@ -385,7 +332,6 @@ func _update_atb_progress():
 		# Check if player ATB is ready
 		if player_atb_progress >= 1.0:
 			player_atb_progress = 1.0
-			print("🎯 PLAYER ATB READY - Starting player turn!")
 			_on_player_atb_ready()
 	else:
 		# Keep player ATB at 100% while turn is ready
@@ -399,16 +345,10 @@ func _update_atb_progress():
 		# Check if enemy ATB is ready
 		if enemy_atb_progress >= 1.0:
 			enemy_atb_progress = 1.0
-			print("🎯 ENEMY ATB READY - Starting enemy turn!")
 			_on_enemy_atb_ready()
 	else:
 		# Keep enemy ATB at 100% while turn is ready
 		enemy_atb_progress = 1.0
-	
-	# Debug output (reduced frequency to avoid spam)
-	if int(Time.get_ticks_msec() / 1000.0) % 2 == 0:  # Only log every 2 seconds
-		print("ATB Progress - Player: ", int(player_atb_progress * 100), "%, Enemy: ", int(enemy_atb_progress * 100), "%")
-		print("  Player ready: ", player_turn_ready, " Enemy ready: ", enemy_turn_ready, " Action in progress: ", action_in_progress)
 	
 	# Emit signal for UI updates
 	atb_bar_updated.emit(player_atb_progress, enemy_atb_progress)

@@ -85,10 +85,7 @@ class EntityStatusEffects:
 		
 		# Position the container above the entity's head
 		visual_effects_container.position = Vector3(0, 2.5, 0)  # Adjust height as needed
-		
-		print("Visual effects container created for ", entity.name)
-		print("  - Container position: ", visual_effects_container.global_position)
-		print("  - Container parent: ", visual_effects_container.get_parent().name)
+
 	
 	func add_effect(effect_type: EFFECT_TYPE, damage: int, duration: int, source: Node):
 		"""Add a new status effect"""
@@ -98,7 +95,7 @@ class EntityStatusEffects:
 				# Refresh existing effect
 				effect.remaining_duration = duration
 				effect.damage_per_tick = damage
-				print(entity.name, " status effect refreshed: ", effect_type)
+		
 				return
 		
 		# Create new effect
@@ -108,7 +105,7 @@ class EntityStatusEffects:
 		# Create and display visual effect
 		_create_visual_effect(new_effect)
 		
-		print(entity.name, " gained status effect: ", effect_type, " for ", duration, " turns")
+
 		
 		# Log to combat log if in combat
 		_log_effect_applied(effect_type, duration)
@@ -117,12 +114,12 @@ class EntityStatusEffects:
 		"""Create a visual effect for the status effect"""
 		# Safety check: ensure entity is valid
 		if not entity or not is_instance_valid(entity):
-			print("⚠️ Cannot create visual effect: entity is invalid")
+	
 			return
 		
 		# Safety check: ensure we have a visual effects container
 		if not visual_effects_container or not is_instance_valid(visual_effects_container):
-			print("⚠️ Cannot create visual effect: no visual effects container")
+	
 			return
 		
 		match effect.type:
@@ -147,10 +144,10 @@ class EntityStatusEffects:
 		"""Create a poison visual effect"""
 		# Safety check: ensure entity is still valid
 		if not entity or not is_instance_valid(entity):
-			print("⚠️ Cannot create poison effect: entity is invalid")
+	
 			return
 			
-		print("Creating poison visual effect for ", entity.name)
+
 		
 		# Create a Sprite3D to display the poison effect
 		var poison_sprite = Sprite3D.new()
@@ -159,7 +156,7 @@ class EntityStatusEffects:
 		# Try to load the poison GIF texture, but fall back to a colored sprite if it fails
 		var poison_texture = null
 		# Note: GIF files are not natively supported in Godot, so we'll use a fallback approach
-		print("⚠️ GIF files not supported in Godot, creating fallback poison effect")
+
 		
 		# Try to create a simple colored sprite using a default texture
 		# First try to load a basic texture, then fall back to just color
@@ -185,8 +182,6 @@ class EntityStatusEffects:
 				tween.set_loops(3)  # Loop 3 times then stop
 				tween.tween_property(poison_sprite, "position:y", poison_sprite.position.y + 0.2, 1.0)
 				tween.tween_property(poison_sprite, "position:y", poison_sprite.position.y, 1.0)
-		else:
-			print("⚠️ Entity has no create_tween method, skipping animation")
 		
 		# Store reference to the visual effect
 		effect.set_visual_effect(poison_sprite)
@@ -194,11 +189,6 @@ class EntityStatusEffects:
 		# Add to visual effects container with safety check
 		if visual_effects_container and is_instance_valid(visual_effects_container):
 			visual_effects_container.add_child(poison_sprite)
-			print("✅ Poison visual effect created successfully for ", entity.name)
-			print("  - Sprite3D added to container: ", visual_effects_container.has_node("PoisonEffect"))
-			print("  - Visual effect reference stored: ", effect.get_visual_effect() != null)
-		else:
-			print("⚠️ Visual effects container not available, effect created but not displayed")
 	
 	func _create_ignite_effect(effect: StatusEffect):
 		"""Create an ignite visual effect"""
@@ -246,7 +236,7 @@ class EntityStatusEffects:
 				
 				effect.is_active = false
 				effects.remove_at(i)
-				print(entity.name, " status effect removed: ", effect_type)
+		
 				break
 	
 	func clear_all_effects():
@@ -258,7 +248,7 @@ class EntityStatusEffects:
 			
 			effect.is_active = false
 		effects.clear()
-		print(entity.name, " all status effects cleared")
+
 	
 	func has_effect(effect_type: EFFECT_TYPE) -> bool:
 		"""Check if entity has a specific effect"""
@@ -301,7 +291,7 @@ class EntityStatusEffects:
 		# Apply total damage
 		if total_damage > 0 and entity.has_method("take_damage"):
 			entity.take_damage(total_damage)
-			print(entity.name, " takes ", total_damage, " total status effect damage!")
+	
 	
 	func _log_effect_applied(effect_type: EFFECT_TYPE, duration: int):
 		"""Log when an effect is applied"""
@@ -451,4 +441,4 @@ func refresh_visual_effects(entity: Node):
 			if effect.is_active and effect.visual_effect == null:
 				# Recreate visual effect if it's missing
 				effects._create_visual_effect(effect)
-				print("Recreated visual effect for ", entity.name, " - ", effect.type)
+		

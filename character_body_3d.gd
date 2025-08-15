@@ -154,9 +154,8 @@ func receive_gold(amount: int):
 	"""Receive gold from enemy drops or other sources"""
 	if stats and stats.has_method("add_gold"):
 		stats.add_gold(amount)
-		print("💰 Player received ", amount, " gold! Total: ", stats.get_gold())
 	else:
-		print("⚠️ Player stats don't support gold - gold lost!")
+		pass
 
 func heal(amount: int):
 	if stats: stats.heal(amount)
@@ -245,7 +244,6 @@ func face_target(target: Node):
 	elif target.get_parent() and target.get_parent() is Node3D:
 		target_pos = target.get_parent().global_position
 	else:
-		print("⚠️ Target has no valid global_position")
 		return
 	
 	var direction = (target_pos - global_position).normalized()
@@ -260,7 +258,7 @@ func orient_camera_toward(target: Node):
 	if not target or not camera:
 		return
 	
-	print("🎥 Orienting camera toward target: ", target.name)
+
 	
 	# Get the direction from player to target
 	var target_pos = Vector3.ZERO
@@ -269,7 +267,6 @@ func orient_camera_toward(target: Node):
 	elif target.get_parent() and target.get_parent() is Node3D:
 		target_pos = target.get_parent().global_position
 	else:
-		print("⚠️ Target has no valid global_position for camera orientation")
 		return
 	
 	var direction = (target_pos - global_position).normalized()
@@ -282,7 +279,7 @@ func orient_camera_toward(target: Node):
 		# Smoothly rotate the camera to face the target
 		var tween = create_tween()
 		tween.tween_property(camera, "rotation:y", target_rotation, 0.5)
-		print("🎥 Camera rotating to face target (rotation: ", target_rotation, ")")
+
 
 func get_camera() -> Camera3D:
 	"""Get the camera reference for external control"""
@@ -290,8 +287,7 @@ func get_camera() -> Camera3D:
 
 func _unhandled_input(event: InputEvent):
 	if event is InputEventMouseButton and event.pressed:
-		print("--- UNHANDLED MOUSE CLICK DETECTED ---")
-		print("Button: ", event.button_index, " at position: ", event.position)
+		pass
 
 func _add_starter_equipment():
 	"""Add starter equipment items to the player's inventory for testing"""
@@ -408,18 +404,9 @@ func _add_starter_equipment():
 	venom_dart.icon = venom_dart_icon
 	
 	# Add all equipment to inventory
-	print("Adding helmet to inventory...")
 	_inventory.add_item_to_bag(helmet, 1)
-	print("Adding chest armor to inventory...")
 	_inventory.add_item_to_bag(chest_armor, 1)
-	print("Adding gloves to inventory...")
 	_inventory.add_item_to_bag(gloves, 1)
-	print("Adding boots to inventory...")
 	_inventory.add_item_to_bag(boots, 1)
-	print("Adding acid flasks to inventory...")
 	_inventory.add_item_to_bag(acid_flask, 3)  # Give 3 acid flasks
-	print("Adding venom darts to inventory...")
 	_inventory.add_item_to_bag(venom_dart, 5)  # Give 5 venom darts
-	
-	print("Added starter equipment, acid flasks, and venom darts to inventory!")
-	print("Current bag contents: ", _inventory.get_bag())

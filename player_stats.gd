@@ -222,7 +222,7 @@ func _recalculate_max_stats():
 		_setting_initial_values = false
 		# Don't set _initialized here as it's used for the _ready() function
 	
-	print("Stats recalculated - Max HP: ", max_health, " Max MP: ", max_mana)
+
 	
 	_recalculating_stats = false
 
@@ -235,12 +235,12 @@ func _calculate_exp_requirement():
 	var curve_factor = pow(exp_curve_exponent, level / 10.0)
 	experience_to_next_level = int(base_exp_requirement * level_factor * curve_factor)
 	
-	print("Level ", level, " requires ", experience_to_next_level, " experience to reach level ", level + 1)
+
 
 func gain_experience(amount: int):
 	"""Gain experience and check for level up"""
 	experience += amount
-	print("Gained ", amount, " experience! Total: ", experience, "/", experience_to_next_level)
+
 	
 	# Check for level up
 	while experience >= experience_to_next_level:
@@ -259,8 +259,7 @@ func _level_up():
 	health = max_health  # Restore health on level up
 	mana = max_mana      # Restore mana on level up
 	
-	print("🎉 LEVEL UP! Now level ", level, "! Stat points available: ", stat_points_available)
-	print("Max HP: ", max_health, " Max MP: ", max_mana)
+
 	
 	# Calculate new experience requirement
 	_calculate_exp_requirement()
@@ -274,43 +273,32 @@ func _level_up():
 func spend_stat_point(stat_name: String) -> bool:
 	"""Spend a stat point to increase a specific stat"""
 	if stat_points_available <= 0:
-		print("No stat points available!")
 		return false
 	
 	match stat_name.to_lower():
 		"health":
 			health += 1
 			_recalculate_max_stats()
-			print("Health increased to ", health, "!")
 		"mana":
 			mana += 1
 			_recalculate_max_stats()
-			print("Mana increased to ", mana, "!")
 		"speed":
 			speed += 1
-			print("Speed increased to ", speed, "!")
 		"strength":
 			strength += 1
-			print("Strength increased to ", strength, "!")
 		"intelligence":
 			intelligence += 1
-			print("Intelligence increased to ", intelligence, "!")
 		"spell_power":
 			spell_power += 1
-			print("Spell Power increased to ", spell_power, "!")
 		"dexterity":
 			dexterity += 1
-			print("Dexterity increased to ", dexterity, "!")
 		"cunning":
 			cunning += 1
-			print("Cunning increased to ", cunning, "!")
 		_:
-			print("Unknown stat: ", stat_name)
 			return false
 	
 	stat_points_available -= 1
 	_update_combat_chances()
-	print("Stat point spent! Remaining: ", stat_points_available)
 	return true
 
 # Level-based stat setting (for enemies)

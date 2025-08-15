@@ -42,8 +42,7 @@ func calculate_damage_with_armor(base_damage: int, armor_value: int, attacker_le
 	
 	# Ensure minimum damage of 1
 	final_damage = max(final_damage, 1)
-	
-	print("Damage calculation: Base: ", base_damage, " Armor: ", armor_value, " Reduction: ", (damage_reduction * 100), "% Final: ", final_damage)
+
 	
 	return final_damage
 
@@ -93,22 +92,14 @@ func get_armor_effectiveness_info(armor_value: int, player_level: int) -> Dictio
 # Example usage and testing
 func test_damage_calculations():
 	"""Test various damage calculation scenarios"""
-	print("=== DAMAGE CALCULATION TESTS ===")
-	
 	# Test 1: Low level player with basic armor
 	var damage1 = calculate_damage_with_armor(50, 12, 1, 1)
-	print("Level 1 vs Level 1, 50 damage, 12 armor: ", damage1)
 	
 	# Test 2: High level player with same armor
 	var damage2 = calculate_damage_with_armor(500, 12, 100, 100)
-	print("Level 100 vs Level 100, 500 damage, 12 armor: ", damage2)
 	
 	# Test 3: High level player with high armor
 	var damage3 = calculate_damage_with_armor(1000, 100, 200, 200)
-	print("Level 200 vs Level 200, 1000 damage, 100 armor: ", damage3)
 	
 	# Test 4: Damage reduction cap test
 	var damage4 = calculate_damage_with_armor(100, 1000, 1, 1)
-	print("Level 1 vs Level 1, 100 damage, 1000 armor (cap test): ", damage4)
-	
-	print("=== END TESTS ===")

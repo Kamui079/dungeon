@@ -83,17 +83,11 @@ var bone_break_timer: Timer = null
 @export var speed_modifier: int = 0
 
 func _ready():
-	print(enemy_name, " _ready() starting...")
-	
 	# Ensure stats are properly initialized
 	if not stats:
-		print(enemy_name, " DEBUG: Creating new stats instance")
 		stats = PlayerStats.new()
 	
-	print(enemy_name, " DEBUG: stats variable before add_child: ", stats)
-	
 	add_child(stats)
-	print(enemy_name, " DEBUG: stats variable after add_child: ", stats)
 	
 	# Set the enemy's level first
 	stats.set_level(enemy_level)
@@ -115,11 +109,6 @@ func _ready():
 	stats.set_cunning(1 + cunning_modifier)
 	stats.set_speed(1 + speed_modifier)
 	
-	print(enemy_name, " spawned at level ", enemy_level, " with stats:")
-	print("  Strength: ", stats.strength, " Intelligence: ", stats.intelligence)
-	print("  Spell Power: ", stats.spell_power, " Dexterity: ", stats.dexterity)
-	print("  Cunning: ", stats.cunning, " Speed: ", stats.speed)
-	
 	# Update combat chances and recalculate max stats
 	stats._update_combat_chances()
 	stats._recalculate_max_stats()
@@ -132,33 +121,16 @@ func _ready():
 	update_status_bars()
 	hide_status_bars()
 	
-	# Final debug check
-	print(enemy_name, " DEBUG: Final stats check - stats: ", stats, " class: ", stats.get_class() if stats else "null")
-	
-	# Debug: Check if this enemy somehow got chest properties
-	print(enemy_name, " DEBUG: Checking for chest properties...")
-	print(enemy_name, " Groups: ", get_groups())
-	print(enemy_name, " Has give_item_to_player method: ", has_method("give_item_to_player"))
-	print(enemy_name, " Parent: ", str(get_parent().name) if get_parent() else "None")
-	print(enemy_name, " Parent groups: ", str(get_parent().get_groups()) if get_parent() else "None")
-	
-	print(enemy_name, " _ready() called")
-	
 	# Try to find CombatManager immediately
-	print(enemy_name, ": Trying immediate CombatManager lookup...")
 	_find_combat_manager()
 	
 	# Set up a timer as a fallback
-	print(enemy_name, ": Setting up timer fallback...")
 	var timer = Timer.new()
 	add_child(timer)
 	timer.wait_time = 0.5  # Wait 0.5 seconds
 	timer.one_shot = true
 	timer.timeout.connect(_find_combat_manager)
 	timer.start()
-	print(enemy_name, ": Timer fallback set up (0.5s)")
-	
-	print(enemy_name, " spawned with ", stats.health, "/", stats.max_health, " HP")
 	
 	# Set up ignite timer
 	ignite_timer = Timer.new()
@@ -173,33 +145,18 @@ func _ready():
 	bone_break_timer.wait_time = 1.0  # Check every second
 	bone_break_timer.timeout.connect(_on_bone_break_tick)
 	bone_break_timer.start()
-	
-	print(enemy_name, " _ready() completed successfully!")
 
 func _find_combat_manager():
-	print(enemy_name, ": _find_combat_manager() called")
 	# Look for CombatManager by name in the current scene
 	var scene = get_tree().current_scene
 	if scene:
-		print(enemy_name, ": Found scene: ", scene.name)
 		combat_manager = scene.get_node_or_null("CombatManager")
-		print(enemy_name, ": Looked for 'CombatManager' node in scene")
-	else:
-		print(enemy_name, ": No current scene found!")
 	
 	if not combat_manager:
-		print("WARNING: ", enemy_name, " could not find CombatManager!")
 		# Try alternative search methods
-		print(enemy_name, ": Trying to find by group...")
 		var managers = get_tree().get_nodes_in_group("CombatManager")
-		print(enemy_name, ": Found ", managers.size(), " nodes in CombatManager group")
-		for manager in managers:
-			print(enemy_name, ": Group member: ", manager.name, " (", manager.get_class(), ")")
 		if managers.size() > 0:
 			combat_manager = managers[0]
-			print(enemy_name, ": Using first group member as combat manager: ", combat_manager.name)
-	else:
-		print(enemy_name, " found CombatManager: ", combat_manager.name)
 
 func _physics_process(delta):
 	# If frozen (in combat), don't process movement
@@ -272,10 +229,10 @@ func start_combat():
 	if not player:
 		player = get_tree().get_first_node_in_group("Player")
 		if not player:
-			print("ERROR: ", enemy_name, " cannot start combat - no player found!")
+
 			return
 	
-	print(enemy_name, " enters combat!")
+
 	
 	# Face the player when combat starts
 	face_target(player)
@@ -283,35 +240,25 @@ func start_combat():
 	# Show status bars when combat starts
 	show_status_bars()
 	
-	print(enemy_name, " calling combat_manager.start_combat with:")
-	print("  - enemy (self): ", self.name, " (", self.get_class(), ")")
-	print("  - player: ", player.name, " (", player.get_class(), ")")
-	print("  - combat_manager: ", combat_manager.name, " (", combat_manager.get_class(), ")")
+
 	
 	# Safety check: ensure combat_manager is not self
 	if combat_manager == self:
-		print("ERROR: CombatManager cannot be the same as enemy!")
+
 		return
 	
 	in_combat = true
 	
-	print("About to call combat_manager.start_combat...")
-	print("combat_manager type: ", typeof(combat_manager))
-	print("combat_manager class: ", combat_manager.get_class())
 	combat_manager.start_combat(self, player)
-	print("combat_manager.start_combat call completed")
 
 func end_combat():
-	print(enemy_name, " end_combat() called!")
 	in_combat = false
-	print(enemy_name, " exits combat!")
 	
 	# Hide status bars when combat ends
 	hide_status_bars()
 	
 	# Notify combat manager if we have one
 	if combat_manager and combat_manager.has_method("end_combat"):
-		print(enemy_name, " notifying combat manager to end combat")
 		combat_manager.end_combat()
 
 func take_damage(amount: int):

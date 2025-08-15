@@ -311,8 +311,3 @@ horizontal_alignment = 1
 
 [node name="HSeparator3" type="HSeparator" parent="EquipmentRoot/Panel/VBoxContainer"]
 layout_mode = 2
-
-[node name="CloseButton" type="Button" parent="EquipmentRoot/Panel/VBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Close (ESC)"

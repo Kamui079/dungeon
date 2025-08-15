@@ -15,23 +15,61 @@ extends Control
 @export var stats_list: VBoxContainer
 
 var player_inventory: Node
+var player_stats: Node
 var slot_nodes: Dictionary = {}
 var stat_labels: Dictionary = {}
 
+# Experience bar elements (created programmatically)
+var experience_section: VBoxContainer
+var experience_bar: ProgressBar
+var experience_text: Label
+var experience_bar_created: bool = false
+
+
+
 func _ready():
-	"""Initialize the equipment UI"""
-	print("EquipmentUI: _ready() called")
-	
-	# Find the player inventory
-	player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
-	if player_inventory:
-		print("EquipmentUI: Found PlayerInventory, connecting signals...")
-		player_inventory.inventory_changed.connect(_on_inventory_changed)
-		print("EquipmentUI: Signal connected successfully")
+	# Find and connect to PlayerInventory
+	var inventory_node = get_node_or_null("../../PlayerInventory")
+	if inventory_node:
+		inventory_node.inventory_changed.connect(_on_inventory_changed)
 	else:
 		printerr("EquipmentUI: Could not find PlayerInventory!")
-		return
 	
+	# Find and connect to PlayerStats
+	var player = get_node_or_null("../../Player")
+	if player and player.has_method("get_stats"):
+		player_stats = player.get_stats()
+	else:
+		# Try alternative path
+		player_stats = get_node_or_null("../../Player/PlayerStats")
+		if not player_stats:
+			printerr("EquipmentUI: Could not find PlayerStats!")
+	
+	# Initialize equipment slots
+	_initialize_equipment_slots()
+	
+	# Update display
+	_update_display()
+	
+	# Connect player stats signals and create experience bar
+	if player_stats:
+		call_deferred("_connect_player_stats_signals")
+		# Use a timer to ensure the experience bar is only created once
+		var timer = Timer.new()
+		add_child(timer)
+		timer.wait_time = 0.1
+		timer.one_shot = true
+		timer.timeout.connect(_create_experience_bar)
+		timer.start()
+	
+
+
+
+
+
+
+func _initialize_equipment_slots():
+	"""Initialize equipment slots and their references"""
 	# Get references to all equipment slot nodes using the existing properties
 	slot_nodes = {
 		"helmet": helmet_slot,
@@ -43,20 +81,6 @@ func _ready():
 		"ring1": ring1_slot,
 		"ring2": ring2_slot
 	}
-	
-	# Debug: Check slot node references
-	print("=== SLOT NODE INIT DEBUG ===")
-	for slot_name in slot_nodes:
-		var slot_node = slot_nodes[slot_name]
-		if slot_node:
-			print("Slot ", slot_name, " found: ", slot_node, " - Valid: ", is_instance_valid(slot_node))
-			if is_instance_valid(slot_node):
-				print("  - Parent: ", slot_node.get_parent())
-				print("  - Scene: ", slot_node.get_scene_file_path())
-				print("  - Children count: ", slot_node.get_child_count())
-		else:
-			print("Slot ", slot_name, " is null!")
-	print("=== END SLOT NODE INIT DEBUG ===")
 	
 	# Initialize stats display
 	_initialize_stats_display()
@@ -81,20 +105,19 @@ func _ready():
 		else:
 			printerr("Equipment slot '", slot_name, "' is not assigned in the editor!")
 	
-	# Initial display update
-	_update_display()
-	
 	# Add to group and hide initially
 	add_to_group("EquipmentUI")
 	hide()
-
-# --- MODIFIED: This function is now fixed ---
 
 func _input(_event):
 	if Input.is_action_just_pressed("character_screen"):
 		toggle_panel()
 
+# Remove _unhandled_input since _input is already handling the character_screen action
+# Having both causes the key to be processed twice, toggling the panel twice
+
 func toggle_panel():
+	# Simple toggle behavior - just flip visibility
 	visible = not visible
 	
 	# Force cleanup tooltips when hiding equipment panel
@@ -102,6 +125,20 @@ func toggle_panel():
 		var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
 		if tooltip_manager:
 			tooltip_manager.force_cleanup()
+	else:
+		# Update display when showing the panel
+		_update_display()
+		
+		# Ensure experience bar is visible and update data
+		if experience_section:
+			experience_section.visible = true
+			call_deferred("_update_experience_display")
+		elif not experience_bar_created:
+			# Experience bar doesn't exist and hasn't been created yet, create it
+			call_deferred("_create_experience_bar")
+		
+		# Additional check: ensure experience bar is properly restored
+		call_deferred("_ensure_experience_bar_restored")
 	
 	_update_cursor_mode()
 
@@ -114,8 +151,13 @@ func _update_cursor_mode():
 	if inventory_ui and inventory_ui.visible:
 		any_ui_visible = true
 	
-	# Set cursor mode based on whether any UI is visible
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if any_ui_visible else Input.MOUSE_MODE_CAPTURED
+	# Only change cursor mode if we're actually showing/hiding the panel
+	# Don't force cursor mode changes that might conflict with other systems
+	if any_ui_visible:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		# Don't force cursor capture - let other systems handle it
+		pass
 
 func _on_inventory_changed():
 	"""Called when the player's inventory changes"""
@@ -134,23 +176,10 @@ func _update_display():
 	
 	var equipment = player_inventory.get_equipment()
 	
-	# Debug: Check what equipment data we're working with
-	print("=== UPDATE DISPLAY DEBUG ===")
-	print("Equipment data: ", equipment)
-	print("Equipment keys: ", equipment.keys())
-	for key in equipment:
-		if equipment[key] != null:
-			print("  ", key, ": ", equipment[key].name if equipment[key].has_method("get") else equipment[key])
-		else:
-			print("  ", key, ": null")
-	print("=== END UPDATE DISPLAY DEBUG ===")
-	
 	# Process each slot
-	print("Processing slots: ", slot_nodes.keys())
 	for slot_name in slot_nodes:
 		var slot_node = slot_nodes[slot_name]
 		if not slot_node: 
-			print("Slot ", slot_name, " node is null, skipping")
 			continue
 		
 		# Call the slot's own _update_display method if it exists
@@ -178,17 +207,12 @@ func _update_display():
 			# Hide/show the slot label based on whether there's a visible icon
 			var should_hide = icon_rect.visible and icon_rect.texture != null
 			_hide_slot_label(slot_node, should_hide)
-			
-			# Debug output for all slots
-			print("Slot ", slot_name, ": has_item=", has_item, ", texture=", icon_rect.texture != null, ", icon_visible=", icon_rect.visible, ", should_hide=", should_hide)
-			if has_item:
-				var equipment_item = equipment[slot_name]
-				print("  - Equipment item: ", equipment_item.name if equipment_item else "null")
-				print("  - Equipment icon: ", equipment_item.icon if equipment_item else "null")
-				print("  - Equipment class: ", equipment_item.get_class() if equipment_item else "null")
 	
 	# Update stats display
 	_update_stats_display()
+	
+	# Update experience display
+	_update_experience_display()
 
 func get_total_armor_value() -> int:
 	"""Get the total armor value from all equipped items"""
@@ -337,10 +361,6 @@ func _hide_slot_label(slot_node: Panel, should_hide: bool):
 		if child is Label and child.name.ends_with("Label"):
 			child.visible = not should_hide
 			labels_found.append(child.name)
-	
-	# Debug output for helmet slot only
-	if slot_node.name == "HelmetSlot":
-		print("HelmetSlot labels found: ", labels_found, " - should_hide: ", should_hide)
 
 func _initialize_stats_display():
 	"""Initialize the stats display labels"""
@@ -388,6 +408,7 @@ func _initialize_stats_display():
 				stat_labels["spell_power"] = child
 			elif "Armor" in text:
 				stat_labels["armor"] = child
+		# End of _initialize_stats_display function
 
 func _find_stats_list_recursively(node: Node) -> VBoxContainer:
 	"""Recursively search for a VBoxContainer that contains stat labels"""
@@ -404,3 +425,210 @@ func _find_stats_list_recursively(node: Node) -> VBoxContainer:
 			return result
 	
 	return null
+
+func _create_experience_bar():
+	"""Create the experience bar elements programmatically"""
+	# Check if experience section already exists and is valid
+	if experience_section and is_instance_valid(experience_section) and experience_section.get_parent():
+		return
+	
+	# If experience section exists but is invalid or orphaned, clean it up
+	if experience_section and (not is_instance_valid(experience_section) or not experience_section.get_parent()):
+		experience_section = null
+		experience_bar = null
+		experience_text = null
+		experience_bar_created = false
+	
+	# Find the stats container to add the experience section to
+	var stats_container = get_node_or_null("EquipmentRoot/Panel/VBoxContainer/MainContainer/StatsContainer")
+	if not stats_container:
+		# Try alternative paths
+		var possible_paths = [
+			"Panel/VBoxContainer/MainContainer/StatsContainer",
+			"VBoxContainer/MainContainer/StatsContainer",
+			"MainContainer/StatsContainer",
+			"StatsContainer"
+		]
+		for path in possible_paths:
+			stats_container = get_node_or_null(path)
+			if stats_container:
+				break
+	
+	if not stats_container:
+		# Try to find it recursively
+		stats_container = _find_stats_container_recursively(self)
+		if not stats_container:
+			printerr("EquipmentUI: Could not find stats container to add experience bar!")
+			return
+	
+	# Create experience section
+	experience_section = VBoxContainer.new()
+	experience_section.name = "ExperienceSection"
+	experience_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	experience_section.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	experience_section.add_theme_constant_override("separation", 8)
+	
+	# Add some spacing above the experience section
+	experience_section.add_theme_constant_override("separation", 15)
+	
+	# Create a subtle background for the experience section
+	var section_style = StyleBoxFlat.new()
+	section_style.bg_color = Color(0.08, 0.1, 0.12, 0.8)  # Less transparent background
+	section_style.border_width_left = 1
+	section_style.border_width_top = 1
+	section_style.border_width_right = 1
+	section_style.border_width_bottom = 1
+	section_style.border_color = Color(0.3, 0.4, 0.5, 0.8)  # Subtle blue-gray border
+	section_style.corner_radius_top_left = 8
+	section_style.corner_radius_top_right = 8
+	section_style.corner_radius_bottom_right = 8
+	section_style.corner_radius_bottom_left = 8
+	experience_section.add_theme_stylebox_override("panel", section_style)
+	
+	# Create experience label
+	var exp_label = Label.new()
+	exp_label.text = "EXPERIENCE"
+	exp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	exp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Make the label more visible
+	exp_label.add_theme_font_size_override("font_size", 16)
+	exp_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9, 1.0))
+	exp_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	experience_section.add_child(exp_label)
+	
+	# Create experience bar
+	experience_bar = ProgressBar.new()
+	experience_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	experience_bar.custom_minimum_size = Vector2(0, 25)  # Make it taller
+	experience_bar.show_percentage = false
+	experience_bar.max_value = 100
+	experience_bar.value = 0
+	
+	# Style the experience bar with more visible colors
+	var style_bg = StyleBoxFlat.new()
+	style_bg.bg_color = Color(0.2, 0.2, 0.2, 1.0)  # Darker background
+	style_bg.border_width_left = 2
+	style_bg.border_width_top = 2
+	style_bg.border_width_right = 2
+	style_bg.border_width_bottom = 2
+	style_bg.border_color = Color(0.6, 0.6, 0.6, 1.0)  # Brighter border
+	style_bg.corner_radius_top_left = 6
+	style_bg.corner_radius_top_right = 6
+	style_bg.corner_radius_bottom_right = 6
+	style_bg.corner_radius_bottom_left = 6
+	
+	var style_fill = StyleBoxFlat.new()
+	style_fill.bg_color = Color(0.3, 1.0, 0.4, 1.0)  # Brighter green
+	style_fill.corner_radius_top_left = 6
+	style_fill.corner_radius_top_right = 6
+	style_fill.corner_radius_bottom_right = 6
+	style_fill.corner_radius_bottom_left = 6
+	
+	experience_bar.add_theme_stylebox_override("background", style_bg)
+	experience_bar.add_theme_stylebox_override("fill", style_fill)
+	
+	experience_section.add_child(experience_bar)
+	
+	# Create experience text
+	experience_text = Label.new()
+	experience_text.text = "Level 1: 0 / 50 XP"
+	experience_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	experience_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Make the text more visible
+	experience_text.add_theme_font_size_override("font_size", 14)
+	experience_text.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1.0))
+	experience_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	experience_section.add_child(experience_text)
+	
+	# Insert the experience section after the stats list
+	var stats_list_node = stats_container.get_node_or_null("StatsList")
+	if stats_list_node:
+		# Insert after StatsList (at the end)
+		stats_container.add_child(experience_section)
+		# Move to the end (after StatsList)
+		stats_container.move_child(experience_section, stats_container.get_child_count() - 1)
+	else:
+		stats_container.add_child(experience_section)
+	
+	# Ensure the experience section is properly visible and sized
+	experience_section.visible = true
+	experience_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	experience_section.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	
+	# Set custom minimum size to ensure visibility
+	experience_section.custom_minimum_size = Vector2(0, 80)  # Force minimum height
+	
+	# Add some spacing above the experience section
+	experience_section.add_theme_constant_override("separation", 15)
+	
+	# Mark as created to prevent duplicates
+	experience_bar_created = true
+	
+	# Force layout update to ensure proper sizing
+	experience_section.force_update_transform()
+	stats_container.force_update_transform()
+	
+	# Force the parent to recalculate layout
+	if stats_container.get_parent():
+		stats_container.get_parent().force_update_transform()
+	
+	# Try to update the display immediately with real player data
+	call_deferred("_update_experience_display")
+
+
+
+func _find_stats_container_recursively(node: Node) -> VBoxContainer:
+	"""Recursively search for the stats container"""
+	if node is VBoxContainer and node.name == "StatsContainer":
+		return node
+	
+	for child in node.get_children():
+		var result = _find_stats_container_recursively(child)
+		if result:
+			return result
+	
+	return null
+
+func _ensure_experience_bar_restored():
+	"""Ensure the experience bar is properly restored and visible"""
+	if not experience_section:
+		return
+	
+	# Make sure the experience section is visible
+	experience_section.visible = true
+	
+	# Don't move things around unnecessarily - just ensure visibility and update data
+	# The experience section should already be in the right place from initial creation
+	
+	# Update the experience display with real data
+	call_deferred("_update_experience_display")
+
+func _update_experience_display():
+	"""Update the experience bar and text with current player progress"""
+	if not experience_bar or not experience_text or not player_stats:
+		return
+	
+	var level_progress = player_stats.get_level_progress()
+	
+	# Update the progress bar with real player data
+	experience_bar.max_value = level_progress.experience_to_next_level
+	experience_bar.value = level_progress.experience
+	
+	# Update the text with real player data
+	experience_text.text = "Level " + str(level_progress.level) + ": " + str(level_progress.experience) + " / " + str(level_progress.experience_to_next_level) + " XP"
+
+func _on_player_level_up(new_level: int):
+	"""Called when the player levels up"""
+	_update_experience_display()
+
+func _on_player_stats_changed():
+	"""Called when player stats change"""
+	_update_experience_display()
+
+func _connect_player_stats_signals():
+	"""Connect signals from player_stats node"""
+	if player_stats:
+		player_stats.level_up.connect(_on_player_level_up)
+		player_stats.stats_changed.connect(_on_player_stats_changed)
+	else:
+		printerr("EquipmentUI: Could not connect PlayerStats signals, player_stats is null!")

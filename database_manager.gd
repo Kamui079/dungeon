@@ -33,19 +33,14 @@ const DATABASE_PATHS = {
 func _ready():
 	add_to_group("DatabaseManager")
 	_load_all_databases()
-	print("DatabaseManager: All databases loaded successfully!")
 
 func _load_all_databases():
 	"""Load all database files"""
-	print("DatabaseManager: Starting database load...")
-	
 	for db_name in DATABASE_PATHS:
 		var db_path = DATABASE_PATHS[db_name]
-		print("DatabaseManager: Attempting to load ", db_name, " from ", db_path)
 		
 		# Check if file exists first
 		if not FileAccess.file_exists(db_path):
-			print("DatabaseManager: WARNING - File does not exist: ", db_path)
 			continue
 		
 		var db_resource = load(db_path)
@@ -70,12 +65,9 @@ func _load_all_databases():
 				"abilities":
 					abilities_database = db_resource
 					_cache_database_data(db_resource, _abilities_cache)
-			
-			print("DatabaseManager: Successfully loaded ", db_name, " database")
+
 		else:
-			print("DatabaseManager: ERROR - Failed to load ", db_name, " database from ", db_path)
-			print("DatabaseManager: This usually means the database needs to be imported by Godot first.")
-			print("DatabaseManager: Try opening the project in the editor to trigger import.")
+			pass
 	
 	# Check how many databases loaded successfully
 	var loaded_count = 0
@@ -87,11 +79,9 @@ func _load_all_databases():
 	if abilities_database: loaded_count += 1
 	
 	if loaded_count == 0:
-		print("DatabaseManager: CRITICAL - No databases loaded! The game will work but without database features.")
-		print("DatabaseManager: To fix this, open the project in Godot editor to trigger database imports.")
+		pass
 	else:
-		print("DatabaseManager: ", loaded_count, " out of 6 databases loaded successfully!")
-		print("DatabaseManager: Database system is ready with limited functionality.")
+		pass
 
 func _cache_database_data(database: Resource, cache: Dictionary):
 	"""Cache database data for faster access"""
@@ -108,7 +98,6 @@ func _cache_database_data(database: Resource, cache: Dictionary):
 func get_weapon_by_id(weapon_id: String) -> Resource:
 	"""Get a weapon resource by its ID"""
 	if not weapons_database:
-		print("DatabaseManager: WARNING - Weapons database not loaded!")
 		return null
 		
 	if _weapons_cache.has("weapons"):
@@ -124,7 +113,6 @@ func get_weapons_by_category(category: String) -> Array:
 	"""Get all weapons in a specific category"""
 	var weapons = []
 	if not weapons_database:
-		print("DatabaseManager: WARNING - Weapons database not loaded!")
 		return weapons
 		
 	if _weapons_cache.has("weapons"):
@@ -160,7 +148,6 @@ func get_all_weapons() -> Array:
 func get_armor_by_id(armor_id: String) -> Resource:
 	"""Get an armor resource by its ID"""
 	if not armor_database:
-		print("DatabaseManager: WARNING - Armor database not loaded!")
 		return null
 		
 	if _armor_cache.has("armor"):
@@ -176,7 +163,6 @@ func get_armor_by_category(category: String) -> Array:
 	"""Get all armor in a specific category"""
 	var armor_pieces = []
 	if not armor_database:
-		print("DatabaseManager: WARNING - Armor database not loaded!")
 		return armor_pieces
 		
 	if _armor_cache.has("armor"):
@@ -210,7 +196,6 @@ func get_armor_by_slot(slot: String) -> Array:
 func get_consumable_by_id(consumable_id: String) -> Resource:
 	"""Get a consumable resource by its ID"""
 	if not consumables_database:
-		print("DatabaseManager: WARNING - Consumables database not loaded!")
 		return null
 		
 	if _consumables_cache.has("all_consumables"):
@@ -226,7 +211,6 @@ func get_consumables_by_category(category: String) -> Array:
 	"""Get all consumables in a specific category"""
 	var consumables = []
 	if not consumables_database:
-		print("DatabaseManager: WARNING - Consumables database not loaded!")
 		return consumables
 		
 	if _consumables_cache.has("all_consumables"):
@@ -258,7 +242,6 @@ func get_mana_items() -> Array:
 func get_enemy_by_id(enemy_id: String) -> Resource:
 	"""Get an enemy resource by its ID"""
 	if not enemies_database:
-		print("DatabaseManager: WARNING - Enemies database not loaded!")
 		return null
 		
 	if _enemies_cache.has("enemies"):
@@ -274,7 +257,6 @@ func get_enemies_by_category(category: String) -> Array:
 	"""Get all enemies in a specific category"""
 	var enemies = []
 	if not enemies_database:
-		print("DatabaseManager: WARNING - Enemies database not loaded!")
 		return enemies
 		
 	if _enemies_cache.has("enemies"):
@@ -299,7 +281,6 @@ func get_spells_by_category(category: String) -> Array:
 	"""Get all spells in a specific category"""
 	var spells = []
 	if not spells_database:
-		print("DatabaseManager: WARNING - Spells database not loaded!")
 		return spells
 		
 	if _spells_cache.has("spells"):
@@ -320,7 +301,6 @@ func get_abilities_by_category(category: String) -> Array:
 	"""Get all abilities in a specific category"""
 	var abilities = []
 	if not abilities_database:
-		print("DatabaseManager: WARNING - Abilities database not loaded!")
 		return abilities
 		
 	if _abilities_cache.has("abilities"):
@@ -445,12 +425,10 @@ func get_database_status() -> Dictionary:
 
 func retry_database_load():
 	"""Retry loading databases (useful if they were imported after game start)"""
-	print("DatabaseManager: Retrying database load...")
 	_load_all_databases()
 
 func reload_databases():
 	"""Reload all databases (useful for development)"""
-	print("DatabaseManager: Reloading all databases...")
 	_weapons_cache.clear()
 	_armor_cache.clear()
 	_consumables_cache.clear()
@@ -459,4 +437,3 @@ func reload_databases():
 	_abilities_cache.clear()
 	
 	_load_all_databases()
-	print("DatabaseManager: All databases reloaded!")

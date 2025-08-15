@@ -11,90 +11,54 @@ class_name Chest
 var _has_been_opened: bool = false
 
 func _ready():
-	print("=== CHEST SCRIPT LOADED ===")
-	print("Chest name: ", name)
-	print("Chest position: ", global_position)
-	print("Item pool size: ", item_pool.size())
-	print("Ensure at least one: ", ensure_at_least_one)
-	print("Destroy after open: ", destroy_after_open)
-	print("=== CHEST SCRIPT READY ===")
+	# Add to chest group for easy finding
+	add_to_group("Chest")
 
 # This function is called by the player controller when they interact with the chest
 # It replaces the old global input handling
 func interact_with_player(player: Node) -> void:
 	print("=== CHEST INTERACTION STARTED ===")
 	print("Chest name: ", name)
-	print("Chest position: ", global_position)
-	print("Player position: ", player.global_position)
-	print("Distance to player: ", global_position.distance_to(player.global_position))
-	
 	# Prevent multiple uses - chest can only be opened once
 	if _has_been_opened:
-		print("Chest has already been opened, ignoring interaction")
 		return
 		
-	print("Player interacting with chest! Testing item giving...")
 	# Try to give items from the pool
 	if player.has_method("receive_item"):
-		print("Player has receive_item method!")
 		give_items_to_player(player)
-	else:
-		print("Player does NOT have receive_item method!")
 
 # Main function to give items to player based on drop chances
 func give_items_to_player(player: Node) -> void:
-	print("=== GIVE_ITEMS_TO_PLAYER CALLED ===")
-	print("Player: ", player.name)
-	print("Item pool size: ", item_pool.size())
-	
 	# Mark chest as opened immediately
 	_has_been_opened = true
 	
 	if item_pool.is_empty():
-		print("ERROR: Item pool is empty!")
 		return
 	
 	# Calculate which items should drop based on drop chances
 	var items_to_give = _calculate_drops()
-	print("Items that rolled to drop: ", items_to_give.size())
 	
 	# Ensure at least one item drops if configured
 	if ensure_at_least_one and items_to_give.is_empty():
-		print("No items rolled to drop, ensuring minimum drop...")
 		var random_item = item_pool[randi() % item_pool.size()]
 		items_to_give.append(random_item)
-		print("Guaranteed drop: ", random_item.name)
 	
 	# Give all the items to the player
 	for item in items_to_give:
-		print("Giving item: ", item.name)
 		if player.has_method("receive_item"):
-			var success = player.receive_item(item)
-			if success:
-				print("Successfully gave ", item.name, " to player")
-			else:
-				print("Failed to give ", item.name, " to player")
-		else:
-			print("ERROR: Player doesn't have receive_item method!")
-	
-	print("Total items given: ", items_to_give.size())
+			player.receive_item(item)
 	
 	# Show visual feedback for items received
 	_show_item_acquired_feedback(items_to_give)
 	
-	print("=== GIVE_ITEMS_TO_PLAYER FINISHED ===")
-	
 	# Optional: destroy chest after opening
 	if destroy_after_open:
-		print("Destroying chest after opening...")
 		queue_free()
 
 # Show visual feedback when items are acquired
 func _show_item_acquired_feedback(items: Array[Resource]) -> void:
 	if items.is_empty():
 		return
-	
-	print("=== SHOWING ITEM ACQUIRED FEEDBACK ===")
 	
 	# Create floating item icons above the chest
 	for i in range(items.size()):
@@ -107,19 +71,9 @@ func _show_item_acquired_feedback(items: Array[Resource]) -> void:
 		
 		# Show item name on screen
 		_show_item_name_notification(item.name)
-		
-		print("Created feedback for item: ", item.name)
-	
-	print("=== ITEM FEEDBACK COMPLETE ===")
 
 # Create a floating item icon that rises from the chest
 func _create_floating_item_icon(item: Resource, index: int, total_items: int) -> void:
-	print("=== CREATING FLOATING ICON ===")
-	if item:
-		print("Item: ", item.name)
-	else:
-		print("Item: null")
-	
 	# Create a Sprite3D for the actual item icon
 	var sprite = Sprite3D.new()
 	var icon_texture = item.get("icon") if item.get("icon") != null else null
@@ -128,23 +82,12 @@ func _create_floating_item_icon(item: Resource, index: int, total_items: int) ->
 	sprite.pixel_size = 0.0005  # Half the current size for appropriately sized item icons
 	sprite.modulate.a = 0.0  # Start transparent
 	
-	print("Sprite created - texture: ", icon_texture)
-	print("Texture is null: ", icon_texture == null)
-	print("Texture type: ", typeof(icon_texture))
-	if icon_texture != null:
-		print("Texture resource path: ", icon_texture.resource_path)
-		print("Texture width: ", icon_texture.get_width())
-		print("Texture height: ", icon_texture.get_height())
-	print("Sprite pixel_size: ", sprite.pixel_size)
-	
 	# If texture failed to load, create a colored fallback
 	if icon_texture == null or icon_texture.get_width() == 0:
-		print("Texture failed to load, creating colored fallback")
 		var material = StandardMaterial3D.new()
 		material.albedo_color = Color.BLUE  # Blue for fallback
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		sprite.material_override = material
-		print("Created blue fallback material")
 	
 	# Add as child of the chest
 	add_child(sprite)
@@ -156,12 +99,7 @@ func _create_floating_item_icon(item: Resource, index: int, total_items: int) ->
 	var offset = Vector3(0, 0, (index - total_items / 2.0) * 1.0)  # Wider spacing along Z-axis
 	sprite.position += offset  # Apply offset after positioning
 	
-	print("Chest position: ", global_position)
-	print("Sprite local position: ", sprite.position)
-	print("Sprite global position: ", sprite.global_position)
-	print("Offset: ", offset)
-	print("Sprite is in tree: ", sprite.is_inside_tree())
-	print("Sprite parent: ", sprite.get_parent())
+
 	
 	# Create animation for the floating effect
 	var tween = create_tween()
@@ -178,7 +116,7 @@ func _create_floating_item_icon(item: Resource, index: int, total_items: int) ->
 		fade_tween.tween_callback(sprite.queue_free)
 	).set_delay(2.0)  # Much shorter delay to cut total time in half
 	
-	print("=== FLOATING ICON CREATED ===")
+
 
 # Show item name notification on screen
 func _show_item_name_notification(item_name: String) -> void:
@@ -240,45 +178,24 @@ func _show_item_name_notification(item_name: String) -> void:
 func _calculate_drops() -> Array[Resource]:
 	var drops: Array[Resource] = []
 	
-	print("=== CALCULATING DROPS ===")
-	print("Item pool size: ", item_pool.size())
-	print("Ensure at least one: ", ensure_at_least_one)
-	
 	for i in range(item_pool.size()):
 		var item = item_pool[i]
 		if item == null:
-			print("WARNING: Item ", i, " is null, skipping...")
 			continue
 			
-		print("Checking item ", i, ": ", item.name)
-		
 		# Get drop chance from item (default to 100% if not set)
 		var drop_chance: float = 100.0
 		if item.get("drop_chance") != null:
 			drop_chance = item.get("drop_chance")
 		
-		print("  Drop chance: ", drop_chance, "%")
-		print("  Drop chance type: ", typeof(drop_chance))
-		print("  Drop chance raw value: ", item.get("drop_chance"))
-		print("  Drop chance raw type: ", typeof(item.get("drop_chance")))
-		
 		# Roll for this item
 		var roll = randf_range(0.0, 100.0)
-		print("  Roll: ", roll, " vs ", drop_chance)
-		print("  Roll <= drop_chance: ", roll, " <= ", drop_chance, " = ", roll <= drop_chance)
 		
 		# Safety check: if drop chance is 100% or higher, always drop
 		if drop_chance >= 100.0:
-			print("  ✓ 100% drop chance, guaranteed drop!")
 			drops.append(item)
 		elif roll <= drop_chance:
-			print("  ✓ Item will drop!")
 			drops.append(item)
-		else:
-			print("  ✗ Item will not drop")
-	
-	print("Final drops: ", drops.size(), " items")
-	print("=== END DROP CALCULATION ===")
 	
 	return drops
 
@@ -287,22 +204,20 @@ func setup_chest(new_item_pool: Array[Resource], min_drops: bool = true, destroy
 	item_pool = new_item_pool
 	ensure_at_least_one = min_drops
 	destroy_after_open = destroy_after
-	print("Chest configured with ", item_pool.size(), " items, min_drops=", min_drops, ", destroy_after=", destroy_after)
+
 
 # Helper method to add items to the pool
 func add_item_to_pool(item: Resource) -> void:
 	if item != null:
 		item_pool.append(item)
-		print("Added ", item.name, " to chest pool. Pool size: ", item_pool.size())
+
 
 # Helper method to remove items from the pool
 func remove_item_from_pool(item: Resource) -> void:
 	if item != null and item_pool.has(item):
 		item_pool.erase(item)
-		print("Removed ", item.name, " from chest pool. Pool size: ", item_pool.size())
+
 
 # Legacy function for compatibility (calls the new system)
 func give_item_to_player(player: Node):
-	print("=== give_item_to_player called (legacy) ===")
 	give_items_to_player(player)
-	print("=== give_item_to_player finished (legacy) ===")
