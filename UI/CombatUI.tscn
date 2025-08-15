@@ -1,6 +1,63 @@
-[gd_scene load_steps=2 format=3 uid="uid://bqxvxqxqxqxqx"]
+[gd_scene load_steps=5 format=3 uid="uid://bqxvxqxqxqxqx"]
 
 [ext_resource type="Script" uid="uid://bme6hpjby01g7" path="res://UI/combat_ui.gd" id="1_combat_ui"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_combat_log"]
+content_margin_left = 15.0
+content_margin_top = 15.0
+content_margin_right = 15.0
+content_margin_bottom = 15.0
+bg_color = Color(0.05, 0.07, 0.09, 0.92)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.2, 0.3, 0.35, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.3)
+shadow_size = 8
+shadow_offset = Vector2(4, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_combat_panel"]
+content_margin_left = 15.0
+content_margin_top = 15.0
+content_margin_right = 15.0
+content_margin_bottom = 15.0
+bg_color = Color(0.05, 0.07, 0.09, 0.92)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.2, 0.3, 0.35, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.3)
+shadow_size = 8
+shadow_offset = Vector2(4, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_popup"]
+content_margin_left = 15.0
+content_margin_top = 15.0
+content_margin_right = 15.0
+content_margin_bottom = 15.0
+bg_color = Color(0.05, 0.07, 0.09, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.2, 0.3, 0.35, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.3)
+shadow_size = 8
+shadow_offset = Vector2(4, 4)
 
 [node name="CombatUI" type="CanvasLayer"]
 script = ExtResource("1_combat_ui")
@@ -11,36 +68,47 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -600.0
-offset_top = -620.0
-offset_bottom = -520.0
+offset_left = -602.0
+offset_top = -757.0
+offset_right = -2.0
+offset_bottom = -457.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_combat_log")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CombatLogPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
+offset_left = 15.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = -15.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 6
 
 [node name="CombatLogLabel" type="Label" parent="CombatLogPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 18
 text = "COMBAT LOG"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="CombatLogPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="CombatLogText" type="TextEdit" parent="CombatLogPanel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 180)
+custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme_override_colors/background_color = Color(0.1, 0.12, 0.14, 0.8)
+theme_override_colors/font_readonly_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 placeholder_text = "Combat events will appear here..."
 editable = false
 context_menu_enabled = false
@@ -57,48 +125,64 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -600.0
-offset_top = -500.0
+offset_left = -603.0
+offset_top = -451.0
+offset_right = -3.0
+offset_bottom = -3.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_combat_panel")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CombatPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
+offset_left = 15.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = -15.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 6
 
 [node name="TitleLabel" type="Label" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 18
 text = "COMBAT"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="HSeparator1" type="HSeparator" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="TurnInfoSection" type="VBoxContainer" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 4
 
 [node name="TurnInfoLabel" type="Label" parent="CombatPanel/VBoxContainer/TurnInfoSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Turn: Player"
 horizontal_alignment = 1
 
 [node name="HSeparator2" type="HSeparator" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 3
 
 [node name="ATBSection" type="VBoxContainer" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 4
 
 [node name="ATBStatusLabel" type="Label" parent="CombatPanel/VBoxContainer/ATBSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
 text = "⏳ ATB bar filling... (0%)"
 horizontal_alignment = 1
 
@@ -106,10 +190,13 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 show_percentage = false
 
 [node name="PlayerATBLabel" type="Label" parent="CombatPanel/VBoxContainer/ATBSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
 text = "Player ATB"
 horizontal_alignment = 1
 
@@ -117,86 +204,131 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 show_percentage = false
 
 [node name="EnemyATBLabel" type="Label" parent="CombatPanel/VBoxContainer/ATBSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 12
 text = "Enemy ATB"
 horizontal_alignment = 1
 
 [node name="HSeparator3" type="HSeparator" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="QueuedActionSection" type="VBoxContainer" parent="CombatPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="QueuedActionLabel" type="Label" parent="CombatPanel/VBoxContainer/QueuedActionSection"]
+modulate = Color(1, 1, 0, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 14
+text = "No action queued"
+horizontal_alignment = 1
+
+[node name="HSeparator4" type="HSeparator" parent="CombatPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 3
 
 [node name="ActionsSection" type="VBoxContainer" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 6
 
 [node name="ActionsLabel" type="Label" parent="CombatPanel/VBoxContainer/ActionsSection"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 16
 text = "ACTIONS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="BasicAttackButton" type="Button" parent="CombatPanel/VBoxContainer/ActionsSection"]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Basic Attack"
 
 [node name="DefendButton" type="Button" parent="CombatPanel/VBoxContainer/ActionsSection"]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Defend"
 
 [node name="ItemButton" type="Button" parent="CombatPanel/VBoxContainer/ActionsSection"]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Use Item"
 
 [node name="SpecialAttacksButton" type="Button" parent="CombatPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Special Attacks"
 
 [node name="SpellsButton" type="Button" parent="CombatPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Spells"
 
-[node name="HSeparator4" type="HSeparator" parent="CombatPanel/VBoxContainer"]
+[node name="HSeparator5" type="HSeparator" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="SpecialAttacksPopup" type="Panel" parent="."]
 visible = false
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -250.0
-offset_top = -200.0
-offset_right = 250.0
-offset_bottom = 200.0
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -1200.0
+offset_top = -800.0
+offset_right = -650.0
+offset_bottom = -400.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_popup")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="SpecialAttacksPopup"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
+offset_left = 25.0
+offset_top = 25.0
+offset_right = -25.0
+offset_bottom = -25.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 8
 
 [node name="TitleLabel" type="Label" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 18
 text = "SPECIAL ATTACKS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="ScrollContainer" type="ScrollContainer" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
@@ -206,53 +338,64 @@ size_flags_vertical = 3
 [node name="VBoxContainer" type="VBoxContainer" parent="SpecialAttacksPopup/VBoxContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 6
 
 [node name="HaymakerButton" type="Button" parent="SpecialAttacksPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 tooltip_text = "A powerful haymaker punch that deals guaranteed critical damage but causes self-damage"
-text = "Haymaker (15 SP)"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Haymaker (3 SP)"
 
 [node name="HSeparator2" type="HSeparator" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="CloseButton" type="Button" parent="SpecialAttacksPopup/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Close"
 
 [node name="SpellsPopup" type="Panel" parent="."]
 visible = false
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -250.0
-offset_top = -200.0
-offset_right = 250.0
-offset_bottom = 200.0
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -1200.0
+offset_top = -800.0
+offset_right = -650.0
+offset_bottom = -400.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_popup")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="SpellsPopup"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
+offset_left = 25.0
+offset_top = 25.0
+offset_right = -25.0
+offset_bottom = -25.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 8
 
 [node name="TitleLabel" type="Label" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 18
 text = "SPELLS"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="ScrollContainer" type="ScrollContainer" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
@@ -262,17 +405,23 @@ size_flags_vertical = 3
 [node name="VBoxContainer" type="VBoxContainer" parent="SpellsPopup/VBoxContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 6
 
 [node name="FireballButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 tooltip_text = "A ranged fire spell that deals fire damage and may ignite the target"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Fireball (15 MP)"
 
 [node name="HSeparator2" type="HSeparator" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="CloseButton" type="Button" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
 text = "Close"

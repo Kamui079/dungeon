@@ -4,6 +4,10 @@ extends CanvasLayer
 var tooltip_panel: Panel
 var item_name_label: Label
 var item_type_label: Label
+var item_rarity_label: Label
+var item_level_label: Label
+var item_stats_label: Label
+var item_description_label: Label
 var show_timer: Timer
 var hide_timer: Timer
 var current_item: Item = null
@@ -18,6 +22,10 @@ func _ready():
 	tooltip_panel = $TooltipPanel
 	item_name_label = $TooltipPanel/VBoxContainer/ItemNameLabel
 	item_type_label = $TooltipPanel/VBoxContainer/ItemTypeLabel
+	item_rarity_label = $TooltipPanel/VBoxContainer/ItemRarityLabel
+	item_level_label = $TooltipPanel/VBoxContainer/ItemLevelLabel
+	item_stats_label = $TooltipPanel/VBoxContainer/ItemStatsLabel
+	item_description_label = $TooltipPanel/VBoxContainer/ItemDescriptionLabel
 	
 	# Set up timers
 	show_timer = $ShowTimer
@@ -32,7 +40,33 @@ func _ready():
 	
 	# Set up the tooltip panel
 	tooltip_panel.visible = false
+	tooltip_panel.modulate.a = 0.0  # Start transparent for fade-in effect
 	layer = 1000
+	
+	# Initialize all labels to be hidden and empty
+	_initialize_tooltip_labels()
+
+func _initialize_tooltip_labels():
+	"""Initialize all tooltip labels to be hidden and empty"""
+	if item_name_label:
+		item_name_label.text = ""
+		item_name_label.visible = false
+	if item_type_label:
+		item_type_label.text = ""
+		item_type_label.visible = false
+	if item_rarity_label:
+		item_rarity_label.text = ""
+		item_rarity_label.visible = false
+	if item_level_label:
+		item_level_label.text = ""
+		item_level_label.visible = false
+	if item_stats_label:
+		item_stats_label.text = ""
+		item_stats_label.visible = false
+	if item_description_label:
+		item_description_label.text = ""
+		item_description_label.visible = false
+
 
 func _process(_delta):
 	var mouse_pos = get_viewport().get_mouse_position()
@@ -213,17 +247,18 @@ func _update_tooltip_position(mouse_pos: Vector2):
 	# Calculate position (offset by 20 pixels from mouse)
 	var tooltip_pos = mouse_pos + Vector2(20, 20)
 	
-	# Ensure tooltip stays within viewport bounds
-	if tooltip_pos.x + tooltip_size.x > viewport_size.x:
+	# Ensure tooltip stays within viewport bounds with better edge detection
+	if tooltip_pos.x + tooltip_size.x > viewport_size.x - 20:
 		tooltip_pos.x = mouse_pos.x - tooltip_size.x - 20
 	
-	if tooltip_pos.y + tooltip_size.y > viewport_size.y:
+	if tooltip_pos.y + tooltip_size.y > viewport_size.y - 20:
 		tooltip_pos.y = mouse_pos.y - tooltip_size.y - 20
 	
 	# Ensure tooltip doesn't go off the left or top edges
-	tooltip_pos.x = max(0, tooltip_pos.x)
-	tooltip_pos.y = max(0, tooltip_pos.y)
+	tooltip_pos.x = max(20, tooltip_pos.x)
+	tooltip_pos.y = max(20, tooltip_pos.y)
 	
+	# Direct positioning - no animations for snappy feel
 	tooltip_panel.position = tooltip_pos
 
 func show_tooltip(item: Item):
@@ -345,12 +380,18 @@ func _show_tooltip():
 	if not current_item:
 		return
 	
-	# Set item information
-	item_name_label.text = current_item.name
-	item_type_label.text = str(current_item.item_type)
+	# Clear all sections first
+	_clear_tooltip_sections()
 	
-	# Show the tooltip
+	# Build tooltip using structured sections
+	_build_tooltip_content()
+	
+	# Auto-resize the tooltip panel to fit content
+	_auto_resize_tooltip()
+	
+	# Show the tooltip immediately - no fade for snappy feel
 	tooltip_panel.visible = true
+	tooltip_panel.modulate.a = 1.0  # Ensure full opacity
 	tooltip_visible = true
 	
 	# Initialize position
@@ -358,7 +399,271 @@ func _show_tooltip():
 	last_mouse_pos = mouse_pos
 	_update_tooltip_position(mouse_pos)
 
+func _clear_tooltip_sections():
+	"""Clear all tooltip sections to prepare for new content"""
+	item_name_label.text = ""
+	item_type_label.text = ""
+	item_rarity_label.text = ""
+	item_level_label.text = ""
+	item_stats_label.text = ""
+	item_description_label.text = ""
+
+func _build_tooltip_content():
+	"""Build tooltip content using structured sections"""
+	
+	# SECTION 1: Item Name (controlled by inspector)
+	if current_item.has_method("should_show_tooltip_name") and current_item.should_show_tooltip_name():
+		var name_text = current_item.name
+		if current_item.has_method("get_tooltip_name"):
+			name_text = current_item.get_tooltip_name()
+		item_name_label.text = name_text
+		item_name_label.visible = true
+	else:
+		item_name_label.visible = false
+	
+	# SECTION 2: Item Type (controlled by inspector)
+	if current_item.has_method("should_show_tooltip_type") and current_item.should_show_tooltip_type():
+		var type_text = "Item"
+		if current_item.has_method("get_tooltip_type"):
+			type_text = current_item.get_tooltip_type()
+		item_type_label.text = type_text
+		item_type_label.visible = true
+	else:
+		item_type_label.visible = false
+	
+	# SECTION 3: Rarity (controlled by inspector)
+	if current_item.has_method("should_show_tooltip_rarity") and current_item.should_show_tooltip_rarity():
+		var rarity_text = "Rarity: "
+		if current_item.has_method("get_tooltip_rarity"):
+			rarity_text += current_item.get_tooltip_rarity()
+		else:
+			rarity_text += "Common"
+		item_rarity_label.text = rarity_text
+		item_rarity_label.visible = true
+		
+		# ALWAYS set rarity color when rarity is displayed
+		_set_rarity_color(current_item)
+	else:
+		item_rarity_label.visible = false
+	
+	# SECTION 4: Level Requirement (controlled by inspector)
+	if current_item.has_method("should_show_tooltip_level_requirement") and current_item.should_show_tooltip_level_requirement():
+		var level_req = 1
+		if current_item.has_method("get_tooltip_level_requirement"):
+			level_req = current_item.get_tooltip_level_requirement()
+		if level_req > 1:
+			item_level_label.text = "Required Level: " + str(level_req)
+			item_level_label.visible = true
+		else:
+			item_level_label.visible = false
+	else:
+		item_level_label.visible = false
+	
+	# SECTION 5: Stats (controlled by inspector)
+	if current_item.has_method("should_show_tooltip_stats") and current_item.should_show_tooltip_stats():
+		var stats_text = _build_stats_section()
+		if stats_text != "":
+			item_stats_label.text = stats_text
+			item_stats_label.visible = true
+		else:
+			item_stats_label.visible = false
+	else:
+		item_stats_label.visible = false
+	
+	# SECTION 6: Description (controlled by inspector)
+	if current_item.has_method("should_show_tooltip_description") and current_item.should_show_tooltip_description():
+		var desc_text = "A mysterious item with unknown properties."
+		if current_item.has_method("get_tooltip_description"):
+			desc_text = current_item.get_tooltip_description()
+		elif current_item.has_method("description"):
+			desc_text = current_item.description
+		
+		# Format description for readability
+		desc_text = _format_description(desc_text)
+		item_description_label.text = desc_text
+		item_description_label.visible = true
+	else:
+		item_description_label.visible = false
+
+func _set_rarity_color(item: Item):
+	"""Set the appropriate color for the rarity label"""
+	
+	if item.has_method("get_rarity"):
+		var rarity = item.get_rarity().to_lower()
+		match rarity:
+			"common":
+				item_rarity_label.modulate = Color(0.9, 0.9, 0.9, 1)  # White
+			"uncommon":
+				item_rarity_label.modulate = Color(0.2, 1.0, 0.2, 1)  # Green
+			"rare":
+				item_rarity_label.modulate = Color(0.2, 0.4, 1.0, 1)  # Blue
+			"epic":
+				item_rarity_label.modulate = Color(0.8, 0.2, 1.0, 1)  # Purple
+			"legendary":
+				item_rarity_label.modulate = Color(1.0, 0.5, 0.0, 1)  # Orange
+			_:
+				item_rarity_label.modulate = Color(0.9, 0.9, 0.9, 1)  # Default white
+	else:
+		item_rarity_label.modulate = Color(0.9, 0.9, 0.9, 1)  # Default white
+
+func _build_stats_section() -> String:
+	"""Build the stats section text"""
+	var stats_text = ""
+	
+	# Special handling for consumable items to show damage and effects
+	if current_item.item_type == Item.ITEM_TYPE.CONSUMABLE:
+		stats_text = _build_consumable_stats()
+		if stats_text != "":
+			return stats_text
+	
+	# First try to get custom stats from inspector
+	if current_item.has_method("get_tooltip_stats"):
+		var custom_stats = current_item.get_tooltip_stats()
+		if custom_stats and custom_stats.size() > 0:
+			for stat_name in custom_stats:
+				var stat_value = custom_stats[stat_name]
+				if stat_value > 0:
+					stats_text += "+" + str(stat_value) + " " + stat_name.capitalize() + "\n"
+				elif stat_value < 0:
+					stats_text += str(stat_value) + " " + stat_name.capitalize() + "\n"
+				else:
+					stats_text += stat_name.capitalize() + ": " + str(stat_value) + "\n"
+			return stats_text
+	
+	# Fallback to legacy get_stats method if no custom stats
+	if current_item.has_method("get_stats"):
+		var stats = current_item.get_stats()
+		if stats and stats.size() > 0:
+			# Format stats like Diablo 2: "+5 Strength", "+3 Dexterity", etc.
+			for stat_name in stats:
+				var stat_value = stats[stat_name]
+				if stat_value > 0:
+					stats_text += "+" + str(stat_value) + " " + stat_name.capitalize() + "\n"
+				elif stat_value < 0:
+					stats_text += str(stat_value) + " " + stat_name.capitalize() + "\n"
+				else:
+					stats_text += stat_name.capitalize() + ": " + str(stat_value) + "\n"
+	
+	return stats_text
+
+func _build_consumable_stats() -> String:
+	"""Build stats specifically for consumable items"""
+	var stats_text = ""
+	
+	# Get custom stats for consumables
+	if current_item.has_method("get_tooltip_stats"):
+		var custom_stats = current_item.get_tooltip_stats()
+		if custom_stats and custom_stats.size() > 0:
+			# Show damage and damage type prominently
+			if custom_stats.has("damage") and custom_stats.damage > 0:
+				var damage_type = custom_stats.get("damage_type", "physical")
+				stats_text += "⚔️ " + str(custom_stats.damage) + " " + damage_type.capitalize() + " Damage\n"
+			
+			# Show armor penetration if present
+			if custom_stats.has("armor_penetration") and custom_stats.armor_penetration > 0:
+				stats_text += "🛡️ " + str(custom_stats.armor_penetration) + " Armor Penetration\n"
+			
+			# Show duration if present
+			if custom_stats.has("duration") and custom_stats.duration > 0:
+				stats_text += "⏱️ " + str(custom_stats.duration) + " Turn Duration\n"
+			
+			# Show poison chance and damage if present
+			if custom_stats.has("poison_chance") and custom_stats.poison_chance > 0:
+				stats_text += "☠️ " + str(custom_stats.poison_chance) + "% Poison Chance\n"
+				if custom_stats.has("poison_damage") and custom_stats.poison_damage > 0:
+					stats_text += "  " + str(custom_stats.poison_damage) + " Poison Damage/Turn\n"
+			
+			# Show other custom stats
+			for stat_name in custom_stats:
+				var stat_value = custom_stats[stat_name]
+				# Skip stats we've already handled specially
+				if stat_name in ["damage", "damage_type", "armor_penetration", "duration", "poison_chance", "poison_damage"]:
+					continue
+				if stat_value > 0:
+					stats_text += "+" + str(stat_value) + " " + stat_name.capitalize() + "\n"
+				elif stat_value < 0:
+					stats_text += str(stat_value) + " " + stat_name.capitalize() + "\n"
+	
+	return stats_text
+
+func _format_description(desc_text: String) -> String:
+	"""Format description text for better readability"""
+	if desc_text.length() > 60:
+		# Add line breaks for readability
+		var words = desc_text.split(" ")
+		var formatted_desc = ""
+		var current_line = ""
+		for word in words:
+			if (current_line + word).length() > 30:
+				formatted_desc += current_line + "\n"
+				current_line = word + " "
+			else:
+				current_line += word + " "
+		formatted_desc += current_line
+		return formatted_desc
+	
+	return desc_text
+
+func _auto_resize_tooltip():
+	"""Automatically resize the tooltip panel to fit its content"""
+	# Wait a frame for all labels to update their sizes
+	await get_tree().process_frame
+	
+	# Calculate the total height needed
+	var total_height = 0
+	var vbox = $TooltipPanel/VBoxContainer
+	
+	# Add up the height of all visible children
+	for child in vbox.get_children():
+		if child.visible and child is Control:
+			total_height += child.size.y
+	
+	# Add spacing between elements
+	var spacing = vbox.get_theme_constant("separation")
+	var visible_children = 0
+	for child in vbox.get_children():
+		if child.visible:
+			visible_children += 1
+	
+	if visible_children > 1:
+		total_height += spacing * (visible_children - 1)
+	
+	# Add top and bottom margins
+	total_height += 24  # 12px top + 12px bottom
+	
+	# Set minimum and maximum sizes
+	var min_height = 120  # Minimum tooltip height
+	var max_height = 400  # Maximum tooltip height
+	
+	# Apply the calculated height with constraints
+	var new_height = clamp(total_height, min_height, max_height)
+	tooltip_panel.size.y = new_height
+	
+	# Update the background highlight to match
+	var highlight = $TooltipPanel/BackgroundHighlight
+	if highlight:
+		highlight.size = tooltip_panel.size
+
 func _hide_tooltip():
+	# Hide immediately - no fade for snappy feel
 	tooltip_panel.visible = false
 	tooltip_visible = false
 	current_item = null
+	
+	# Clear all label text to prevent any leftover text from showing
+	_clear_all_label_text()
+
+func _clear_all_label_text():
+	"""Clear all label text to prevent leftover text from showing"""
+	if item_name_label:
+		item_name_label.text = ""
+	if item_type_label:
+		item_type_label.text = ""
+	if item_rarity_label:
+		item_rarity_label.text = ""
+	if item_level_label:
+		item_level_label.text = ""
+	if item_stats_label:
+		item_stats_label.text = ""
+	if item_description_label:
+		item_description_label.text = ""

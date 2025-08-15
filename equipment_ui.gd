@@ -190,6 +190,51 @@ func _update_display():
 	# Update stats display
 	_update_stats_display()
 
+func get_total_armor_value() -> int:
+	"""Get the total armor value from all equipped items"""
+	if not player_inventory:
+		return 0
+	
+	var total_armor = 0
+	var equipment = player_inventory.get_equipment()
+	
+	for slot_name in equipment:
+		var item = equipment[slot_name]
+		if item != null and item is Equipment:
+			total_armor += item.armor_value
+	
+	return total_armor
+
+func get_total_stat_bonuses() -> Dictionary:
+	"""Get all stat bonuses from equipped items"""
+	if not player_inventory:
+		return {}
+	
+	var total_bonuses = {
+		"strength": 0,
+		"dexterity": 0,
+		"intelligence": 0,
+		"speed": 0,
+		"cunning": 0,
+		"spell_power": 0,
+		"armor": 0
+	}
+	
+	var equipment = player_inventory.get_equipment()
+	
+	for slot_name in equipment:
+		var item = equipment[slot_name]
+		if item != null and item is Equipment:
+			# Add stat bonuses
+			for stat_name in item.stat_bonuses:
+				if total_bonuses.has(stat_name):
+					total_bonuses[stat_name] += item.stat_bonuses[stat_name]
+			
+			# Add armor value
+			total_bonuses["armor"] += item.armor_value
+	
+	return total_bonuses
+
 func _update_stats_display():
 	"""Update the stats display with current equipment bonuses"""
 	if not stats_list or not player_inventory:

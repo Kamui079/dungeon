@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="Item" load_steps=2 format=3 uid="uid://power_strike"]
+
+[ext_resource type="Script" path="res://Inventory/item.gd" id="1_item"]
+
+[resource]
+script = ExtResource("1_item")
+name = "Power Strike"
+description = "A powerful melee attack that deals increased damage."
+item_type = 1
+max_stack = 1
+drop_chance = 100.0
+rarity = 1
+equipment_slot = ""
+stats = {}
+
+# Tooltip Section Controls
+show_name = true
+show_type = true
+show_rarity = true
+show_level_requirement = true
+show_stats = true
+show_description = true
+
+# Tooltip Content
+custom_name = ""
+custom_type = "Combat Ability"
+custom_description = "A powerful melee attack that deals increased damage."
+level_requirement = 3
+custom_stats = {"damage": 15, "cooldown": 3, "stamina_cost": 10}

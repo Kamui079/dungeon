@@ -1,0 +1,79 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://consumables_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"potions": {
+		"ints_to_locators": {
+			0: "res://Consumables/SmallHealingPotion.tres",
+			1: "res://Consumables/SmallManaPotion.tres"
+		},
+		"ints_to_strings": {
+			0: "small_healing",
+			1: "small_mana"
+		},
+		"strings_to_ints": {
+			"small_healing": 0,
+			"small_mana": 1
+		},
+		"categories_to_ints": {
+			"health": {0: true},
+			"mana": {1: true},
+			"basic": {0: true, 1: true},
+			"starter": {0: true, 1: true}
+		}
+	},
+	"throwables": {
+		"ints_to_locators": {
+			0: "res://Consumables/AcidFlask.tres",
+			1: "res://Consumables/VenomDart.tres"
+		},
+		"ints_to_strings": {
+			0: "acid_flask",
+			1: "venom_dart"
+		},
+		"strings_to_ints": {
+			"acid_flask": 0,
+			"venom_dart": 1
+		},
+		"categories_to_ints": {
+			"throwable": {0: true, 1: true},
+			"damage": {0: true, 1: true},
+			"status_effect": {0: true, 1: true},
+			"acid": {0: true},
+			"poison": {1: true},
+			"combat": {0: true, 1: true}
+		}
+	},
+	"all_consumables": {
+		"ints_to_locators": {
+			0: "res://Consumables/SmallHealingPotion.tres",
+			1: "res://Consumables/SmallManaPotion.tres",
+			2: "res://Consumables/AcidFlask.tres",
+			3: "res://Consumables/VenomDart.tres"
+		},
+		"ints_to_strings": {
+			0: "small_healing",
+			1: "small_mana",
+			2: "acid_flask",
+			3: "venom_dart"
+		},
+		"strings_to_ints": {
+			"small_healing": 0,
+			"small_mana": 1,
+			"acid_flask": 2,
+			"venom_dart": 3
+		},
+		"categories_to_ints": {
+			"healing": {0: true},
+			"mana": {1: true},
+			"throwable": {2: true, 3: true},
+			"damage": {2: true, 3: true},
+			"status_effect": {2: true, 3: true},
+			"starter": {0: true, 1: true},
+			"combat": {2: true, 3: true}
+		}
+	}
+}

@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://weapons_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"weapons": {
+		"ints_to_locators": {
+			0: "res://weapons/rusty_sword.tres"
+		},
+		"ints_to_strings": {
+			0: "rusty_sword"
+		},
+		"strings_to_ints": {
+			"rusty_sword": 0
+		},
+		"categories_to_ints": {
+			"melee": {0: true},
+			"sword": {0: true},
+			"starter": {0: true},
+			"basic": {0: true},
+			"one_handed": {0: true}
+		}
+	},
+	"melee_weapons": {
+		"ints_to_locators": {
+			0: "res://weapons/rusty_sword.tres"
+		},
+		"ints_to_strings": {
+			0: "rusty_sword"
+		},
+		"strings_to_ints": {
+			"rusty_sword": 0
+		},
+		"categories_to_ints": {
+			"melee": {0: true},
+			"sword": {0: true},
+			"starter": {0: true},
+			"basic": {0: true},
+			"one_handed": {0: true}
+		}
+	},
+	"starter_weapons": {
+		"ints_to_locators": {
+			0: "res://weapons/rusty_sword.tres"
+		},
+		"ints_to_strings": {
+			0: "rusty_sword"
+		},
+		"strings_to_ints": {
+			"rusty_sword": 0
+		},
+		"categories_to_ints": {
+			"starter": {0: true},
+			"basic": {0: true},
+			"tier_1": {0: true}
+		}
+	}
+}

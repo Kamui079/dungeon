@@ -6,11 +6,15 @@ signal combat_started
 signal combat_ended
 signal turn_changed(current_actor: Node, turn_type: String)
 signal atb_bar_updated(player_progress: float, enemy_progress: float)
+signal action_queued(action: String, data: Dictionary)
+signal action_dequeued()
 
 var in_combat: bool = false
-var current_enemy: Node = null
+var current_enemies: Array[Node] = []  # Array to support multiple enemies
+var current_enemy: Node = null  # Keep for backward compatibility
 var current_player: Node = null
 var combat_ui: Node = null
+var hud: Node = null  # Reference to the HUD for spirit bar control
 var current_actor: Node = null  # Who's currently acting
 var turn_type: String = "player"  # "player" or "enemy"
 var player_defending: bool = false  # Track if player is defending
@@ -88,7 +92,11 @@ func start_combat(enemy: Node, player: Node):
 		return
 	
 	in_combat = true
-	current_enemy = enemy
+	
+	# Add enemy to the list and set as current
+	if not current_enemies.has(enemy):
+		current_enemies.append(enemy)
+	current_enemy = enemy  # Maintain backward compatibility
 	current_player = player
 	combat_round = 1
 	
@@ -99,6 +107,22 @@ func start_combat(enemy: Node, player: Node):
 		print("Combat UI has add_combat_log_entry method: ", combat_ui.has_method("add_combat_log_entry"))
 	else:
 		print("WARNING: No CombatUI found in scene!")
+	
+	# Find HUD for spirit bar control
+	hud = get_tree().get_first_node_in_group("HUD")
+	if not hud and current_player:
+		# Try to find HUD as a child of the player
+		for child in current_player.get_children():
+			if child.has_method("show_spirit_bar"):
+				hud = child
+				break
+	
+	print("HUD found: ", hud)
+	if hud and hud.has_method("show_spirit_bar"):
+		hud.show_spirit_bar()
+		print("Spirit bar shown!")
+	else:
+		print("WARNING: No HUD found or missing show_spirit_bar method!")
 	
 	# Log combat start
 	_log_combat_event("⚔️ Combat started! " + enemy.enemy_name + " vs " + player.name)
@@ -114,6 +138,9 @@ func start_combat(enemy: Node, player: Node):
 	# Call enemy's custom combat start behavior
 	if current_enemy and current_enemy.has_method("on_combat_start"):
 		current_enemy.on_combat_start()
+	
+	# Orient player and camera toward the enemy
+	_orient_player_toward_enemy()
 	
 	# Freeze both entities
 	if current_player and current_player.has_method("set_physics_process_enabled"):
@@ -209,6 +236,14 @@ func _start_player_turn():
 	waiting_for_action = true
 	player_turn_ready = true
 	
+	# Passive spirit is now given in _on_player_atb_ready() to ensure it happens every turn
+	
+	# Check if there's a queued action to execute immediately
+	if player_action_queued:
+		print("🎯 Executing queued action at start of player turn!")
+		_execute_queued_player_action()
+		return
+	
 	print("=== PLAYER TURN STARTED ===")
 	_log_turn_start(current_player, "player")
 	
@@ -222,6 +257,11 @@ func _start_enemy_turn():
 	current_actor = current_enemy
 	waiting_for_action = false
 	enemy_turn_ready = true
+	
+	# Give passive spirit regeneration (2 points per turn)
+	if current_enemy and current_enemy.has_method("gain_spirit"):
+		current_enemy.gain_spirit(2)
+		print("✨ Enemy gained 2 passive spirit points for turn start")
 	
 	print("=== ENEMY TURN STARTED ===")
 	_log_turn_start(current_enemy, "enemy")
@@ -308,11 +348,31 @@ func _start_atb_progress_updates():
 	# Start the timer
 	atb_progress_timer.start()
 	print("ATB progress timer started with wait time: ", atb_progress_timer.wait_time, "s")
+	
+	# Store the start time for safety checks using meta
+	set_meta("atb_timer_start_time", Time.get_ticks_msec() / 1000.0)
 
 func _update_atb_progress():
 	"""Update ATB progress bars"""
 	if not in_combat:
 		return
+	
+	# Safety check: ensure we have valid references
+	if not current_player or not current_enemy:
+		print("⚠️ ATB update: Missing player or enemy reference")
+		return
+	
+	# Safety check: prevent ATB from running indefinitely
+	if atb_progress_timer and has_meta("atb_timer_start_time"):
+		var current_time = Time.get_ticks_msec() / 1000.0
+		var timer_start_time = get_meta("atb_timer_start_time", 0.0)
+		var timer_age = current_time - timer_start_time
+		
+		# If timer has been running for more than 60 seconds, something is wrong
+		if timer_age > 60.0:
+			print("⚠️ ATB timer running too long (", timer_age, "s), stopping for safety")
+			atb_progress_timer.stop()
+			return
 	
 	# Calculate progress based on elapsed time since each entity's ATB started
 	var current_time = Time.get_ticks_msec() / 1000.0
@@ -352,11 +412,34 @@ func _update_atb_progress():
 	
 	# Emit signal for UI updates
 	atb_bar_updated.emit(player_atb_progress, enemy_atb_progress)
+	
+	# Check if there are queued actions that should be executed now
+	# Only check every few frames to prevent excessive calls
+	if int(Time.get_ticks_msec() / 1000.0) % 3 == 0:  # Check every 3 seconds instead of every frame
+		check_and_execute_queued_actions()
 
 func _on_player_atb_ready():
 	"""Called when player's ATB bar is full"""
+	# Safety check: prevent multiple calls
+	if player_turn_ready:
+		print("⚠️ Player ATB already ready, ignoring duplicate call")
+		return
+		
 	print("🎯 PLAYER ATB READY - Starting player turn!")
 	player_turn_ready = true
+	
+	# ALWAYS give passive spirit when ATB is ready (this is the start of a turn)
+	if current_player and current_player.has_method("get_stats") and current_player.get_stats():
+		current_player.get_stats().gain_spirit(2)
+		print("✨ Player gained 2 passive spirit points for turn start (ATB ready)")
+	
+	print("🔍 DEBUG: ATB ready - player_action_queued: ", player_action_queued, " queued_action: ", queued_action)
+	
+	# Check if there's a queued action to execute
+	if player_action_queued:
+		print("🎯 Executing queued action now that ATB is ready!")
+		_execute_queued_player_action()
+		return
 	
 	# Only start player turn if no action is in progress
 	if not action_in_progress:
@@ -364,9 +447,18 @@ func _on_player_atb_ready():
 		_start_player_turn()
 	else:
 		print("⏸️ Player ATB ready but action in progress - turn will start when action finishes")
+	
+	# Also check for any queued actions that should execute now
+	# Use the throttled version to prevent excessive calls
+	check_and_execute_queued_actions()
 
 func _on_enemy_atb_ready():
 	"""Called when enemy's ATB bar is full"""
+	# Safety check: prevent multiple calls
+	if enemy_turn_ready:
+		print("⚠️ Enemy ATB already ready, ignoring duplicate call")
+		return
+		
 	print("🎯 ENEMY ATB READY - Starting enemy turn!")
 	enemy_turn_ready = true
 	
@@ -385,6 +477,10 @@ func _process_enemy_turn():
 	# Mark action as in progress
 	action_in_progress = true
 	enemy_turn_ready = false
+	
+	# Set turn type to enemy for proper ATB state management
+	turn_type = "enemy"
+	current_actor = current_enemy
 	
 	print("Enemy taking turn...")
 	
@@ -415,11 +511,16 @@ func end_enemy_turn():
 	# Start a new ATB cycle for the enemy only
 	enemy_atb_start_time = Time.get_ticks_msec() / 1000.0
 	print("Enemy turn ended - starting new ATB cycle at: ", enemy_atb_start_time, "s")
+	
+	# Check if player has queued actions that should execute now
+	check_and_execute_queued_actions()
 
 # Private method for internal use
 func _end_enemy_turn():
 	"""Private method to end enemy turn - use end_enemy_turn() instead"""
-	end_enemy_turn()
+	# This was causing a recursive loop - just call the public method directly
+	# end_enemy_turn()  # REMOVED to prevent recursion
+	pass
 
 func _end_player_turn():
 	"""End the player's turn"""
@@ -427,12 +528,21 @@ func _end_player_turn():
 	action_in_progress = false
 	player_turn_ready = false
 	
+	# Check if there's a queued action to execute immediately
+	if player_action_queued:
+		print("🎯 Executing queued action after turn ended!")
+		_execute_queued_player_action()
+		return
+	
 	# Reset player ATB progress and start new timer
 	player_atb_progress = 0.0
 	
 	# Start a new ATB cycle for the player only
 	player_atb_start_time = Time.get_ticks_msec() / 1000.0
 	print("Player turn ended - starting new ATB cycle at: ", player_atb_start_time, "s")
+	
+	# Check if there are more queued actions to execute
+	check_and_execute_queued_actions()
 
 func end_combat():
 	if not in_combat:
@@ -489,22 +599,42 @@ func end_combat():
 			current_player.set_process_mode(Node.PROCESS_MODE_INHERIT)
 		elif current_player and current_player.has_method("set_process"):
 			current_player.set_process(true)
-			
-	if current_enemy and current_enemy.has_method("set_physics_process_enabled"):
-		current_enemy.set_physics_process_enabled(true)
-	else:
-		# Try alternative unfreezing methods
-		if current_enemy and current_enemy.has_method("set_process_mode"):
-			current_enemy.set_process_mode(Node.PROCESS_MODE_INHERIT)
-		elif current_enemy and current_player.has_method("set_process"):
-			current_enemy.set_process(true)
 	
+	# Unfreeze all enemies
+	for enemy in current_enemies:
+		if enemy and enemy.has_method("set_physics_process_enabled"):
+			enemy.set_physics_process_enabled(true)
+		elif enemy and enemy.has_method("set_process_mode"):
+			enemy.set_process_mode(Node.PROCESS_MODE_INHERIT)
+		elif enemy and enemy.has_method("set_process"):
+			enemy.set_process(true)
+			
 	# Clear references
+	current_enemies.clear()
 	current_enemy = null
 	current_player = null
 	
 	# Emit signal for UI to respond
 	combat_ended.emit()
+	
+	# Hide spirit bar when combat ends
+	if hud and hud.has_method("hide_spirit_bar"):
+		hud.hide_spirit_bar()
+		print("Spirit bar hidden!")
+	elif current_player:
+		# Try to find HUD as a child of the player
+		var hud_found = false
+		for child in current_player.get_children():
+			if child.has_method("hide_spirit_bar"):
+				child.hide_spirit_bar()
+				print("Spirit bar hidden via player child search!")
+				hud_found = true
+				break
+		
+		if not hud_found:
+			print("WARNING: No HUD found or missing hide_spirit_bar method!")
+	else:
+		print("WARNING: No HUD found or missing hide_spirit_bar method!")
 
 # Player action methods with action queuing
 func player_basic_attack():
@@ -514,13 +644,21 @@ func player_basic_attack():
 	
 	# Check if player's turn is ready
 	if not player_turn_ready:
-		print("Player turn not ready yet!")
+		print("Player turn not ready yet! Queuing basic attack...")
+		_queue_player_action("basic_attack", {})
 		return
 	
 	# Check if an action is already in progress
 	if action_in_progress:
 		print("Action in progress, queuing basic attack...")
 		_queue_player_action("basic_attack", {})
+		return
+	
+	# If we get here, the action can be executed immediately
+	# Check if there are any queued actions that should go first
+	if player_action_queued:
+		print("🎯 Executing queued action first, then basic attack!")
+		_execute_queued_player_action()
 		return
 	
 	# Mark action as in progress
@@ -548,24 +686,47 @@ func player_basic_attack():
 		current_enemy.take_damage(final_damage)
 		_log_damage_dealt(current_player, current_enemy, final_damage)
 	
+	# Gain spirit from basic attack
+	if player_stats.has_method("gain_spirit"):
+		player_stats.gain_spirit(1)
+		print("⚔️ Player gained 1 spirit point from basic attack")
+	
 	# End player turn
 	_end_player_turn()
 
 func player_special_attack():
+	print("DEBUG: player_special_attack() called")
 	print("=== player_special_attack called ===")
+	
+	# Check spirit points FIRST, before any ATB or queuing logic
+	var haymaker_cost = 3
+	var current_spirit = current_player.get_spirit()
+	print("DEBUG: player_special_attack - Checking spirit FIRST - Need: ", haymaker_cost, " SP, Have: ", current_spirit, " SP")
+	if current_spirit < haymaker_cost:
+		print("Not enough spirit! Need ", haymaker_cost, " SP, have ", current_spirit, " SP")
+		return
+	
 	if not in_combat or not current_enemy or not current_player:
 		print("Cannot perform special attack: in_combat=", in_combat, " current_enemy=", current_enemy, " current_player=", current_player)
 		return
 	
 	# Check if player's turn is ready (ATB system)
 	if not player_turn_ready:
-		print("Player turn not ready yet!")
+		print("Player turn not ready yet! Queuing special attack...")
+		_queue_player_action("special_attack", {})
 		return
 	
 	# Check if an action is already in progress
 	if action_in_progress:
 		print("Action in progress, queuing special attack...")
 		_queue_player_action("special_attack", {})
+		return
+	
+	# If we get here, the action can be executed immediately
+	# Check if there are any queued actions that should go first
+	if player_action_queued:
+		print("🎯 Executing queued action first, then special attack!")
+		_execute_queued_player_action()
 		return
 	
 	# Mark action as in progress
@@ -575,11 +736,7 @@ func player_special_attack():
 	print("=== PLAYER SPECIAL ATTACK ===")
 	_log_player_action("special_attack")
 	
-	# Check if player has enough spirit
-	if not current_player.can_use_special_attack():
-		print("Not enough spirit! Need ", current_player.get_special_attack_cost(), " SP, have ", current_player.get_spirit(), " SP")
-		_end_player_turn()
-		return
+	# Spirit check already done at the beginning of the function
 	
 	# For ATB system, skip movement checks and perform attack directly
 	# Perform haymaker special attack
@@ -588,7 +745,7 @@ func player_special_attack():
 	var final_damage = _process_haymaker_attack(base_damage, damage_type)
 	
 	# Spend spirit cost
-	current_player.get_stats().spend_spirit(current_player.get_special_attack_cost())
+	current_player.get_stats().spend_spirit(haymaker_cost)
 	
 	print("Player performs Haymaker! Deals ", final_damage, " damage!")
 	
@@ -609,7 +766,8 @@ func player_special_attack():
 	# Check if enemy is defeated
 	if current_enemy.get_stats().health <= 0:
 		print("Enemy defeated!")
-		end_combat()
+		# Remove the defeated enemy and continue combat if there are others
+		remove_enemy_from_combat(current_enemy)
 		return
 	
 	# End turn after special attack
@@ -623,13 +781,21 @@ func player_cast_spell():
 	
 	# Check if player's turn is ready (ATB system)
 	if not player_turn_ready:
-		print("Player turn not ready yet!")
+		print("Player turn not ready yet! Queuing spell...")
+		_queue_player_action("cast_spell", {})
 		return
 	
 	# Check if an action is already in progress
 	if action_in_progress:
 		print("Action in progress, queuing spell...")
 		_queue_player_action("cast_spell", {})
+		return
+	
+	# If we get here, the action can be executed immediately
+	# Check if there are any queued actions that should go first
+	if player_action_queued:
+		print("🎯 Executing queued action first, then spell!")
+		_execute_queued_player_action()
 		return
 	
 	# Mark action as in progress
@@ -675,7 +841,8 @@ func player_cast_spell():
 	# Check if enemy is defeated
 	if current_enemy.get_stats().health <= 0:
 		print("Enemy defeated!")
-		end_combat()
+		# Remove the defeated enemy and continue combat if there are others
+		remove_enemy_from_combat(current_enemy)
 		return
 	
 	# End turn after spell
@@ -688,13 +855,21 @@ func player_defend():
 	
 	# Check if player's turn is ready
 	if not player_turn_ready:
-		print("Player turn not ready yet!")
+		print("Player turn not ready yet! Queuing defend...")
+		_queue_player_action("defend", {})
 		return
 	
 	# Check if an action is already in progress
 	if action_in_progress:
 		print("Action in progress, queuing defend...")
 		_queue_player_action("defend", {})
+		return
+	
+	# If we get here, the action can be executed immediately
+	# Check if there are any queued actions that should go first
+	if player_action_queued:
+		print("🎯 Executing queued action first, then defend!")
+		_execute_queued_player_action()
 		return
 	
 	# Mark action as in progress
@@ -717,13 +892,21 @@ func player_use_item(item_name: String):
 	
 	# Check if player's turn is ready
 	if not player_turn_ready:
-		print("Player turn not ready yet!")
+		print("Player turn not ready yet! Queuing item use...")
+		_queue_player_action("use_item", {"item_name": item_name})
 		return
 	
 	# Check if an action is already in progress
 	if action_in_progress:
 		print("Action in progress, queuing item use...")
 		_queue_player_action("use_item", {"item_name": item_name})
+		return
+	
+	# If we get here, the action can be executed immediately
+	# Check if there are any queued actions that should go first
+	if player_action_queued:
+		print("🎯 Executing queued action first, then item use!")
+		_execute_queued_player_action()
 		return
 	
 	# Mark action as in progress
@@ -733,9 +916,34 @@ func player_use_item(item_name: String):
 	print("=== PLAYER USE ITEM: ", item_name, " ===")
 	_log_player_action("use_item", {"item_name": item_name})
 	
-	# Use the item
-	if current_player.has_method("use_item"):
-		current_player.use_item(item_name)
+	# Find the item in inventory to get its properties
+	var player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
+	var item_resource = null
+	if player_inventory:
+		var bag = player_inventory.get_bag()
+		for slot in bag:
+			if bag[slot].item.name == item_name:
+				item_resource = bag[slot].item
+				break
+	
+	# Use the item directly on the player
+	if item_resource and item_resource.has_method("use"):
+		item_resource.use(current_player)
+	
+	# Handle special item effects (like throwable weapons)
+	if item_resource and item_resource.custom_effect == "throw_damage":
+		_handle_combat_item_use(item_resource)
+	
+	# Consume the item from inventory
+	if player_inventory and item_resource:
+		var bag = player_inventory.get_bag()
+		for slot in bag:
+			if bag[slot].item.name == item_name:
+				bag[slot].quantity -= 1
+				if bag[slot].quantity <= 0:
+					bag.erase(slot)
+				player_inventory.inventory_changed.emit()
+				break
 	
 	# End player turn
 	_end_player_turn()
@@ -898,8 +1106,8 @@ func _apply_damage_to_enemy(damage: int) -> Dictionary:
 	var enemy_stats = current_enemy.get_stats()
 	var armor_reduction = 0
 	
-	if enemy_stats and enemy_stats.has_method("get_armor"):
-		armor_reduction = enemy_stats.get_armor()
+	if enemy_stats and enemy_stats.has_method("get_armor_value"):
+		armor_reduction = enemy_stats.get_armor_value()
 	
 	# Calculate final damage (armor reduces damage by 1 per point)
 	var final_damage = max(1, damage - armor_reduction)
@@ -938,32 +1146,364 @@ func _queue_player_action(action: String, data: Dictionary):
 	player_action_queued = true
 	queued_action = action
 	queued_action_data = data
-	print("Player action queued: ", action)
+	print("Player action queued: ", action, " with data: ", data)
+	
+	# Emit signal for UI to show queued action
+	action_queued.emit(action, data)
+	
+	# Log the queued action to the combat UI
+	if combat_ui and combat_ui.has_method("add_combat_log_entry"):
+		var action_display = action.replace("_", " ").capitalize()
+		var message = "⏳ " + action_display + " queued - waiting for ATB bar to fill"
+		if data.has("item_name"):
+			message += " (" + data["item_name"] + ")"
+		combat_ui.add_combat_log_entry(message)
+	
+	# Debug: Print the current state after queuing
+	print("🔍 DEBUG: After queuing - player_action_queued: ", player_action_queued, " queued_action: ", queued_action)
 
 func _execute_queued_player_action():
 	"""Execute the queued player action"""
+	print("🚀 _execute_queued_player_action called!")
+	
 	if not player_action_queued:
+		print("❌ No queued action to execute!")
 		return
 	
 	var action = queued_action
 	var data = queued_action_data
+	
+	print("🎯 Executing queued action: ", action, " with data: ", data)
 	
 	# Clear the queue
 	player_action_queued = false
 	queued_action = ""
 	queued_action_data = {}
 	
+	# Emit signal for UI to hide queued action
+	action_dequeued.emit()
+	
 	# Execute the action
+	print("🎯 About to execute queued action: ", action)
 	match action:
 		"basic_attack":
-			player_basic_attack()
+			print("🎯 Executing queued basic attack")
+			_execute_basic_attack_directly()
+		"special_attack":
+			print("🎯 Executing queued special attack")
+			_execute_special_attack_directly()
+		"cast_spell":
+			print("🎯 Executing queued spell")
+			_execute_spell_directly()
 		"defend":
-			player_defend()
+			print("🎯 Executing queued defend")
+			_execute_defend_directly()
 		"use_item":
+			print("🎯 Executing queued item use")
 			if data.has("item_name"):
-				player_use_item(data["item_name"])
+				_execute_item_use_directly(data["item_name"])
 		_:
 			print("Unknown queued action: ", action)
+
+# Direct execution functions for queued actions (bypass queuing logic)
+func _execute_basic_attack_directly():
+	"""Execute basic attack directly without queuing checks"""
+	print("=== EXECUTING QUEUED BASIC ATTACK ===")
+	_log_player_action("basic_attack")
+	
+	# Get player stats
+	var player_stats = current_player.get_stats()
+	if not player_stats:
+		_end_player_turn()
+		return
+	
+	# Calculate damage using PlayerStats methods
+	var base_damage = 10  # Base damage
+	var strength_multiplier = player_stats.get_melee_damage_multiplier()
+	var final_damage = int(base_damage * strength_multiplier)
+	
+	print("Player attack - Base: ", base_damage, " Strength multiplier: ", strength_multiplier, " Final: ", final_damage)
+	
+	# Apply damage to enemy
+	if current_enemy and current_enemy.has_method("take_damage"):
+		current_enemy.take_damage(final_damage)
+		_log_damage_dealt(current_player, current_enemy, final_damage)
+	
+	# Gain spirit from basic attack
+	if player_stats.has_method("gain_spirit"):
+		player_stats.gain_spirit(1)
+		print("⚔️ Player gained 1 spirit point from basic attack")
+	
+	# End player turn
+	_end_player_turn()
+
+func _execute_special_attack_directly():
+	print("DEBUG: _execute_special_attack_directly() called")
+	"""Execute special attack directly without queuing checks"""
+	print("=== EXECUTING QUEUED SPECIAL ATTACK ===")
+	_log_player_action("special_attack")
+	
+	print("DEBUG: About to check spirit in _execute_special_attack_directly")
+	# Check if player has enough spirit (haymaker costs 3 SP)
+	var haymaker_cost = 3
+	var current_spirit = current_player.get_spirit()
+	print("DEBUG: _execute_special_attack_directly - Need: ", haymaker_cost, " SP, Have: ", current_spirit, " SP")
+	if current_spirit < haymaker_cost:
+		print("Not enough spirit! Need ", haymaker_cost, " SP, have ", current_player.get_spirit(), " SP")
+		_end_player_turn()
+		return
+	
+	# Perform haymaker special attack
+	var base_damage = current_player.get_special_attack_damage()
+	var damage_type = current_player.get_special_attack_damage_type()
+	var final_damage = _process_haymaker_attack(base_damage, damage_type)
+	
+	# Spend spirit cost
+	current_player.get_stats().spend_spirit(haymaker_cost)
+	
+	print("Player performs Haymaker! Deals ", final_damage, " damage!")
+	
+	# Apply damage and get armor reduction information
+	var damage_result = _apply_damage_to_enemy(final_damage)
+	var actual_damage = damage_result.final_damage
+	var armor_reduction = damage_result.armor_reduction
+	
+	# Log the special attack with armor reduction information
+	_log_attack(current_player, current_enemy, actual_damage, "special attack", armor_reduction)
+	
+	# Apply self-damage (5% of damage dealt)
+	var self_damage = int(final_damage * 0.05)
+	if self_damage > 0:
+		print("💥 Haymaker backlash! Player takes ", self_damage, " damage!")
+		_apply_damage_to_player(self_damage)
+	
+	# Check if enemy is defeated
+	if current_enemy.get_stats().health <= 0:
+		print("Enemy defeated!")
+		# Remove the defeated enemy and continue combat if there are others
+		remove_enemy_from_combat(current_enemy)
+		return
+	
+	# End turn after special attack
+	_end_player_turn()
+
+func _execute_spell_directly():
+	"""Execute spell directly without queuing checks"""
+	print("=== EXECUTING QUEUED SPELL ===")
+	_log_player_action("cast_spell")
+	
+	# Check if player has enough mana
+	if not current_player or not current_player.has_method("get_stats") or not current_player.get_stats():
+		print("ERROR: Player has no stats!")
+		_end_player_turn()
+		return
+	
+	var player_stats = current_player.get_stats()
+	if player_stats.mana < 10:  # Basic spell cost
+		print("Not enough mana! Need 10 MP, have ", player_stats.mana, " MP")
+		_end_player_turn()
+		return
+	
+	# Cast fireball (no movement needed for ranged attacks)
+	var base_damage = current_player.get_spell_damage()
+	var damage_type = current_player.get_spell_damage_type()
+	var final_damage = _process_attack_damage(base_damage, damage_type, "fireball")
+	var mana_cost = 10
+	
+	print("Player casts Fireball! Deals ", final_damage, " damage! Costs ", mana_cost, " MP!")
+	player_stats.mana -= mana_cost
+	
+	# Apply damage and get armor reduction information
+	var damage_result = _apply_damage_to_enemy(final_damage)
+	var actual_damage = damage_result.final_damage
+	var armor_reduction = damage_result.armor_reduction
+	
+	# Log the spell attack with armor reduction information
+	_log_attack(current_player, current_enemy, actual_damage, "spell", armor_reduction)
+	
+	# Check for fire ignite
+	if current_player.has_method("is_fire_attack") and current_player.is_fire_attack("fireball"):
+		_check_fire_ignite(final_damage, "fireball")
+	
+	# Check if enemy is defeated
+	if current_enemy.get_stats().health <= 0:
+		print("Enemy defeated!")
+		# Remove the defeated enemy and continue combat if there are others
+		remove_enemy_from_combat(current_enemy)
+		return
+	
+	# End turn after spell
+	_end_player_turn()
+
+func _execute_defend_directly():
+	"""Execute defend directly without queuing checks"""
+	print("=== EXECUTING QUEUED DEFEND ===")
+	_log_player_action("defend")
+	
+	# Set defending state
+	player_defending = true
+	
+	# End player turn
+	_end_player_turn()
+
+func _execute_item_use_directly(item_name: String):
+	"""Execute item use directly without queuing checks"""
+	print("=== EXECUTING QUEUED ITEM USE: ", item_name, " ===")
+	_log_player_action("use_item", {"item_name": item_name})
+	
+	# Find the item in inventory to get its properties
+	var player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
+	var item_resource = null
+	if player_inventory:
+		var bag = player_inventory.get_bag()
+		for slot in bag:
+			if bag[slot].item.name == item_name:
+				item_resource = bag[slot].item
+				break
+	
+	# Use the item directly on the player
+	if item_resource and item_resource.has_method("use"):
+		item_resource.use(current_player)
+	
+	# Handle special item effects (like throwable weapons)
+	if item_resource and item_resource.custom_effect == "throw_damage":
+		_handle_combat_item_use(item_resource)
+	
+	# Consume the item from inventory
+	if player_inventory and item_resource:
+		var bag = player_inventory.get_bag()
+		for slot in bag:
+			if bag[slot].item.name == item_name:
+				bag[slot].quantity -= 1
+				if bag[slot].quantity <= 0:
+					bag.erase(slot)
+				player_inventory.inventory_changed.emit()
+				break
+	
+	# End player turn
+	_end_player_turn()
+
+func _handle_combat_item_use(item: Resource):
+	"""Handle special combat items like throwable weapons"""
+	if not item or not current_enemy:
+		return
+	
+	# Check if it's a throwable weapon
+	if item.custom_effect == "throw_damage":
+		_handle_throwable_weapon_combat(item)
+	else:
+		# Handle other item types
+		print("Item used: ", item.name, " (no special combat effect)")
+
+func _handle_throwable_weapon_combat(item: Resource):
+	"""Handle throwable weapon combat effects"""
+	print("🎯 Throwable weapon combat: ", item.name)
+	
+	# Get item properties
+	var damage = item.custom_stats.get("damage", 0)
+	var damage_type = item.custom_stats.get("damage_type", "physical")
+	var armor_penetration = item.custom_stats.get("armor_penetration", 0)
+	var duration = item.custom_stats.get("duration", 0)
+	
+	# Apply armor penetration
+	var final_damage = damage
+	if armor_penetration > 0:
+		var enemy_armor = 0
+		if current_enemy.has_method("get_stats") and current_enemy.get_stats():
+			enemy_armor = current_enemy.get_stats().get_armor_value()
+		final_damage = max(1, damage + armor_penetration - enemy_armor)
+		print("Armor penetration applied: Base damage ", damage, " + Pen ", armor_penetration, " - Enemy armor ", enemy_armor, " = Final ", final_damage)
+	
+	# Apply damage to enemy
+	if current_enemy and current_enemy.has_method("take_damage"):
+		current_enemy.take_damage(final_damage)
+		_log_attack(current_player, current_enemy, final_damage, "throwable weapon (" + damage_type + ")")
+		
+		# Handle special effects based on damage type
+		if damage_type == "acid":
+			_handle_acid_effects(item)
+		elif damage_type == "piercing":
+			_handle_piercing_effects(item)
+		
+		# Check if enemy is defeated
+		if current_enemy.get_stats().health <= 0:
+			print("Enemy defeated by throwable weapon!")
+			# Don't end combat immediately - let the enemy handle its death
+			# The enemy will call remove_enemy_from_combat when it's ready
+			return
+	else:
+		print("ERROR: Enemy cannot take damage!")
+
+func _handle_acid_effects(item: Resource):
+	"""Handle acid-specific effects like poisoning"""
+	print("🧪 Processing acid effects...")
+	
+	# Get acid properties
+	var poison_chance = item.custom_stats.get("poison_chance", 35.0)  # Default 35% chance
+	var poison_damage = item.custom_stats.get("poison_damage", 5)    # Default 5 damage per tick
+	var poison_duration = item.custom_stats.get("duration", 3)       # Default 3 turns
+	
+	# Roll for poison application
+	var roll = randf() * 100.0
+	print("Acid poison check: ", roll, " vs ", poison_chance, "% chance")
+	
+	if roll <= poison_chance:
+		print("☠️ Enemy poisoned by acid! Duration: ", poison_duration, " turns, Damage per tick: ", poison_damage)
+		
+		# Use the new status effects system
+		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+		if status_manager:
+			status_manager.apply_poison(current_enemy, poison_damage, poison_duration, current_player)
+		else:
+			# Fallback: manually track poison if status manager not available
+			_apply_manual_poison(poison_damage, poison_duration)
+		
+		# Log the poison effect
+		_log_combat_event("☠️ " + current_enemy.enemy_name + " is poisoned by acid! (" + str(poison_duration) + " turns)")
+	else:
+		print("Acid did not poison the enemy")
+
+func _handle_piercing_effects(item: Resource):
+	"""Handle piercing weapon effects like poison darts"""
+	print("🎯 Processing piercing effects...")
+	
+	# Get piercing weapon properties
+	var poison_chance = item.custom_stats.get("poison_chance", 0.0)  # Default 0% chance
+	var poison_damage = item.custom_stats.get("poison_damage", 0)    # Default 0 damage per tick
+	var poison_duration = item.custom_stats.get("duration", 0)       # Default 0 turns
+	
+	# Check if this weapon has poison properties
+	if poison_chance > 0 and poison_damage > 0 and poison_duration > 0:
+		# Roll for poison application
+		var roll = randf() * 100.0
+		print("Piercing poison check: ", roll, " vs ", poison_chance, "% chance")
+		
+		if roll <= poison_chance:
+			print("☠️ Enemy poisoned by piercing weapon! Duration: ", poison_duration, " turns, Damage per tick: ", poison_damage)
+			
+			# Use the new status effects system
+			var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+			if status_manager:
+				status_manager.apply_poison(current_enemy, poison_damage, poison_duration, current_player)
+			else:
+				# Fallback: manually track poison if status manager not available
+				_apply_manual_poison(poison_damage, poison_duration)
+			
+			# Log the poison effect
+			_log_combat_event("☠️ " + current_enemy.enemy_name + " is poisoned by " + item.name + "! (" + str(poison_duration) + " turns)")
+		else:
+			print("Piercing weapon did not poison the enemy")
+	else:
+		print("Piercing weapon has no poison properties")
+
+func _apply_manual_poison(damage_per_tick: int, duration: int):
+	"""Apply poison manually if status effects system not available"""
+	print("⚠️ Status effects system not available - using manual poison tracking")
+	
+	# For now, just log that poison was applied
+	# In a full implementation, you'd want to track this in the enemy's stats
+	# or create a status effect system
+	print("Manual poison applied: ", damage_per_tick, " damage per tick for ", duration, " turns")
 
 # Missing helper functions
 func _log_attack(attacker: Node, target: Node, damage: int, attack_type: String = "attack", armor_reduction: int = 0):
@@ -1044,15 +1584,15 @@ func _check_fire_ignite(initial_damage: int, _attack_type: String):
 		print("Fire attack did not ignite target")
 
 func _gain_spirit_from_damage(_amount: int):
-	"""Gain spirit when taking damage"""
-	if current_player and current_player.has_method("get_stats") and current_player.get_stats():
-		current_player.get_stats().gain_spirit(2)
+	"""Gain spirit when taking damage - REMOVED: only defense gives spirit now"""
+	# Spirit gain removed - only successful defense gives spirit points
+	pass
 
 func _gain_spirit_from_defense():
 	"""Gain spirit when successfully defending"""
 	if current_player and current_player.has_method("get_stats") and current_player.get_stats():
-		var spirit_gain = randi_range(3, 4)
-		current_player.get_stats().gain_spirit(spirit_gain)
+		current_player.get_stats().gain_spirit(2)
+		print("🛡️ Player gained 2 spirit points from successful defense")
 
 # Missing damage functions
 func _apply_damage_to_player(damage: int):
@@ -1107,12 +1647,10 @@ func _handle_player_damage_taken(base_damage: int, attacker: Node) -> Dictionary
 	if not player_stats:
 		return {"final_damage": base_damage, "armor_reduction": 0}
 	
-	# Get player's equipment for armor calculation
-	var equipment_ui = get_tree().get_first_node_in_group("EquipmentUI")
-	if not equipment_ui:
-		return {"final_damage": base_damage, "armor_reduction": 0}
-	
-	var total_armor = equipment_ui.get_total_armor_value()
+	# Get player's armor value from stats
+	var total_armor = 0
+	if player_stats.has_method("get_armor_value"):
+		total_armor = player_stats.get_armor_value()
 	var attacker_level = 1  # Default level if we can't determine
 	
 	# Try to get attacker level
@@ -1146,6 +1684,95 @@ func handle_player_damage(damage: int, attack_type: String = "attack"):
 	
 	# Apply damage to player using the existing damage handling system
 	_apply_damage_to_player(damage)
+
+# Public method for inventory UI to call
+func queue_item_usage(item_name: String):
+	"""Queue an item to be used when the player's turn is ready"""
+	if not in_combat:
+		print("Cannot queue item usage: not in combat")
+		return
+	
+	print("Item usage queued: ", item_name)
+	_queue_player_action("use_item", {"item_name": item_name})
+	
+	# If player's turn is already ready, execute the action immediately
+	if player_turn_ready and not action_in_progress:
+		print("🎯 Player turn ready - executing queued action immediately!")
+		_execute_queued_player_action()
+
+# Status effects convenience methods
+func apply_status_effect(target: Node, effect_type: String, damage: int, duration: int, source: Node):
+	"""Apply a status effect using the StatusEffectsManager"""
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if status_manager:
+		match effect_type:
+			"poison":
+				status_manager.apply_poison(target, damage, duration, source)
+			"ignite":
+				status_manager.apply_ignite(target, damage, duration, source)
+			"bone_break":
+				status_manager.apply_bone_break(target, damage, duration, source)
+			"stun":
+				status_manager.apply_stun(target, duration, source)
+			"slow":
+				status_manager.apply_slow(target, duration, source)
+			_:
+				print("Unknown effect type: ", effect_type)
+	else:
+		print("StatusEffectsManager not found!")
+
+# Test method for status effects
+func test_status_effects():
+	"""Test method to apply various status effects for debugging"""
+	if not in_combat or not current_enemy:
+		print("Cannot test status effects: not in combat or no enemy")
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if status_manager:
+		print("Testing status effects on ", current_enemy.name)
+		
+		# Test poison effect
+		status_manager.apply_poison(current_enemy, 5, 3, current_player)
+		
+		# Get debug info
+		var debug_info = status_manager.get_effects_debug_info(current_enemy)
+		print("Status effects debug info: ", debug_info)
+	else:
+		print("StatusEffectsManager not found!")
+
+# Helper function to check and execute queued actions
+func check_and_execute_queued_actions():
+	"""Check if there are queued actions that should be executed immediately"""
+	# Safety check: prevent excessive calls
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	# Use a class variable instead of static local variable
+	if not has_method("_get_last_check_time"):
+		# Initialize the last check time if it doesn't exist
+		set_meta("last_check_time", 0.0)
+	
+	var last_check_time = get_meta("last_check_time", 0.0)
+	
+	# Only allow checking every 0.5 seconds to prevent rapid-fire execution
+	if current_time - last_check_time < 0.5:
+		return
+	
+	# Update the last check time using meta
+	set_meta("last_check_time", current_time)
+	
+	print("🔍 Checking queued actions - Player queued: ", player_action_queued, " Turn ready: ", player_turn_ready, " Action in progress: ", action_in_progress)
+	
+	if player_action_queued and player_turn_ready and not action_in_progress:
+		print("🎯 All conditions met - executing queued action now!")
+		_execute_queued_player_action()
+	elif player_action_queued:
+		print("⏸️ Queued action exists but conditions not met:")
+		print("  - Player queued: ", player_action_queued)
+		print("  - Turn ready: ", player_turn_ready)
+		print("  - Action in progress: ", action_in_progress)
+	else:
+		print("ℹ️ No queued actions to check")
 
 func _handle_enemy_damage_taken(base_damage: int, attacker: Node) -> Dictionary:
 	"""Apply armor reduction to damage taken by enemy"""
@@ -1207,7 +1834,21 @@ func end_current_turn():
 	# Mark action as in progress
 	action_in_progress = false
 	
-	# In ATB system, we don't automatically start the next turn
+	# In ATB system, we need to reset the appropriate turn ready state
+	# and start a new ATB cycle for the entity that just finished their turn
+	if turn_type == "enemy":
+		# Reset enemy turn ready state and start new ATB cycle
+		enemy_turn_ready = false
+		enemy_atb_progress = 0.0
+		enemy_atb_start_time = Time.get_ticks_msec() / 1000.0
+		print("Enemy turn ended - starting new ATB cycle at: ", enemy_atb_start_time, "s")
+	elif turn_type == "player":
+		# Reset player turn ready state and start new ATB cycle
+		player_turn_ready = false
+		player_atb_progress = 0.0
+		player_atb_start_time = Time.get_ticks_msec() / 1000.0
+		print("Player turn ended - starting new ATB cycle at: ", player_atb_start_time, "s")
+	
 	# The ATB system will naturally progress and call the appropriate
 	# turn start functions when the bars are ready
 
@@ -1233,6 +1874,15 @@ func get_atb_status() -> Dictionary:
 		"atb_progress_timer_active": atb_progress_timer != null and atb_progress_timer.timeout.is_connected(_update_atb_progress)
 	}
 
+func get_queued_action_info() -> Dictionary:
+	"""Get information about the currently queued action"""
+	if player_action_queued:
+		return {
+			"action": queued_action,
+			"data": queued_action_data
+		}
+	return {}
+
 # Safety timer function
 func _on_safety_timer_timeout():
 	"""Safety check to prevent infinite loops"""
@@ -1245,3 +1895,179 @@ func _on_safety_timer_timeout():
 	
 	# For now, we'll just ensure the safety timer keeps running
 	# This prevents the function from causing crashes
+
+func _orient_player_toward_enemy(target_enemy: Node = null):
+	"""Orient the player and camera toward the enemy when combat starts"""
+	var enemy_to_face = target_enemy if target_enemy else current_enemy
+	
+	if not current_player or not enemy_to_face:
+		return
+	
+	print("🎯 Orienting player and camera toward enemy: ", enemy_to_face.enemy_name if enemy_to_face.has_method("enemy_name") else enemy_to_face.name)
+	
+	# Make player face the enemy
+	if current_player.has_method("face_target"):
+		current_player.face_target(enemy_to_face)
+		print("✅ Player oriented toward enemy")
+	
+	# Orient camera toward enemy (if player has camera control methods)
+	if current_player.has_method("orient_camera_toward"):
+		current_player.orient_camera_toward(enemy_to_face)
+		print("✅ Camera oriented toward enemy")
+	elif current_player.has_method("get_camera"):
+		# Alternative: get camera and orient it directly
+		var camera = current_player.get_camera()
+		if camera:
+			_orient_camera_toward_enemy(camera, enemy_to_face)
+			print("✅ Camera oriented toward enemy (direct method)")
+	else:
+		print("⚠️ Player has no camera orientation methods")
+
+func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
+	"""Helper function to orient a camera toward the enemy"""
+	if not target_enemy or not camera:
+		return
+	
+	# Get the direction from player to enemy
+	var player_pos = current_player.global_position
+	var enemy_pos = target_enemy.global_position
+	var direction = (enemy_pos - player_pos).normalized()
+	
+	# Calculate the target rotation for the camera
+	var target_rotation = atan2(direction.x, direction.z)
+	
+	# Smoothly rotate the camera to face the enemy
+	var tween = create_tween()
+	tween.tween_property(camera, "rotation:y", target_rotation, 0.5)
+	print("🎥 Camera rotating to face enemy (rotation: ", target_rotation, ")")
+
+func add_enemy_to_combat(enemy: Node):
+	"""Add an enemy to an ongoing combat encounter"""
+	if not in_combat or not enemy or not current_player:
+		print("Cannot add enemy: combat not active or invalid enemy")
+		return
+	
+	# Safety check: ensure enemy is actually an Enemy class
+	if not enemy.has_method("get_stats") or not enemy.has_method("take_damage"):
+		print("ERROR: Enemy does not have required methods!")
+		return
+	
+	# Add enemy to the list
+	if not current_enemies.has(enemy):
+		current_enemies.append(enemy)
+		print("➕ Enemy added to combat: ", enemy.enemy_name if enemy.has_method("enemy_name") else enemy.name)
+		
+		# Reorient player and camera toward the new enemy
+		_orient_player_toward_enemy(enemy)
+		
+		# Log the new enemy joining
+		_log_combat_event("🆕 " + (enemy.enemy_name if enemy.has_method("enemy_name") else enemy.name) + " joins the fight!")
+	else:
+		print("⚠️ Enemy already in combat: ", enemy.name)
+
+func remove_enemy_from_combat(enemy: Node):
+	"""Remove an enemy from combat when they die"""
+	if not in_combat or not enemy:
+		print("Cannot remove enemy: combat not active or invalid enemy")
+		return
+	
+	# Check if enemy is already dead to prevent double removal
+	if enemy.has_method("get_stats") and enemy.get_stats().health <= 0:
+		# Check if enemy is already processing death
+		if enemy.has_method("is_processing_death") and enemy.is_processing_death:
+			return
+		
+		# If enemy is already dead, just ensure it's removed from lists
+		if current_enemies.has(enemy):
+			current_enemies.erase(enemy)
+		
+		# Update current_enemy if this was the current one
+		if current_enemy == enemy:
+			if current_enemies.size() > 0:
+				current_enemy = current_enemies[0]
+				_orient_player_toward_enemy(current_enemy)
+			else:
+				current_enemy = null
+				print("🏁 No more enemies - ending combat")
+				end_combat()
+		return
+	
+	# Remove enemy from the list
+	if current_enemies.has(enemy):
+		current_enemies.erase(enemy)
+		print("💀 Enemy removed from combat: ", enemy.enemy_name if enemy.has_method("enemy_name") else enemy.name)
+		
+		# If this was the current enemy, update current_enemy
+		if current_enemy == enemy:
+			if current_enemies.size() > 0:
+				# Set the first remaining enemy as current
+				current_enemy = current_enemies[0]
+				print("🔄 Current enemy updated to: ", current_enemy.enemy_name if current_enemy.has_method("enemy_name") else current_enemy.name)
+				
+				# Reorient player and camera toward the new current enemy
+				_orient_player_toward_enemy(current_enemy)
+			else:
+				# No more enemies, end combat
+				current_enemy = null
+				print("🏁 No more enemies - ending combat")
+				end_combat()
+		else:
+			# Reorient toward the current enemy (if any)
+			if current_enemy and current_enemy.has_method("get_stats") and current_enemy.get_stats().health > 0:
+				_orient_player_toward_enemy(current_enemy)
+			elif current_enemies.size() > 0:
+				# Find a living enemy to orient toward
+				for living_enemy in current_enemies:
+					if living_enemy.has_method("get_stats") and living_enemy.get_stats().health > 0:
+						current_enemy = living_enemy
+						_orient_player_toward_enemy(current_enemy)
+						break
+	else:
+		print("⚠️ Enemy not found in combat list: ", enemy.name)
+
+func get_nearest_living_enemy() -> Node:
+	"""Get the nearest living enemy for automatic targeting"""
+	if current_enemies.is_empty():
+		return null
+	
+	var nearest_enemy = null
+	var nearest_distance = INF
+	
+	for enemy in current_enemies:
+		if enemy.has_method("get_stats") and enemy.get_stats().health > 0:
+			var distance = current_player.global_position.distance_to(enemy.global_position)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				nearest_enemy = enemy
+	
+	return nearest_enemy
+
+func auto_reorient_to_nearest_enemy():
+	"""Automatically reorient player and camera toward the nearest living enemy"""
+	var nearest = get_nearest_living_enemy()
+	if nearest:
+		print("🔄 Auto-reorienting toward nearest enemy: ", nearest.enemy_name if nearest.has_method("enemy_name") else nearest.name)
+		_orient_player_toward_enemy(nearest)
+		return true
+	else:
+		print("⚠️ No living enemies found for reorientation")
+		return false
+
+func join_combat(enemy: Node):
+	"""Public method for enemies to join ongoing combat"""
+	if not in_combat:
+		print("⚠️ Cannot join combat: no combat in progress")
+		return false
+	
+	add_enemy_to_combat(enemy)
+	return true
+
+func get_combat_enemies() -> Array[Node]:
+	"""Get all enemies currently in combat"""
+	return current_enemies.duplicate()
+
+func get_combat_enemy_count() -> int:
+	"""Get the number of enemies currently in combat"""
+	return current_enemies.size()
+
+# End of CombatManager class

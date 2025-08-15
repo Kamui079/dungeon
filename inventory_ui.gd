@@ -88,17 +88,75 @@ func update_display():
 		var icon_rect := slot_node.find_child("Icon") as TextureRect
 		var quantity_label := slot_node.find_child("QuantityLabel") as Label
 		if not icon_rect or not quantity_label: continue
+		
+		# Debug: Check what we're working with
+		print("Slot ", i, " - Found quantity_label: ", quantity_label.name, " current text: '", quantity_label.text, "' visible: ", quantity_label.visible)
 
 		if bag.has(i):
 			var item_data = bag[i]
 			icon_rect.texture = item_data.item.icon
 			# Always show icons for items in bag - dragging is handled by the slot itself
 			icon_rect.visible = true
+			
+			# Debug: Print item data to see what's happening
+			print("Slot ", i, " - Item: ", item_data.item.name, " Quantity: ", item_data.quantity, " Type: ", item_data.item.item_type)
+			
+			# Scale up small consumable icons for better visibility
+			if item_data.item.item_type == Item.ITEM_TYPE.CONSUMABLE:
+				icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				# Scale up consumable icons but keep them within slot bounds
+				icon_rect.custom_minimum_size = Vector2(52, 52)  # Slightly larger but still within 64x64 slot
+			else:
+				# Reset to default for equipment
+				icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				icon_rect.custom_minimum_size = Vector2(64, 64)
+			
+			# Debug: Check quantity logic
+			print("  Quantity check: ", item_data.quantity, " > 1 = ", item_data.quantity > 1)
 			if item_data.quantity > 1:
 				quantity_label.text = str(item_data.quantity)
 				quantity_label.visible = true
+				quantity_label.modulate.a = 1.0  # Ensure fully visible
+				# Unlock quantity label for stacks
+				if slot_node.has_method("_unlock_quantity_label_for_stack"):
+					slot_node._unlock_quantity_label_for_stack()
+				print("  Showing quantity: ", item_data.quantity)
 			else:
+				# Never show quantity labels for single items or empty slots
+				quantity_label.text = ""
 				quantity_label.visible = false
+				quantity_label.modulate.a = 0.0  # Force completely invisible
+				# Lock down quantity label for single items
+				if slot_node.has_method("_lock_quantity_label_for_single_item"):
+					slot_node._lock_quantity_label_for_single_item()
+				print("  Hiding quantity label (quantity was: ", item_data.quantity, ")")
+			
+			# Debug: Verify what we set
+			print("  After setting - text: '", quantity_label.text, "' visible: ", quantity_label.visible, " alpha: ", quantity_label.modulate.a)
 		else:
 			icon_rect.visible = false
 			quantity_label.visible = false
+			quantity_label.text = ""
+			quantity_label.modulate.a = 0.0  # Force completely invisible
+			# Lock down quantity label for empty slots
+			if slot_node.has_method("_lock_quantity_label_for_single_item"):
+				slot_node._lock_quantity_label_for_single_item()
+			# Reset icon scaling when slot is empty
+			icon_rect.custom_minimum_size = Vector2(64, 64)
+			print("  Slot ", i, " is empty - cleared quantity label")
+			print("  After clearing - text: '", quantity_label.text, "' visible: ", quantity_label.visible, " alpha: ", quantity_label.modulate.a)
+	
+	# Final safety check: ensure single items never show quantity labels
+	await get_tree().process_frame  # Wait a frame for any other scripts to run
+	for i in range(items_container.get_child_count()):
+		var slot_node = items_container.get_child(i)
+		var quantity_label := slot_node.find_child("QuantityLabel") as Label
+		if quantity_label and bag.has(i):
+			var item_data = bag[i]
+			if item_data.quantity <= 1:
+				quantity_label.text = ""
+				quantity_label.visible = false
+				quantity_label.modulate.a = 0.0
+				print("  Final safety check - Slot ", i, " forced to hide quantity label")

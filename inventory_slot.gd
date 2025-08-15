@@ -29,6 +29,9 @@ func _ready():
 	# Try to get player_inventory from scene tree if not set
 	if not player_inventory:
 		player_inventory = get_tree().get_first_node_in_group("PlayerInventory")
+	
+	# Set up icon scaling for better visibility
+	_setup_icon_scaling()
 
 func _gui_input(event: InputEvent):
 	# Handle mouse motion for custom tooltip detection
@@ -168,6 +171,55 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 		return { "source": "bag", "from_slot": slot_index }
 		
 	return null
+
+
+
+func _setup_icon_scaling():
+	"""Set up icon scaling to make small icons more visible"""
+	var icon_rect = find_child("Icon") as TextureRect
+	var quantity_label = find_child("QuantityLabel") as Label
+	if icon_rect:
+		# Scale up small icons to fill more of the slot
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		
+		# Add a scale factor to make icons larger
+		icon_rect.custom_minimum_size = Vector2(48, 48)  # Slightly smaller than slot to allow scaling
+		icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	
+	# Debug: Check quantity label state
+	if quantity_label:
+		print("InventorySlot ", slot_index, " - QuantityLabel text: '", quantity_label.text, "' visible: ", quantity_label.visible)
+		# Ensure quantity label starts with no text and stays hidden
+		quantity_label.text = ""
+		quantity_label.visible = false
+		# Force the label to stay hidden for single items
+		quantity_label.modulate.a = 0.0
+		# Completely disable the label for single items
+		quantity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+func _lock_quantity_label_for_single_item():
+	"""Completely lock down quantity label for single items"""
+	var quantity_label = find_child("QuantityLabel") as Label
+	if quantity_label:
+		# Make it completely non-functional
+		quantity_label.text = ""
+		quantity_label.visible = false
+		quantity_label.modulate.a = 0.0
+		quantity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Set it to ignore all input and be completely hidden
+		quantity_label.process_mode = Node.PROCESS_MODE_DISABLED
+		print("InventorySlot ", slot_index, " - Quantity label completely locked down")
+
+func _unlock_quantity_label_for_stack():
+	"""Unlock quantity label for item stacks"""
+	var quantity_label = find_child("QuantityLabel") as Label
+	if quantity_label:
+		# Re-enable for stacks
+		quantity_label.process_mode = Node.PROCESS_MODE_INHERIT
+		quantity_label.mouse_filter = Control.MOUSE_FILTER_PASS
+		print("InventorySlot ", slot_index, " - Quantity label unlocked for stack")
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	return data is Dictionary and data.has("source")

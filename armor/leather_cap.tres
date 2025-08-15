@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="Equipment" load_steps=2 format=3 uid="uid://leather_cap"]
+
+[ext_resource type="Script" path="res://equipment.gd" id="1_equipment"]
+
+[resource]
+script = ExtResource("1_equipment")
+name = "Leather Cap"
+description = "A simple leather cap that provides basic protection."
+item_type = 1
+max_stack = 1
+drop_chance = 100.0
+rarity = 0
+equipment_slot = "helmet"
+slot = 1
+armor_value = 2
+damage_value = 0
+stat_bonuses = {}
+required_level = 1
+
+# Tooltip Section Controls
+show_name = true
+show_type = true
+show_rarity = true
+show_level_requirement = false
+show_stats = true
+show_description = true
+
+# Tooltip Content
+custom_name = ""
+custom_type = ""
+custom_description = ""
+level_requirement = 1
+custom_stats = {"armor": 2}

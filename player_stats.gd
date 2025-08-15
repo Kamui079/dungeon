@@ -15,6 +15,9 @@ var mana: int = 50
 var spirit: int = 0  # Spirit points for special attacks
 var max_spirit: int = 10  # Maximum spirit points
 
+# Gold system
+var gold: int = 0  # Player's gold currency
+
 # Calculated max stats (based on base stats + level bonuses)
 var max_health: int = 100
 var max_mana: int = 50
@@ -38,6 +41,7 @@ var intelligence: int = 1  # Increases spell power
 var spell_power: int = 1  # Base spell power (can be increased by items)
 var dexterity: int = 1  # Increases critical chance and dodge chance
 var cunning: int = 1  # Increases spell crit chance, ranged damage, and parry chance
+var armor: int = 0  # Base armor value (can be increased by equipment)
 
 # Combat mechanics
 var dodge_chance: float = 0.0  # Base dodge chance
@@ -360,6 +364,33 @@ func reset_spirit() -> void:
 	spirit = 0
 	emit_signal("spirit_changed", spirit)
 
+func get_spirit() -> int:
+	"""Get current spirit points"""
+	return spirit
+
+func get_gold() -> int:
+	"""Get current gold amount"""
+	return gold
+
+func add_gold(amount: int):
+	"""Add gold to player's currency"""
+	gold += amount
+	print("💰 Gold gained: +", amount, " (Total: ", gold, ")")
+
+func spend_gold(amount: int) -> bool:
+	"""Spend gold if player has enough"""
+	if gold >= amount:
+		gold -= amount
+		print("💰 Gold spent: -", amount, " (Total: ", gold, ")")
+		return true
+	else:
+		print("⚠️ Not enough gold! Need: ", amount, ", Have: ", gold)
+		return false
+
+func has_gold(amount: int) -> bool:
+	"""Check if player has enough gold"""
+	return gold >= amount
+
 # Combat mechanics
 func roll_dodge() -> bool:
 	"""Roll for dodge - returns true if attack is dodged"""
@@ -568,7 +599,8 @@ func get_stat_summary() -> Dictionary:
 			"spell_power": spell_power,
 			"dexterity": dexterity,
 			"cunning": cunning,
-			"speed": speed
+			"speed": speed,
+			"armor": armor
 		},
 		"combat_chances": {
 			"dodge": dodge_chance,
@@ -593,6 +625,7 @@ func debug_stat_allocation():
 	print("Dexterity: ", dexterity, " (each point gives +dodge +crit chance)")
 	print("Cunning: ", cunning, " (each point gives +parry +spell crit)")
 	print("Speed: ", speed, " (each point gives +turn advantage)")
+	print("Armor: ", armor, " (base armor value + equipment bonuses)")
 	print()
 	print("Example allocations:")
 	print("  Tank build: Health + Strength + Dexterity")
@@ -646,18 +679,26 @@ func modify_stats(stat_name: String, value: int):
 		"speed":
 			speed += value
 			_update_combat_chances()
+		"armor":
+			armor += value
+			# Ensure armor doesn't go negative
+			armor = max(0, armor)
 	
 	emit_signal("stats_changed")
 
 func add_armor(amount: int):
-	"""Add armor value (placeholder for future armor system)"""
-	# This is a placeholder - you can implement actual armor mechanics later
-	print("Armor added: ", amount)
+	"""Add armor value to the player's armor stat"""
+	armor += amount
+	# Ensure armor doesn't go negative
+	armor = max(0, armor)
+	print("Armor added: ", amount, " (Total: ", armor, ")")
 
 func remove_armor(amount: int):
-	"""Remove armor value (placeholder for future armor system)"""
-	# This is a placeholder - you can implement actual armor mechanics later
-	print("Armor removed: ", amount)
+	"""Remove armor value from the player's armor stat"""
+	armor -= amount
+	# Ensure armor doesn't go negative
+	armor = max(0, armor)
+	print("Armor removed: ", amount, " (Total: ", armor, ")")
 
 func add_damage(amount: int):
 	"""Add damage value (placeholder for future damage system)"""
@@ -668,3 +709,7 @@ func remove_damage(amount: int):
 	"""Remove damage value (placeholder for future damage system)"""
 	# This is a placeholder - you can implement actual damage mechanics later
 	print("Damage removed: ", amount)
+
+func get_armor_value() -> int:
+	"""Get the current armor value (base + equipment bonuses)"""
+	return armor

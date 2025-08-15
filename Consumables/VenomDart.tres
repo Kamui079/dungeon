@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="Consumable" load_steps=2, format=3, uid="uid://bqxvxqxqxqxqx2"]
+
+[ext_resource type="Script" path="res://consumable.gd" id="1_0x0x0"]
+
+[resource]
+script = ExtResource("1_0x0x0")
+icon = null
+name = "Venom Dart"
+description = "A small dart coated with deadly venom. Throws quickly and applies poison damage over time."
+item_type = 0
+drop_chance = 60.0
+rarity = 2
+show_name = true
+show_type = true
+show_rarity = true
+show_level_requirement = false
+show_stats = true
+show_description = true
+custom_name = ""
+custom_type = "Throwable Weapon"
+custom_description = "A swift venom dart that can be thrown at enemies. The venom causes continuous poison damage and has a high chance to apply poison status."
+level_requirement = 1
+custom_stats = {
+"damage": 15,
+"damage_type": "piercing",
+"duration": 4,
+"armor_penetration": 3,
+"poison_chance": 100.0,
+"poison_damage": 6
+}
+consumable_type = 3
+custom_effect = "throw_damage" 

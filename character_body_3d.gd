@@ -150,6 +150,14 @@ func receive_item(item: Resource) -> bool:
 	printerr("Player has no valid inventory to receive items.")
 	return false
 
+func receive_gold(amount: int):
+	"""Receive gold from enemy drops or other sources"""
+	if stats and stats.has_method("add_gold"):
+		stats.add_gold(amount)
+		print("💰 Player received ", amount, " gold! Total: ", stats.get_gold())
+	else:
+		print("⚠️ Player stats don't support gold - gold lost!")
+
 func heal(amount: int):
 	if stats: stats.heal(amount)
 func restore_mana(amount: int):
@@ -214,20 +222,72 @@ func face_nearest_enemy():
 	var nearest_enemy = null; var nearest_distance = INF
 	for enemy in enemies:
 		if enemy.has_method("get_stats") and enemy.get_stats().health > 0:
-			var distance = global_position.distance_to(enemy.global_position)
+			# Get enemy position - check if it's a Node3D or has a parent with global_position
+			var enemy_pos = Vector3.ZERO
+			if enemy is Node3D:
+				enemy_pos = enemy.global_position
+			elif enemy.get_parent() and enemy.get_parent() is Node3D:
+				enemy_pos = enemy.get_parent().global_position
+			else:
+				continue  # Skip enemies without valid positions
+			
+			var distance = global_position.distance_to(enemy_pos)
 			if distance < nearest_distance:
 				nearest_distance = distance; nearest_enemy = enemy
 	if nearest_enemy: face_target(nearest_enemy)
 func face_target(target: Node):
 	if not target: return
-	var direction = (target.global_position - global_position).normalized()
+	
+	# Get target position - check if it's a Node3D or has a parent with global_position
+	var target_pos = Vector3.ZERO
+	if target is Node3D:
+		target_pos = target.global_position
+	elif target.get_parent() and target.get_parent() is Node3D:
+		target_pos = target.get_parent().global_position
+	else:
+		print("⚠️ Target has no valid global_position")
+		return
+	
+	var direction = (target_pos - global_position).normalized()
 	direction.y = 0
 	if direction.is_normalized():
 		var target_rotation = atan2(direction.x, direction.z)
 		var tween = create_tween()
 		tween.tween_property(self, "rotation:y", target_rotation, 0.3)
+
+func orient_camera_toward(target: Node):
+	"""Orient the camera toward a target (used for combat orientation)"""
+	if not target or not camera:
+		return
+	
+	print("🎥 Orienting camera toward target: ", target.name)
+	
+	# Get the direction from player to target
+	var target_pos = Vector3.ZERO
+	if target is Node3D:
+		target_pos = target.global_position
+	elif target.get_parent() and target.get_parent() is Node3D:
+		target_pos = target.get_parent().global_position
+	else:
+		print("⚠️ Target has no valid global_position for camera orientation")
+		return
+	
+	var direction = (target_pos - global_position).normalized()
+	direction.y = 0  # Keep camera level
+	
+	if direction.is_normalized():
+		# Calculate target rotation for the camera
+		var target_rotation = atan2(direction.x, direction.z)
 		
-		# Add this function to the very end of character_body_3d.gd
+		# Smoothly rotate the camera to face the target
+		var tween = create_tween()
+		tween.tween_property(camera, "rotation:y", target_rotation, 0.5)
+		print("🎥 Camera rotating to face target (rotation: ", target_rotation, ")")
+
+func get_camera() -> Camera3D:
+	"""Get the camera reference for external control"""
+	return camera
+
 func _unhandled_input(event: InputEvent):
 	if event is InputEventMouseButton and event.pressed:
 		print("--- UNHANDLED MOUSE CLICK DETECTED ---")
@@ -247,7 +307,7 @@ func _add_starter_equipment():
 	helmet.equipment_slot = "helmet"
 	helmet.slot = Equipment.EQUIP_SLOT.HEAD
 	helmet.armor_value = 2
-	helmet.stat_bonuses = {"dexterity": 1, "strength": 1}
+	helmet.stat_bonuses = {}  # No stat bonuses - just armor
 	helmet.rarity = Item.RARITY.COMMON
 	helmet.max_stack = 1
 	# Load helmet icon
@@ -262,7 +322,7 @@ func _add_starter_equipment():
 	chest_armor.equipment_slot = "chest"
 	chest_armor.slot = Equipment.EQUIP_SLOT.CHEST
 	chest_armor.armor_value = 3
-	chest_armor.stat_bonuses = {"strength": 2, "health": 20}
+	chest_armor.stat_bonuses = {}  # No stat bonuses - just armor
 	chest_armor.rarity = Item.RARITY.COMMON
 	chest_armor.max_stack = 1
 	# Load chest armor icon
@@ -299,10 +359,67 @@ func _add_starter_equipment():
 	var boots_icon = preload("res://Models/armor.png/icons/ffffff/transparent/1x1/lorc/boots.png")
 	boots.icon = boots_icon
 	
-	# Add all equipment to inventory
-	_inventory.add_item_to_bag(helmet, 1)
-	_inventory.add_item_to_bag(chest_armor, 1)
-	_inventory.add_item_to_bag(gloves, 1)
-	_inventory.add_item_to_bag(boots, 1)
+	# Create acid flask for testing throwable weapons
+	var acid_flask = Consumable.new()
+	acid_flask.name = "Acid Flask"
+	acid_flask.description = "A fragile glass vial filled with corrosive acid. Throw it at enemies to deal damage over time."
+	acid_flask.item_type = Item.ITEM_TYPE.CONSUMABLE
+	acid_flask.consumable_type = Item.CONSUMABLE_TYPE.CUSTOM
+	acid_flask.custom_effect = "throw_damage"
+	acid_flask.custom_stats = {
+		"damage": 25,
+		"damage_type": "acid",
+		"duration": 3,
+		"armor_penetration": 5,
+		"poison_chance": 60.0,
+		"poison_damage": 8
+	}
+	acid_flask.rarity = Item.RARITY.UNCOMMON
+	acid_flask.max_stack = 5
+	acid_flask.drop_chance = 75.0
+	acid_flask.amount = 1  # Set amount to 1 to avoid showing "0"
+	acid_flask.show_stats = true  # Enable stats display in tooltip
+	# Load acid flask icon
+	var acid_flask_icon = preload("res://Consumables/acidflask.png")
+	acid_flask.icon = acid_flask_icon
 	
-	print("Added starter equipment to inventory!")
+	# Create venom dart for testing status effects
+	var venom_dart = Consumable.new()
+	venom_dart.name = "Venom Dart"
+	venom_dart.description = "A small dart coated with deadly venom. Throws quickly and applies poison damage over time."
+	venom_dart.item_type = Item.ITEM_TYPE.CONSUMABLE
+	venom_dart.consumable_type = Item.CONSUMABLE_TYPE.CUSTOM
+	venom_dart.custom_effect = "throw_damage"
+	venom_dart.custom_stats = {
+		"damage": 15,
+		"damage_type": "piercing",
+		"duration": 4,
+		"armor_penetration": 3,
+		"poison_chance": 100.0,
+		"poison_damage": 6
+	}
+	venom_dart.rarity = Item.RARITY.RARE
+	venom_dart.max_stack = 10
+	venom_dart.drop_chance = 60.0
+	venom_dart.amount = 1  # Set amount to 1 to avoid showing "0"
+	venom_dart.show_stats = true  # Enable stats display in tooltip
+	# Load venom dart icon
+	var venom_dart_icon = preload("res://Consumables/poisondart.webp")
+	venom_dart.icon = venom_dart_icon
+	
+	# Add all equipment to inventory
+	print("Adding helmet to inventory...")
+	_inventory.add_item_to_bag(helmet, 1)
+	print("Adding chest armor to inventory...")
+	_inventory.add_item_to_bag(chest_armor, 1)
+	print("Adding gloves to inventory...")
+	_inventory.add_item_to_bag(gloves, 1)
+	print("Adding boots to inventory...")
+	_inventory.add_item_to_bag(boots, 1)
+	print("Adding acid flasks to inventory...")
+	_inventory.add_item_to_bag(acid_flask, 3)  # Give 3 acid flasks
+	print("Adding venom darts to inventory...")
+	_inventory.add_item_to_bag(venom_dart, 5)  # Give 5 venom darts
+	
+	print("Added starter equipment, acid flasks, and venom darts to inventory!")
+	print("Current bag contents: ", _inventory.get_bag())

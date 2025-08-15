@@ -4,10 +4,8 @@ class_name BigRat
 # Enemy functionality will be added via composition
 var enemy_behavior: Node = null
 
-# Poison system variables
-var poison_damage: int = 0
-var poison_duration: int = 0
-var poison_timer: Timer = null
+# Status effects are now handled by the StatusEffectsManager
+# Individual poison variables removed in favor of centralized system
 
 func _ready():
 	# Create enemy behavior component
@@ -26,6 +24,33 @@ func _ready():
 	enemy_behavior.damage_range_max = 8
 	enemy_behavior.enemy_level = 3
 	
+	# Enemy database integration
+	enemy_behavior.enemy_id = "big_rat"
+	enemy_behavior.enemy_category = "beasts"
+	enemy_behavior.enemy_rarity = 1  # Common
+	enemy_behavior.enemy_tags = ["rodent", "dungeon", "low_level"]
+	
+	# Global systems integration - Big Rats are vulnerable to most effects
+	enemy_behavior.can_be_poisoned = true
+	enemy_behavior.can_be_ignited = true
+	enemy_behavior.can_be_stunned = true
+	enemy_behavior.can_be_slowed = true
+	enemy_behavior.can_be_frozen = true
+	enemy_behavior.can_be_shocked = true
+	enemy_behavior.can_be_bleeding = true
+	enemy_behavior.can_be_bone_broken = true
+	
+	# Loot and rewards
+	enemy_behavior.base_gold_reward = 3
+	enemy_behavior.gold_variance = 2
+	enemy_behavior.guaranteed_loot = []
+	enemy_behavior.loot_table = {
+		"rat_fang": {"chance": 0.15, "item": null},  # 15% chance for rat fang
+		"rat_pelt": {"chance": 0.25, "item": null},  # 25% chance for rat pelt
+		"small_healing_potion": {"chance": 0.10, "item": null}  # 10% chance for healing potion
+	}
+	enemy_behavior.loot_chance_multiplier = 1.0
+	
 	# Stat modifiers (6 speed, 2 strength, 2 dexterity)
 	enemy_behavior.strength_modifier = 1
 	enemy_behavior.intelligence_modifier = 0
@@ -36,13 +61,6 @@ func _ready():
 	
 	# Call enemy behavior's _ready to initialize stats
 	enemy_behavior._ready()
-	
-	# Set up poison timer
-	poison_timer = Timer.new()
-	add_child(poison_timer)
-	poison_timer.wait_time = 1.0
-	poison_timer.timeout.connect(_on_poison_tick)
-	poison_timer.start()
 	
 	# Initialize status bars
 	_create_bar_textures()
@@ -104,7 +122,7 @@ func melee_attack():
 		enemy_behavior.current_target.take_damage(damage)
 	
 	if enemy_behavior:
-		enemy_behavior.gain_spirit(2)
+		enemy_behavior.gain_spirit(1)
 	
 	if enemy_behavior and enemy_behavior.combat_manager:
 		enemy_behavior.combat_manager.end_current_turn()
@@ -134,40 +152,8 @@ func bite_attack():
 	elif enemy_behavior.current_target.has_method("take_damage"):
 		enemy_behavior.current_target.take_damage(damage)
 	
-	# Poison chance
-	if randf() <= 0.5:
-		apply_poison(damage, 3)
-		# Log poison application only if in combat
-		if enemy_behavior and enemy_behavior.in_combat and enemy_behavior.combat_manager and enemy_behavior.combat_manager.has_method("_log_combat_event"):
-			enemy_behavior.combat_manager._log_combat_event("☠️ " + enemy_behavior.current_target.name + " is poisoned!")
-	
 	if enemy_behavior and enemy_behavior.combat_manager:
 		enemy_behavior.combat_manager.end_current_turn()
-
-# Poison system
-func apply_poison(initial_damage: int, duration: int = 3):
-	poison_damage = int(initial_damage * 0.2)
-	poison_duration = duration
-
-func _on_poison_tick():
-	if poison_duration > 0:
-		if enemy_behavior and enemy_behavior.current_target and enemy_behavior.current_target.has_method("get_stats"):
-			var target_stats = enemy_behavior.current_target.get_stats()
-			if target_stats and target_stats.health <= 0:
-				poison_duration = 0
-				poison_damage = 0
-				return
-		
-		# Log poison damage to combat log only if in combat
-		if enemy_behavior and enemy_behavior.in_combat and enemy_behavior.combat_manager and enemy_behavior.combat_manager.has_method("_log_combat_event"):
-			enemy_behavior.combat_manager._log_combat_event("☠️ " + enemy_behavior.current_target.name + " takes " + str(poison_damage) + " poison damage!")
-		
-		if enemy_behavior and enemy_behavior.current_target and enemy_behavior.current_target.has_method("take_damage"):
-			enemy_behavior.current_target.take_damage(poison_damage)
-		poison_duration -= 1
-		
-		if poison_duration <= 0:
-			poison_damage = 0
 
 # AI logic
 func choose_attack() -> String:

@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://enemies_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"enemies": {
+		"ints_to_locators": {
+			0: "res://enemies/big_rat.gd",
+			1: "res://enemies/goblin.gd"
+		},
+		"ints_to_strings": {
+			0: "big_rat",
+			1: "goblin"
+		},
+		"strings_to_ints": {
+			"big_rat": 0,
+			"goblin": 1
+		},
+		"categories_to_ints": {
+			"beasts": {0: true},
+			"humanoids": {1: true},
+			"low_level": {0: true, 1: true},
+			"dungeon": {0: true, 1: true},
+			"common": {0: true, 1: true},
+			"rodent": {0: true},
+			"goblin": {1: true}
+		}
+	},
+	"enemy_templates": {
+		"ints_to_locators": {
+			0: "res://enemies/enemy.gd"
+		},
+		"ints_to_strings": {
+			0: "base_enemy"
+		},
+		"strings_to_ints": {
+			"base_enemy": 0
+		},
+		"categories_to_ints": {
+			"template": {0: true},
+			"base_class": {0: true}
+		}
+	}
+}

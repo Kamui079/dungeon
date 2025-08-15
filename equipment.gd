@@ -83,3 +83,35 @@ func can_equip_in_slot(slot_name: String) -> bool:
 	"""Check if this equipment can be equipped in a specific slot"""
 	var this_equipment_slot = get_slot_name()
 	return this_equipment_slot == slot_name
+
+func get_stats() -> Dictionary:
+	"""Get stats for tooltip display"""
+	var equipment_stats = {}
+	
+	# Add armor if present
+	if armor_value > 0:
+		equipment_stats["armor"] = armor_value
+	
+	# Add damage if present
+	if damage_value > 0:
+		equipment_stats["damage"] = damage_value
+	
+	# Add stat bonuses
+	for stat_name in stat_bonuses:
+		equipment_stats[stat_name] = stat_bonuses[stat_name]
+	
+	return equipment_stats
+
+func get_rarity() -> String:
+	"""Get rarity as string for tooltip display"""
+	match rarity:
+		RARITY.COMMON: return "Common"
+		RARITY.UNCOMMON: return "Uncommon"
+		RARITY.RARE: return "Rare"
+		RARITY.EPIC: return "Epic"
+		RARITY.LEGENDARY: return "Legendary"
+		_: return "Common"
+
+func get_level_requirement() -> int:
+	"""Get level requirement for tooltip display"""
+	return required_level

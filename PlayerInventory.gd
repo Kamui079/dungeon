@@ -19,25 +19,70 @@ func get_bag() -> Dictionary: return bag
 func get_equipment() -> Dictionary: return equipment
 
 func add_item_to_bag(item: Resource, quantity: int = 1) -> int:
+	print("add_item_to_bag: Adding ", quantity, "x ", item.name, " (max_stack: ", item.max_stack, ")")
 	var remaining_quantity = quantity
+	
+	# Try to stack with existing items of the same type
 	if item.max_stack > 1:
+		print("add_item_to_bag: Attempting to stack with existing items...")
 		for i in range(MAX_BAG_SLOTS):
-			if bag.has(i) and bag[i].item.resource_path == item.resource_path:
-				var can_add = item.max_stack - bag[i].quantity
-				if can_add > 0:
-					var amount_to_add = min(remaining_quantity, can_add)
-					bag[i].quantity += amount_to_add
-					remaining_quantity -= amount_to_add
-					if remaining_quantity <= 0: break
+			if bag.has(i):
+				var existing_item = bag[i].item
+				print("add_item_to_bag: Checking slot ", i, " for stacking with ", existing_item.name)
+				# Check if items are the same type by comparing name and properties
+				if _are_items_same_type(existing_item, item):
+					var can_add = item.max_stack - bag[i].quantity
+					print("add_item_to_bag: Items are same type, can add ", can_add, " more")
+					if can_add > 0:
+						var amount_to_add = min(remaining_quantity, can_add)
+						bag[i].quantity += amount_to_add
+						remaining_quantity -= amount_to_add
+						print("add_item_to_bag: Added ", amount_to_add, " to slot ", i, ", remaining: ", remaining_quantity)
+						if remaining_quantity <= 0: break
+	
+	# Add remaining quantity to new slots
 	if remaining_quantity > 0:
+		print("add_item_to_bag: Adding ", remaining_quantity, " to new slots...")
 		for i in range(MAX_BAG_SLOTS):
 			if not bag.has(i):
 				var amount_in_new_stack = min(remaining_quantity, item.max_stack)
 				bag[i] = { "item": item, "quantity": amount_in_new_stack }
 				remaining_quantity -= amount_in_new_stack
+				print("add_item_to_bag: Created new stack in slot ", i, " with ", amount_in_new_stack, " items")
+				print("add_item_to_bag: Slot ", i, " now contains: ", bag[i])
 				if remaining_quantity <= 0: break
-	inventory_changed.emit() # This line was missing from the version you were running
+	
+	print("add_item_to_bag: Final remaining quantity: ", remaining_quantity)
+	inventory_changed.emit()
 	return remaining_quantity
+
+func _are_items_same_type(item1: Resource, item2: Resource) -> bool:
+	"""Check if two items are the same type for stacking purposes"""
+	if not item1 or not item2:
+		print("_are_items_same_type: One or both items are null")
+		return false
+	
+	# If both have resource paths, compare them
+	if item1.resource_path and item2.resource_path:
+		var same = item1.resource_path == item2.resource_path
+		print("_are_items_same_type: Comparing resource paths - ", item1.name, " vs ", item2.name, " = ", same)
+		return same
+	
+	# For dynamically created items, compare by name and type
+	if item1.name == item2.name and item1.item_type == item2.item_type:
+		# For equipment, also check the slot
+		if item1.item_type == Item.ITEM_TYPE.EQUIPMENT:
+			var same = item1.slot == item2.slot
+			print("_are_items_same_type: Equipment comparison - ", item1.name, " vs ", item2.name, " = ", same)
+			return same
+		# For consumables, check if they're the same type
+		elif item1.item_type == Item.ITEM_TYPE.CONSUMABLE:
+			var same = item1.consumable_type == item2.consumable_type
+			print("_are_items_same_type: Consumable comparison - ", item1.name, " vs ", item2.name, " = ", same)
+			return same
+	
+	print("_are_items_same_type: Items are different - ", item1.name, " vs ", item2.name)
+	return false
 
 func handle_right_click(bag_slot: int, equipment_slot: String):
 	if bag_slot != -1 and bag.has(bag_slot):
@@ -57,10 +102,27 @@ func handle_drop_data(data: Dictionary, to_bag_slot: int, to_equipment_slot: Str
 	elif source == "equipment" and to_equipment_slot != "": _swap_equipment_slots(from_slot, to_equipment_slot)
 func _consume_item(bag_slot: int):
 	var item_resource = bag[bag_slot].item; var player_node = get_parent()
+	
+	# Check if we're in combat
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager and combat_manager.in_combat:
+		# Queue the item usage for combat
+		print("In combat - queuing item usage: ", item_resource.name)
+		combat_manager.queue_item_usage(item_resource.name)
+		return
+	
+	# Not in combat - use item immediately
 	if item_resource.use(player_node):
 		bag[bag_slot].quantity -= 1
 		if bag[bag_slot].quantity <= 0: bag.erase(bag_slot)
 		inventory_changed.emit()
+
+func has_item(item_name: String) -> bool:
+	"""Check if the player has a specific item in their bag"""
+	for slot in bag:
+		if bag[slot].item.name == item_name:
+			return true
+	return false
 func _move_item_in_bag(from_slot: int, to_slot: int):
 	if from_slot == to_slot or not bag.has(from_slot): return
 	var from_item = bag[from_slot]

@@ -24,6 +24,9 @@ class_name CombatUI
 @onready var enemy_atb_bar: ProgressBar = $CombatPanel/VBoxContainer/ATBSection/EnemyATBBar
 @onready var atb_status_label: Label = $CombatPanel/VBoxContainer/ATBSection/ATBStatusLabel
 
+# Queued action indicator
+@onready var queued_action_label: Label = $CombatPanel/VBoxContainer/QueuedActionSection/QueuedActionLabel
+
 # Combat log
 @onready var combat_log_text: TextEdit = $CombatLogPanel/VBoxContainer/CombatLogText
 
@@ -32,6 +35,13 @@ class_name CombatUI
 
 var combat_manager: Node = null
 
+# Button state management
+var button_states = {}
+
+# Track which button corresponds to which action for highlighting
+var action_button_map = {}
+var currently_queued_action: String = ""
+
 func _ready():
 	print("=== COMBAT UI READY ===")
 	# Add to CombatUI group for spirit updates
@@ -39,6 +49,13 @@ func _ready():
 	
 	# Start hidden
 	hide()
+	
+	# Hide queued action indicator initially
+	if queued_action_label:
+		queued_action_label.hide()
+		print("Queued action label hidden at startup")
+	else:
+		print("ERROR: Queued action label not found at startup!")
 	
 	# Force hide popups at startup
 	if special_attacks_popup:
@@ -90,7 +107,10 @@ func _ready():
 		print("Spells button connected!")
 	else:
 		print("ERROR: Spells button not found!")
-		
+	
+	# Start updating button states
+	update_button_states()
+	
 	# Connect popup buttons
 	if haymaker_button:
 		haymaker_button.pressed.connect(_on_haymaker_pressed)
@@ -137,9 +157,14 @@ func _ready():
 		combat_manager.combat_ended.connect(_on_combat_ended)
 		combat_manager.turn_changed.connect(_on_turn_changed)
 		combat_manager.atb_bar_updated.connect(_on_atb_bar_updated)
+		combat_manager.action_queued.connect(_on_action_queued)
+		combat_manager.action_dequeued.connect(_on_action_dequeued)
 		print("Combat UI: Connected to combat manager signals!")
 	else:
 		print("WARNING: No combat manager found!")
+	
+	# Initialize action button mapping AFTER all buttons are connected
+	call_deferred("_setup_action_button_mapping")
 	
 	# Add debug keyboard shortcut (F12 key)
 	set_process_input(true)
@@ -182,6 +207,8 @@ func _on_combat_started():
 	# Ensure popups are hidden when combat starts
 	special_attacks_popup.hide()
 	spells_popup.hide()
+	# Clear any previous button highlights
+	_clear_all_button_highlights()
 	# Clear previous combat log
 	clear_combat_log()
 	# Reset spirit display
@@ -202,23 +229,21 @@ func update_player_status(_player: Node):
 	"""Placeholder for player status update"""
 	pass # No longer using ProgressBars for player status
 
-
-
 func _on_combat_ended():
 	print("Combat UI: Combat ended!")
 	hide()
 	# Hide any open popups
 	special_attacks_popup.hide()
 	spells_popup.hide()
+	# Clear any queued action highlighting
+	if currently_queued_action != "":
+		_restore_button_appearance(currently_queued_action)
+		currently_queued_action = ""
 
 func _on_basic_attack_pressed():
 	if combat_manager:
-		# Check if player's turn is ready
-		if combat_manager.is_player_turn_ready():
-			combat_manager.player_basic_attack()
-		else:
-			print("Player turn not ready yet! ATB bar still filling...")
-			add_combat_log_entry("⚠️ Wait for your ATB bar to fill up!")
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_basic_attack()
 
 func _on_special_attacks_popup_pressed():
 	print("Special attacks button pressed!")
@@ -239,28 +264,18 @@ func _on_spells_popup_pressed():
 func _on_haymaker_pressed():
 	print("Haymaker button pressed!")
 	if combat_manager:
-		# Check if player's turn is ready
-		if combat_manager.is_player_turn_ready():
-			combat_manager.player_special_attack()
-			special_attacks_popup.hide()  # Close popup after selection
-		else:
-			print("Player turn not ready yet! ATB bar still filling...")
-			add_combat_log_entry("⚠️ Wait for your ATB bar to fill up!")
-			special_attacks_popup.hide()
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_special_attack()
+		special_attacks_popup.hide()  # Close popup after selection
 	else:
 		print("ERROR: No combat manager found!")
 
 func _on_fireball_pressed():
 	print("Fireball button pressed!")
 	if combat_manager:
-		# Check if player's turn is ready
-		if combat_manager.is_player_turn_ready():
-			combat_manager.player_cast_spell()
-			spells_popup.hide()  # Close popup after selection
-		else:
-			print("Player turn not ready yet! ATB bar still filling...")
-			add_combat_log_entry("⚠️ Wait for your ATB bar to fill up!")
-			spells_popup.hide()
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_cast_spell()
+		spells_popup.hide()  # Close popup after selection
 	else:
 		print("ERROR: No combat manager found!")
 
@@ -274,36 +289,47 @@ func _on_spells_close_pressed():
 
 func _on_defend_pressed():
 	if combat_manager:
-		# Check if player's turn is ready
-		if combat_manager.is_player_turn_ready():
-			combat_manager.player_defend()
-		else:
-			print("Player turn not ready yet! ATB bar still filling...")
-			add_combat_log_entry("⚠️ Wait for your ATB bar to fill up!")
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_defend()
 
 func _on_item_pressed():
 	if combat_manager:
-		# Check if player's turn is ready
-		if combat_manager.is_player_turn_ready():
-			# Toggle the inventory UI
-			var inventory_ui = get_tree().get_first_node_in_group("InventoryUIGroup")
-			if inventory_ui:
-				if inventory_ui.visible:
-					inventory_ui.hide()
+		# Always show inventory - combat manager will handle queuing if needed
+		var inventory_ui = get_tree().get_first_node_in_group("InventoryUI")
+		if inventory_ui:
+			if inventory_ui.visible:
+				inventory_ui.hide()
+				print("Inventory UI hidden!")
+			else:
+				inventory_ui.show()
+				print("Inventory UI shown!")
+		else:
+			print("No inventory UI found in 'InventoryUI' group!")
+			# Try alternative group names
+			var alt_inventory = get_tree().get_first_node_in_group("PlayerInventory")
+			if alt_inventory:
+				print("Found inventory in 'PlayerInventory' group instead")
+				if alt_inventory.visible:
+					alt_inventory.hide()
 					print("Inventory UI hidden!")
 				else:
-					inventory_ui.show()
+					alt_inventory.show()
 					print("Inventory UI shown!")
 			else:
-				print("No inventory UI found!")
-		else:
-			print("Player turn not ready yet! ATB bar still filling...")
-			add_combat_log_entry("⚠️ Wait for your ATB bar to fill up!")
+				print("No inventory UI found in any known groups!")
 
 # ATB System methods
 func _on_atb_bar_updated(player_progress: float, enemy_progress: float):
 	"""Update ATB bars when progress changes"""
 	print("ATB Update - Player: ", int(player_progress * 100), "%, Enemy: ", int(enemy_progress * 100), "%")
+	
+	# Clear queued action when ATB resets (goes back to 0%)
+	if player_progress < 0.1 and currently_queued_action != "":
+		print("ATB reset detected - clearing queued action")
+		_restore_button_appearance(currently_queued_action)
+		currently_queued_action = ""
+		if queued_action_label:
+			queued_action_label.hide()
 	
 	if player_atb_bar:
 		player_atb_bar.value = player_progress * 100  # Convert to percentage
@@ -429,3 +455,249 @@ func debug_atb_status():
 	
 	add_combat_log_entry(status_text)
 	print("ATB Debug Info: ", atb_status)
+
+# Queued action handlers
+func _on_action_queued(action: String, data: Dictionary):
+	"""Handle when an action is queued"""
+	print("🎯 Action queued: ", action, " with data: ", data)
+	
+	if not queued_action_label:
+		print("ERROR: Queued action label not found!")
+		return
+	
+	# Map action types to specific ability names for better clarity
+	var action_name = _get_action_display_name(action)
+	var action_text = "⏳ Queued: " + action_name
+	
+	# Add item name if it's an item use action
+	if data.has("item_name"):
+		action_text += " (" + data["item_name"] + ")"
+	
+	queued_action_label.text = action_text
+	queued_action_label.show()
+	print("✅ Queued action indicator shown: ", action_text)
+	
+	# Combat log entry is now handled by the combat manager with detailed messages
+	_highlight_queued_action(action)
+
+func _get_action_display_name(action: String) -> String:
+	"""Convert action type to specific ability name for better display"""
+	match action:
+		"basic_attack":
+			return "Basic Attack"
+		"special_attack":
+			return "Haymaker"
+		"cast_spell":
+			return "Fireball"
+		"defend":
+			return "Defend"
+		"use_item":
+			return "Use Item"
+		_:
+			# Fallback: capitalize and replace underscores
+			return action.replace("_", " ").capitalize()
+
+func _on_action_dequeued():
+	"""Handle when a queued action is executed"""
+	print("🎯 Action dequeued - hiding queued action indicator")
+	
+	if not queued_action_label:
+		print("ERROR: Queued action label not found!")
+		return
+	
+	# Hide the queued action indicator
+	queued_action_label.hide()
+	print("✅ Queued action indicator hidden")
+	_restore_button_appearance(currently_queued_action)
+
+func update_button_states():
+	"""Update button states based on available resources"""
+	if not combat_manager or not combat_manager.current_player:
+		return
+	
+	var player = combat_manager.current_player
+	var player_stats = player.get_stats() if player.has_method("get_stats") else null
+	
+	if not player_stats:
+		return
+	
+	# Get current resources
+	var current_spirit = player_stats.get_spirit() if player_stats.has_method("get_spirit") else 0
+	var current_mana = player_stats.mana
+	var current_health = player_stats.health
+	
+	# Update Haymaker button (costs 3 spirit)
+	if haymaker_button:
+		var haymaker_cost = 3
+		var can_afford_haymaker = current_spirit >= haymaker_cost
+		_set_button_state(haymaker_button, can_afford_haymaker, "Haymaker", haymaker_cost, current_spirit, "SP")
+	
+	# Update Fireball button (costs 15 mana)
+	if fireball_button:
+		var fireball_cost = 15
+		var can_afford_fireball = current_mana >= fireball_cost
+		_set_button_state(fireball_button, can_afford_fireball, "Fireball", fireball_cost, current_mana, "MP")
+	
+	# Update Basic Attack button (always available)
+	if basic_attack_button:
+		_set_button_state(basic_attack_button, true, "Basic Attack", 0, 0, "")
+	
+	# Update Defend button (always available)
+	if defend_button:
+		_set_button_state(defend_button, true, "Defend", 0, 0, "")
+	
+	# Update Item button (check if player has any usable items)
+	if item_button:
+		var has_usable_items = _check_if_player_has_usable_items(player)
+		_set_button_state(item_button, has_usable_items, "Use Item", 0, 0, "")
+	
+	# Update Special Attacks button (menu opener - always available)
+	if special_attacks_button:
+		_set_button_state(special_attacks_button, true, "Special Attacks", 0, 0, "")
+	
+	# Update Spells button (menu opener - always available)
+	if spells_button:
+		_set_button_state(spells_button, true, "Spells", 0, 0, "")
+
+func _check_if_player_has_usable_items(player: Node) -> bool:
+	"""Check if the player has any items they can use in combat"""
+	# This is a placeholder - you can expand this based on your inventory system
+	# For now, assume player always has some items
+	return true
+
+func _set_button_state(button: Button, can_afford: bool, ability_name: String, cost: int, current: int, resource_type: String):
+	"""Set button visual state and tooltip based on affordability"""
+	if not button:
+		return
+	
+	# Don't change button appearance if it's currently highlighted green (queued)
+	if currently_queued_action != "":
+		var queued_button = action_button_map.get(currently_queued_action)
+		if button == queued_button:
+			return
+	
+	# Store original state if not already stored
+	if not button_states.has(button):
+		button_states[button] = {
+			"original_modulate": button.modulate,
+			"original_disabled": button.disabled,
+			"original_tooltip": button.tooltip_text
+		}
+	
+	if can_afford:
+		# Enable button and restore original appearance
+		button.disabled = false
+		button.modulate = button_states[button]["original_modulate"]
+		button.tooltip_text = button_states[button]["original_tooltip"]
+	else:
+		# Disable button and make it red to show it's not usable
+		button.disabled = true
+		button.modulate = Color(1.0, 0.3, 0.3, 0.8)  # Red with slight transparency
+		button.tooltip_text = ability_name + " (Cost: " + str(cost) + " " + resource_type + ")\nYou have: " + str(current) + " " + resource_type + "\nNot enough resources!"
+
+func _process(delta):
+	"""Update button states every frame during combat"""
+	if visible and combat_manager:
+		update_button_states()
+
+func _setup_action_button_mapping():
+	"""Set up mapping between action types and their corresponding buttons"""
+	print("🔧 Setting up action button mapping...")
+	print("🔧 Basic attack button: ", basic_attack_button)
+	print("🔧 Haymaker button: ", haymaker_button)
+	print("🔧 Fireball button: ", fireball_button)
+	print("🔧 Defend button: ", defend_button)
+	print("🔧 Item button: ", item_button)
+	
+	action_button_map = {
+		"basic_attack": basic_attack_button,
+		"special_attack": haymaker_button,
+		"cast_spell": fireball_button,
+		"defend": defend_button,
+		"use_item": item_button
+	}
+	
+	print("🔧 Action button mapping set up: ", action_button_map.keys())
+	for action in action_button_map.keys():
+		var button = action_button_map[action]
+		print("🔧 ", action, " -> ", button, " (valid: ", is_instance_valid(button) if button else "null", ")")
+
+func _highlight_queued_action(action: String):
+	"""Highlight the button corresponding to the queued action in green"""
+	print("🔍 Attempting to highlight action: ", action)
+	print("🔍 Action button map: ", action_button_map)
+	print("🔍 Available actions: ", action_button_map.keys())
+	
+	var button = action_button_map.get(action)
+	if button:
+		print("✅ Found button for action: ", action, " - Button: ", button)
+		# Store original state if not already stored
+		if not button_states.has(button):
+			button_states[button] = {
+				"original_modulate": button.modulate,
+				"original_disabled": button.disabled,
+				"original_tooltip": button.tooltip_text
+			}
+			print("✅ Stored original button state for: ", action)
+		
+		# Turn button green to show it's queued
+		button.modulate = Color(0.2, 1.0, 0.2, 1.0)  # Bright green
+		print("✅ Button highlighted green for queued action: ", action)
+		currently_queued_action = action # Update the currently queued action
+	else:
+		print("⚠️ No button found for action: ", action)
+		print("⚠️ Available actions in map: ", action_button_map.keys())
+		print("⚠️ Requested action: ", action)
+
+func _restore_button_appearance(action: String):
+	"""Restore the button appearance when action is dequeued"""
+	var button = action_button_map.get(action)
+	if button and button_states.has(button):
+		# Check if the button should actually be red (not usable)
+		var should_be_red = _should_button_be_red(button, action)
+		if should_be_red:
+			# Button should be red because it's not usable
+			button.modulate = Color(1.0, 0.3, 0.3, 0.8)
+		else:
+			# Restore original appearance
+			button.modulate = button_states[button]["original_modulate"]
+		print("✅ Button appearance restored for action: ", action)
+	else:
+		print("⚠️ Could not restore button appearance for action: ", action)
+
+func _should_button_be_red(button: Button, action: String) -> bool:
+	"""Check if a button should be red based on current resource availability"""
+	if not combat_manager or not combat_manager.current_player:
+		return false
+	
+	var player = combat_manager.current_player
+	var player_stats = player.get_stats() if player.has_method("get_stats") else null
+	
+	if not player_stats:
+		return false
+	
+	var current_spirit = player_stats.get_spirit() if player_stats.has_method("get_spirit") else 0
+	var current_mana = player_stats.mana
+	
+	# Check specific actions for resource requirements
+	# Note: Menu opener buttons (Special Attacks, Spells) are never red
+	match action:
+		"special_attack":
+			return current_spirit < 3  # Haymaker costs 3 spirit
+		"cast_spell":
+			return current_mana < 15  # Fireball costs 15 mana
+		_:
+			return false  # Other actions (including menu openers) are always available
+
+func _clear_all_button_highlights():
+	"""Clear all button highlights - useful for resetting state"""
+	for action in action_button_map.keys():
+		var button = action_button_map[action]
+		if button and button_states.has(button):
+			# Check if button should be red (not usable)
+			var should_be_red = _should_button_be_red(button, action)
+			if should_be_red:
+				button.modulate = Color(1.0, 0.3, 0.3, 0.8)
+			else:
+				button.modulate = button_states[button]["original_modulate"]
+	currently_queued_action = ""

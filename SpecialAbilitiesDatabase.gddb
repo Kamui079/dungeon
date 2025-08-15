@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://special_abilities_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"abilities": {
+		"ints_to_locators": {},
+		"ints_to_strings": {},
+		"strings_to_ints": {},
+		"categories_to_ints": {
+			"combat": {},
+			"movement": {},
+			"social": {},
+			"crafting": {},
+			"exploration": {},
+			"passive": {},
+			"active": {},
+			"ultimate": {},
+			"starter": {},
+			"advanced": {},
+			"master": {}
+		}
+	},
+	"combat_abilities": {
+		"ints_to_locators": {},
+		"ints_to_strings": {},
+		"strings_to_ints": {},
+		"categories_to_ints": {
+			"melee": {},
+			"ranged": {},
+			"magic": {},
+			"defensive": {},
+			"counter": {},
+			"combo": {},
+			"finisher": {}
+		}
+	},
+	"movement_abilities": {
+		"ints_to_locators": {},
+		"ints_to_strings": {},
+		"strings_to_ints": {},
+		"categories_to_ints": {
+			"dash": {},
+			"jump": {},
+			"climb": {},
+			"swim": {},
+			"fly": {},
+			"teleport": {},
+			"stealth": {}
+		}
+	},
+	"passive_abilities": {
+		"ints_to_locators": {},
+		"ints_to_strings": {},
+		"strings_to_ints": {},
+		"categories_to_ints": {
+			"stat_boost": {},
+			"resistance": {},
+			"regeneration": {},
+			"detection": {},
+			"crafting": {},
+			"social": {}
+		}
+	}
+}
