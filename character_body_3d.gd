@@ -41,9 +41,12 @@ func _ready():
 	var hud_scene: PackedScene = preload("res://UI/HUD.tscn")
 	var hud: HUD = hud_scene.instantiate()
 	add_child(hud)
-	stats.health_changed.connect(hud.set_health); stats.mana_changed.connect(hud.set_mana)
-	stats.spirit_changed.connect(hud.set_spirit); hud.set_health(stats.health, stats.max_health)
-	hud.set_mana(stats.mana, stats.max_mana); hud.set_spirit(stats.spirit, 10)
+	stats.health_changed.connect(hud.set_health)
+	stats.mana_changed.connect(hud.set_mana)
+	stats.spirit_changed.connect(hud.set_spirit)
+	hud.set_health(stats.health, stats.max_health)
+	hud.set_mana(stats.mana, stats.max_mana)
+	hud.set_spirit(stats.spirit, 10)
 	stats.spirit_changed.connect(_on_spirit_changed)
 	
 	# --- THIS IS THE CORRECTED UI SETUP ---
@@ -89,6 +92,8 @@ func get_spirit() -> int:
 	if has_method("get_stats") and get_stats(): return get_stats().spirit
 	return 0
 
+
+
 # --- Movement and Input Processing ---
 func _physics_process(delta):
 	if is_frozen: return
@@ -101,14 +106,17 @@ func _physics_process(delta):
 
 func _input(event):
 	if is_frozen: return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		get_tree().quit()
+	# ESC key handling moved to PauseMenu
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * mouse_sensitivity)
 		if is_instance_valid(camera):
 			camera.rotate_x(-event.relative.y * mouse_sensitivity)
 			camera.rotation.x = clamp(camera.rotation.x, -PI/4, PI/4)
-			camera.rotation.y = 0.0; camera.rotation.z = 0.0
+			# Only keep camera Y rotation at 0 when NOT in combat to allow combat orientation
+			var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+			if not combat_manager or not combat_manager.in_combat:
+				camera.rotation.y = 0.0
+			camera.rotation.z = 0.0
 
 func handle_movement(delta):
 	var input_dir = Input.get_vector("move_left", "move_right", "move_backwards", "move_forward")
@@ -199,10 +207,14 @@ func set_physics_process_enabled(enabled: bool):
 	set_physics_process_internal(enabled)
 	is_frozen = not enabled
 	set_process_input(enabled)
-	if enabled: Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if enabled: 
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		# Don't auto-face enemy when unfrozen during combat - let combat manager handle it
+		var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+		if not combat_manager or not combat_manager.in_combat:
+			face_nearest_enemy()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		face_nearest_enemy()
 
 # --- Signal Connections & Helpers ---
 func _on_chest_detected(): _can_interact = true
@@ -235,7 +247,11 @@ func face_nearest_enemy():
 				nearest_distance = distance; nearest_enemy = enemy
 	if nearest_enemy: face_target(nearest_enemy)
 func face_target(target: Node):
-	if not target: return
+	if not target: 
+		print("⚠️ face_target: No target provided")
+		return
+	
+	print("🎯 face_target called with target: ", target.name)
 	
 	# Get target position - check if it's a Node3D or has a parent with global_position
 	var target_pos = Vector3.ZERO
@@ -244,21 +260,53 @@ func face_target(target: Node):
 	elif target.get_parent() and target.get_parent() is Node3D:
 		target_pos = target.get_parent().global_position
 	else:
+		print("⚠️ face_target: Target has no valid position")
 		return
+	
+	print("🎯 Target position: ", target_pos, " Player position: ", global_position)
 	
 	var direction = (target_pos - global_position).normalized()
 	direction.y = 0
 	if direction.is_normalized():
 		var target_rotation = atan2(direction.x, direction.z)
-		var tween = create_tween()
-		tween.tween_property(self, "rotation:y", target_rotation, 0.3)
+		print("🎯 Direction vector: ", direction, " Target rotation: ", target_rotation, " Current rotation: ", rotation.y)
+		
+		# Try flipping the rotation 180 degrees to fix the orientation issue
+		target_rotation += PI
+		
+		# First, reset camera to neutral position to avoid conflicts with scene rotation
+		if camera:
+			print("🎯 Resetting camera to neutral position first...")
+			var reset_tween = create_tween()
+			reset_tween.tween_property(camera, "rotation:y", 0.0, 0.4)
+			reset_tween.tween_callback(func():
+				# After camera reset, rotate player and set final camera position
+				print("🎯 Camera reset complete, now rotating player...")
+				var player_tween = create_tween()
+				player_tween.tween_property(self, "rotation:y", target_rotation, 0.8)
+				print("✅ Player rotation tween started")
+				
+				# Ensure camera stays at neutral rotation
+				var camera_tween = create_tween()
+				camera_tween.tween_property(camera, "rotation:y", 0.0, 0.8)
+				print("✅ Camera rotation tween started")
+			)
+		else:
+			print("⚠️ face_target: No camera reference")
+			# Just rotate player if no camera
+			var tween = create_tween()
+			tween.tween_property(self, "rotation:y", target_rotation, 0.8)
+			print("✅ Player rotation tween started (no camera)")
+	else:
+		print("⚠️ face_target: Direction not normalized")
 
 func orient_camera_toward(target: Node):
 	"""Orient the camera toward a target (used for combat orientation)"""
 	if not target or not camera:
+		print("⚠️ orient_camera_toward: Missing target or camera")
 		return
 	
-
+	print("🎯 orient_camera_toward called with target: ", target.name)
 	
 	# Get the direction from player to target
 	var target_pos = Vector3.ZERO
@@ -267,18 +315,58 @@ func orient_camera_toward(target: Node):
 	elif target.get_parent() and target.get_parent() is Node3D:
 		target_pos = target.get_parent().global_position
 	else:
+		print("⚠️ orient_camera_toward: Target has no valid position")
 		return
+	
+	print("🎯 Target position: ", target_pos, " Player position: ", global_position)
 	
 	var direction = (target_pos - global_position).normalized()
 	direction.y = 0  # Keep camera level
 	
 	if direction.is_normalized():
-		# Calculate target rotation for the camera
+		# Calculate target rotation for the player (not the camera)
 		var target_rotation = atan2(direction.x, direction.z)
+		print("🎯 Direction vector: ", direction, " Target rotation: ", target_rotation, " Current rotation: ", rotation.y)
 		
-		# Smoothly rotate the camera to face the target
-		var tween = create_tween()
-		tween.tween_property(camera, "rotation:y", target_rotation, 0.5)
+		# Try flipping the rotation 180 degrees to fix the orientation issue
+		target_rotation += PI
+		
+		# First, reset camera to neutral position to avoid conflicts with scene rotation
+		print("🎯 Resetting camera to neutral position first...")
+		var reset_tween = create_tween()
+		reset_tween.tween_property(camera, "rotation:y", 0.0, 0.4)
+		reset_tween.tween_callback(func():
+			# After camera reset, rotate player and set final camera position
+			print("🎯 Camera reset complete, now rotating player...")
+			var player_tween = create_tween()
+			player_tween.tween_property(self, "rotation:y", target_rotation, 0.8)
+			print("✅ Player rotation tween started in orient_camera_toward")
+			
+			# Ensure camera stays at neutral rotation
+			var camera_tween = create_tween()
+			camera_tween.tween_property(camera, "rotation:y", 0.0, 0.8)
+			print("✅ Camera rotation tween started in orient_camera_toward")
+		)
+		
+		print("🎥 Camera system oriented toward target (player rotation: ", target_rotation, ")")
+	else:
+		print("⚠️ orient_camera_toward: Direction not normalized")
+
+
+func reset_camera_control():
+	"""Reset camera control to the player after combat ends"""
+	if not camera:
+		return
+	
+	# Reset the camera's local rotation to neutral
+	var camera_tween = create_tween()
+	camera_tween.tween_property(camera, "rotation:y", 0.0, 0.3)
+	
+	# Also reset the camera's X rotation to a comfortable viewing angle
+	var camera_x_tween = create_tween()
+	camera_x_tween.tween_property(camera, "rotation:x", -0.3, 0.3)  # Slight downward angle
+	
+	print("🎥 Camera control reset to player")
 
 
 func get_camera() -> Camera3D:

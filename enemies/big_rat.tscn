@@ -23,23 +23,4 @@ pixel_size = 0.003
 modulate = Color(1, 1, 1, 1)
 position = Vector3(0, 0.5, 0)
 
-[node name="HealthBar" type="Sprite3D" parent="."]
-billboard = true
-pixel_size = 0.008
-position = Vector3(0, 1.2, 0)
-modulate = Color(0.2, 0.8, 0.2, 1.0)
-scale = Vector3(2, 0.8, 1)
 
-[node name="ManaBar" type="Sprite3D" parent="."]
-billboard = true
-pixel_size = 0.008
-position = Vector3(0, 1.0, 0)
-modulate = Color(0.2, 0.2, 0.8, 1.0)
-scale = Vector3(2, 0.8, 1)
-
-[node name="EnemyNameLabel" type="Label3D" parent="."]
-text = "Big Rat"
-billboard = true
-pixel_size = 0.004
-position = Vector3(0, 1.4, 0)
-modulate = Color(1, 1, 1, 1)

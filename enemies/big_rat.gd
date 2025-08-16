@@ -9,7 +9,7 @@ var enemy_behavior: Node = null
 
 func _ready():
 	# Create enemy behavior component
-	enemy_behavior = preload("res://enemies/enemy.gd").new()
+	enemy_behavior = preload("enemy.gd").new()
 	add_child(enemy_behavior)
 	
 	# Set rat-specific properties
@@ -177,6 +177,12 @@ func move_to_target_for_attack(target: Node):
 				enemy_behavior.combat_manager.end_current_turn()
 			return
 	
+	if not self is Node3D:
+		print("Big Rat ERROR: Self is not a Node3D - cannot access global_position!")
+		return
+	if not target is Node3D:
+		print("Big Rat ERROR: Target is not a Node3D - cannot access global_position!")
+		return
 	var direction = (target.global_position - global_position).normalized()
 	var attack_position = target.global_position - (direction * 1.5)
 	
@@ -223,6 +229,12 @@ func take_turn():
 			enemy_behavior.combat_manager.end_current_turn()
 		return
 	
+	if not self is Node3D:
+		print("Big Rat ERROR: Self is not a Node3D - cannot access global_position!")
+		return
+	if not enemy_behavior.current_target is Node3D:
+		print("Big Rat ERROR: Current target is not a Node3D - cannot access global_position!")
+		return
 	var distance_to_target = global_position.distance_to(enemy_behavior.current_target.global_position)
 	if distance_to_target > 1.5:
 		move_to_target_for_attack(enemy_behavior.current_target)
@@ -262,92 +274,23 @@ func set_physics_process_enabled(enabled: bool):
 	if enemy_behavior:
 		enemy_behavior.set_physics_process_enabled(enabled)
 
-# Status bar management functions
+# Status bar management functions - REMOVED (now handled by top panel)
 func _create_bar_textures():
-	"""Create simple white textures for the health and mana bars"""
-	var health_bar = get_node_or_null("HealthBar")
-	var mana_bar = get_node_or_null("ManaBar")
-	var enemy_name_label = get_node_or_null("EnemyNameLabel")
-	
-	if health_bar:
-		# Create a simple white texture for the health bar
-		var image = Image.create(64, 8, false, Image.FORMAT_RGBA8)
-		image.fill(Color.WHITE)
-		var texture = ImageTexture.create_from_image(image)
-		health_bar.texture = texture
-	
-	if mana_bar:
-		# Create a simple white texture for the mana bar
-		var image = Image.create(64, 8, false, Image.FORMAT_RGBA8)
-		image.fill(Color.WHITE)
-		var texture = ImageTexture.create_from_image(image)
-		mana_bar.texture = texture
-	
-	# Set enemy name label text
-	if enemy_name_label:
-		enemy_name_label.text = "Big Rat"
+	"""Status bars removed - now displayed in top enemy status panel"""
+	pass
 
 func update_status_bars():
-	"""Update both health and mana bars"""
-	print("BigRat: update_status_bars() called")
-	if not enemy_behavior or not enemy_behavior.stats:
-		print("BigRat: Cannot update status bars - enemy_behavior or stats is null")
-		return
-		
-	var health_bar = get_node_or_null("HealthBar")
-	var mana_bar = get_node_or_null("ManaBar")
-	
-	print("BigRat: health_bar found: ", health_bar != null, " mana_bar found: ", mana_bar != null)
-	print("BigRat: Current health: ", enemy_behavior.stats.health, "/", enemy_behavior.stats.max_health)
-	print("BigRat: Current mana: ", enemy_behavior.stats.mana, "/", enemy_behavior.stats.max_mana)
-	
-	if health_bar:
-		# Scale the health bar based on current health percentage
-		var health_percent = float(enemy_behavior.stats.health) / float(enemy_behavior.stats.max_health)
-		health_bar.scale.x = health_percent
-		print("BigRat: Health bar scaled to: ", health_percent)
-		# Change color based on health level
-		if health_percent > 0.6:
-			health_bar.modulate = Color(0.2, 0.8, 0.2, 1.0)  # Green
-		elif health_percent > 0.3:
-			health_bar.modulate = Color(0.8, 0.8, 0.2, 1.0)  # Yellow
-		else:
-			health_bar.modulate = Color(0.8, 0.2, 0.2, 1.0)  # Red
-	
-	if mana_bar:
-		# Scale the mana bar based on current mana percentage
-		var mana_percent = float(enemy_behavior.stats.mana) / float(enemy_behavior.stats.max_mana)
-		mana_bar.scale.x = mana_percent
-		print("BigRat: Mana bar scaled to: ", mana_percent)
+	"""Status bars removed - now displayed in top enemy status panel"""
+	pass
 
 func show_status_bars():
-	"""Show the status bars above the enemy's head"""
-	print("BigRat: show_status_bars() called")
-	var health_bar = get_node_or_null("HealthBar")
-	var mana_bar = get_node_or_null("ManaBar")
-	var enemy_name_label = get_node_or_null("EnemyNameLabel")
-	
-	print("BigRat: health_bar found: ", health_bar != null, " mana_bar found: ", mana_bar != null, " enemy_name_label found: ", enemy_name_label != null)
-	
-	if health_bar:
-		health_bar.visible = true
-		print("BigRat: Health bar made visible")
-	if mana_bar:
-		mana_bar.visible = true
-		print("BigRat: Mana bar made visible")
-	if enemy_name_label:
-		enemy_name_label.visible = true
-		print("BigRat: Enemy name label made visible")
+	"""Show the status bars above the enemy's head - DISABLED, now shown in top panel"""
+	print("BigRat: show_status_bars() called - Status bars now displayed in top panel")
+	# Status bars are now displayed in the top enemy status panel
+	# This function is kept for compatibility but does nothing
 
 func hide_status_bars():
-	"""Hide the status bars"""
-	var health_bar = get_node_or_null("HealthBar")
-	var mana_bar = get_node_or_null("ManaBar")
-	var enemy_name_label = get_node_or_null("EnemyNameLabel")
-	
-	if health_bar:
-		health_bar.visible = false
-	if mana_bar:
-		mana_bar.visible = false
-	if enemy_name_label:
-		enemy_name_label.visible = false
+	"""Hide the status bars - DISABLED, now handled by top panel"""
+	print("BigRat: hide_status_bars() called - Status bars now handled by top panel")
+	# Status bars are now handled by the top enemy status panel
+	# This function is kept for compatibility but does nothing

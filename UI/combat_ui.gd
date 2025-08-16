@@ -30,8 +30,13 @@ class_name CombatUI
 # Combat log
 @onready var combat_log_text: TextEdit = $CombatLogPanel/VBoxContainer/CombatLogText
 
-# Enemy status elements - removed from UI, now displayed above enemy head
-# @onready var enemy_name_label: Label = $CombatPanel/VBoxContainer/EnemyStatusSection/EnemyNameLabel
+# Enemy status panel (new top-screen display)
+@onready var enemy_status_panel: Panel = $EnemyStatusPanel
+@onready var enemy_name_label: Label = $EnemyStatusPanel/VBoxContainer/EnemyNameLabel
+@onready var health_bar: ProgressBar = $EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection/HealthBar
+@onready var health_value: Label = $EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection/HealthValue
+@onready var mana_bar: ProgressBar = $EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection/ManaBar
+@onready var mana_value: Label = $EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection/ManaValue
 
 var combat_manager: Node = null
 
@@ -47,8 +52,17 @@ func _ready():
 	# Add to CombatUI group for spirit updates
 	add_to_group("CombatUI")
 	
+	# Connect to status effects manager for updates - TEMPORARILY DISABLED
+	# var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	# if status_manager:
+	# 	status_manager.effects_changed.connect(_on_effects_changed)
+	# 	print("Combat UI: Connected to status effects manager")
+	
 	# Start hidden
 	hide()
+	
+	# Hide enemy status panel initially
+	hide_enemy_status_panel()
 	
 	# Hide queued action indicator initially
 	if queued_action_label:
@@ -204,6 +218,8 @@ func check_player_turn_readiness():
 func _on_combat_started():
 	print("Combat UI: Combat started!")
 	show()
+	# Show enemy status panel
+	show_enemy_status_panel()
 	# Ensure popups are hidden when combat starts
 	special_attacks_popup.hide()
 	spells_popup.hide()
@@ -215,6 +231,10 @@ func _on_combat_started():
 	update_spirit_display(0)
 	# Update turn display
 	update_turn_display()
+	
+	# Try to update enemy status panel with current enemy
+	if combat_manager and combat_manager.current_enemy:
+		update_enemy_status_panel(combat_manager.current_enemy)
 
 func update_spirit_display(_spirit_points: int):
 	"""Placeholder for spirit display update"""
@@ -232,6 +252,8 @@ func update_player_status(_player: Node):
 func _on_combat_ended():
 	print("Combat UI: Combat ended!")
 	hide()
+	# Hide enemy status panel
+	hide_enemy_status_panel()
 	# Hide any open popups
 	special_attacks_popup.hide()
 	spells_popup.hide()
@@ -321,8 +343,6 @@ func _on_item_pressed():
 # ATB System methods
 func _on_atb_bar_updated(player_progress: float, enemy_progress: float):
 	"""Update ATB bars when progress changes"""
-	print("ATB Update - Player: ", int(player_progress * 100), "%, Enemy: ", int(enemy_progress * 100), "%")
-	
 	# Clear queued action when ATB resets (goes back to 0%)
 	if player_progress < 0.1 and currently_queued_action != "":
 		print("ATB reset detected - clearing queued action")
@@ -362,6 +382,9 @@ func _on_turn_changed(current_actor: Node, turn_type: String):
 		return
 		
 	update_turn_display()
+	
+	# Refresh enemy status panel when turn changes
+	refresh_enemy_status_panel()
 
 func update_turn_display():
 	"""Update the turn system display with current information"""
@@ -383,8 +406,6 @@ func update_turn_display():
 		elif turn_type_text == "enemy":
 			turn_type_text = "Enemy"
 		turn_info_label.text = "Turn: " + actor_name + " (" + turn_type_text + ")"
-	
-	print("Turn display updated!")
 
 # Combat log methods
 func add_combat_log_entry(message: String):
@@ -701,3 +722,91 @@ func _clear_all_button_highlights():
 			else:
 				button.modulate = button_states[button]["original_modulate"]
 	currently_queued_action = ""
+
+# Enemy Status Panel Methods
+func show_enemy_status_panel():
+	"""Show the enemy status panel"""
+	if enemy_status_panel:
+		enemy_status_panel.show()
+		print("Combat UI: Enemy status panel shown")
+	else:
+		print("ERROR: Enemy status panel not found!")
+
+func hide_enemy_status_panel():
+	"""Hide the enemy status panel"""
+	if enemy_status_panel:
+		enemy_status_panel.hide()
+		print("Combat UI: Enemy status panel hidden")
+	else:
+		print("ERROR: Enemy status panel not found!")
+
+func update_enemy_status_panel(enemy: Node):
+	"""Update the enemy status panel with enemy data"""
+	if not enemy or not is_instance_valid(enemy):
+		return
+	
+	# Update enemy name
+	if enemy_name_label:
+		enemy_name_label.text = enemy.name
+	
+	# Try to get enemy stats
+	var enemy_stats = null
+	if enemy.has_method("get_stats"):
+		enemy_stats = enemy.get_stats()
+	elif enemy.has_method("stats"):
+		enemy_stats = enemy.stats
+	
+	if enemy_stats:
+		# Update health
+		if health_bar and health_value:
+			var current_health = enemy_stats.health if "health" in enemy_stats else 100
+			var max_health = enemy_stats.max_health if "max_health" in enemy_stats else 100
+			
+			health_bar.max_value = max_health
+			health_bar.value = current_health
+			health_value.text = str(current_health) + "/" + str(max_health)
+			
+			# Update health bar color based on percentage
+			var health_percent = float(current_health) / float(max_health)
+			if health_percent > 0.6:
+				health_bar.modulate = Color(0.3, 1.0, 0.3)  # Green
+			elif health_percent > 0.3:
+				health_bar.modulate = Color(1.0, 1.0, 0.3)  # Yellow
+			else:
+				health_bar.modulate = Color(1.0, 0.3, 0.3)  # Red
+		
+		# Update mana
+		if mana_bar and mana_value:
+			var current_mana = enemy_stats.mana if "mana" in enemy_stats else 50
+			var max_mana = enemy_stats.max_mana if "max_mana" in enemy_stats else 50
+			
+			mana_bar.max_value = max_mana
+			mana_bar.value = current_mana
+			mana_value.text = str(current_mana) + "/" + str(max_mana)
+	else:
+		# If no stats available, show default values
+		if health_bar and health_value:
+			health_bar.max_value = 100
+			health_bar.value = 100
+			health_value.text = "100/100"
+			health_bar.modulate = Color(0.3, 1.0, 0.3)  # Green
+		
+		if mana_bar and mana_value:
+			mana_bar.max_value = 50
+			mana_bar.value = 50
+			mana_value.text = "50/50"
+	
+	print("Combat UI: Updated enemy status panel for: ", enemy.name)
+
+func refresh_enemy_status_panel():
+	"""Refresh the enemy status panel with current enemy data"""
+	if combat_manager and combat_manager.current_enemy:
+		update_enemy_status_panel(combat_manager.current_enemy)
+
+# Signal handlers - TEMPORARILY DISABLED
+# func _on_effects_changed(entity: Node):
+# 	"""Called when status effects change for an entity"""
+# 	# If this is the current enemy in combat, refresh the status panel
+# 	if enemy_status_panel and enemy_status_panel.current_enemy == entity:
+# 		enemy_status_panel.refresh_display()
+# 		print("Combat UI: Refreshed enemy status panel due to effects change")

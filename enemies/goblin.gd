@@ -6,7 +6,7 @@ var enemy_behavior: Node = null
 
 func _ready():
 	# Create enemy behavior component
-	enemy_behavior = preload("res://enemies/enemy.gd").new()
+	enemy_behavior = preload("enemy.gd").new()
 	add_child(enemy_behavior)
 	
 	# Set goblin-specific properties
@@ -142,28 +142,10 @@ func special_attack():
 	if enemy_behavior and enemy_behavior.combat_manager:
 		enemy_behavior.combat_manager.end_current_turn()
 
-# Status bar management
+# Status bar management - REMOVED (now handled by top panel)
 func _create_bar_textures():
-	# Create health bar texture
-	var health_bar = ProgressBar.new()
-	health_bar.name = "HealthBar"
-	health_bar.max_value = 100
-	health_bar.value = 100
-	health_bar.show_percentage = false
-	health_bar.modulate = Color(1, 0, 0, 0.8)  # Red
-	
-	# Create mana bar texture
-	var mana_bar = ProgressBar.new()
-	mana_bar.name = "ManaBar"
-	mana_bar.max_value = 100
-	mana_bar.value = 100
-	mana_bar.show_percentage = false
-	mana_bar.modulate = Color(0, 0, 1, 0.8)  # Blue
-	
-	# Add bars to enemy behavior
-	if enemy_behavior:
-		enemy_behavior.add_child(health_bar)
-		enemy_behavior.add_child(mana_bar)
+	"""Status bars removed - now displayed in top enemy status panel"""
+	pass
 
 func show_status_bars():
 	if enemy_behavior:

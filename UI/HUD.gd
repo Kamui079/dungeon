@@ -27,6 +27,8 @@ func set_mana(current: int, maximum: int) -> void:
 	mana_bar.value = clamp(current, 0, maximum)
 	mana_label.text = "Mana: " + str(current) + "/" + str(maximum)
 
+
+
 func set_spirit(current: int, maximum: int = 10) -> void:
 	spirit_bar.max_value = max(1, maximum)
 	spirit_bar.value = clamp(current, 0, maximum)
