@@ -1,9 +1,30 @@
-[gd_scene load_steps=3 format=3 uid="uid://dw2y071evqab3"]
+[gd_scene load_steps=6 format=3 uid="uid://dw2y071evqab3"]
 
 [ext_resource type="Script" uid="uid://c63vakmxgpgkj" path="res://UI/HUD.gd" id="1_hud"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_fill"]
+bg_color = Color(1, 0.3, 0.3, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
 [sub_resource type="SystemFont" id="1_font"]
 subpixel_positioning = 0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mana_fill"]
+bg_color = Color(0.3, 0.6, 1, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_spirit_fill"]
+bg_color = Color(0.8, 0.3, 1, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -17,49 +38,90 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 
-[node name="VBox" type="VBoxContainer" parent="Margin"]
+[node name="HBox" type="HBoxContainer" parent="Margin"]
 layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 0
 
-[node name="HBoxHealth" type="HBoxContainer" parent="Margin/VBox"]
+[node name="VBox" type="VBoxContainer" parent="Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+
+[node name="HBoxHealth" type="VBoxContainer" parent="Margin/HBox/VBox"]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="Margin/VBox/HBoxHealth"]
-layout_mode = 2
-theme_override_fonts/font = SubResource("1_font")
-text = "Health"
-
-[node name="HealthBar" type="ProgressBar" parent="Margin/VBox/HBoxHealth"]
+[node name="HealthBar" type="ProgressBar" parent="Margin/HBox/VBox/HBoxHealth"]
 custom_minimum_size = Vector2(300, 18)
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_styles/fill = SubResource("StyleBoxFlat_health_fill")
 value = 100.0
 show_percentage = false
 
-[node name="HBoxMana" type="HBoxContainer" parent="Margin/VBox"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Margin/VBox/HBoxMana"]
-layout_mode = 2
+[node name="HealthValue" type="Label" parent="Margin/HBox/VBox/HBoxHealth/HealthBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_fonts/font = SubResource("1_font")
-text = "Mana"
+text = "100/100"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="ManaBar" type="ProgressBar" parent="Margin/VBox/HBoxMana"]
+[node name="HBoxMana" type="VBoxContainer" parent="Margin/HBox/VBox"]
+layout_mode = 2
+
+[node name="ManaBar" type="ProgressBar" parent="Margin/HBox/VBox/HBoxMana"]
 custom_minimum_size = Vector2(300, 18)
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_styles/fill = SubResource("StyleBoxFlat_mana_fill")
 value = 50.0
 show_percentage = false
 
-[node name="HBoxSpirit" type="HBoxContainer" parent="Margin/VBox"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Margin/VBox/HBoxSpirit"]
-layout_mode = 2
+[node name="ManaValue" type="Label" parent="Margin/HBox/VBox/HBoxMana/ManaBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_fonts/font = SubResource("1_font")
-text = "Spirit"
+text = "50/50"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="SpiritBar" type="ProgressBar" parent="Margin/VBox/HBoxSpirit"]
+[node name="HBoxSpirit" type="HBoxContainer" parent="Margin/HBox/VBox"]
+layout_mode = 2
+
+[node name="SpiritBar" type="ProgressBar" parent="Margin/HBox/VBox/HBoxSpirit"]
 custom_minimum_size = Vector2(300, 18)
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_styles/fill = SubResource("StyleBoxFlat_spirit_fill")
 max_value = 10.0
 show_percentage = false
+
+[node name="SpiritValue" type="Label" parent="Margin/HBox/VBox/HBoxSpirit/SpiritBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = SubResource("1_font")
+text = "0/10"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="EnemyPanelsContainer" type="HBoxContainer" parent="Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_override_constants/separation = 15

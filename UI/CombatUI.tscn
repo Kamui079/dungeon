@@ -1,73 +1,6 @@
-[gd_scene load_steps=10 format=3 uid="uid://bqxvxqxqxqxqx"]
+[gd_scene load_steps=5 format=3 uid="uid://bqxvxqxqxqxqx"]
 
 [ext_resource type="Script" uid="uid://bme6hpjby01g7" path="res://UI/combat_ui.gd" id="1_combat_ui"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_enemy_panel"]
-content_margin_left = 15.0
-content_margin_top = 15.0
-content_margin_right = 15.0
-content_margin_bottom = 15.0
-bg_color = Color(0.05, 0.07, 0.09, 0.92)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.2, 0.3, 0.35, 0.9)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-shadow_color = Color(0, 0, 0, 0.3)
-shadow_size = 8
-shadow_offset = Vector2(4, 4)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
-bg_color = Color(0.1, 0.12, 0.14, 0.9)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.2, 0.3, 0.35, 0.8)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_2"]
-bg_color = Color(0.2, 0.8, 0.2, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.1, 0.6, 0.1, 1)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3"]
-bg_color = Color(0.1, 0.12, 0.14, 0.9)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.2, 0.3, 0.35, 0.8)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4"]
-bg_color = Color(0.2, 0.4, 0.8, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.1, 0.3, 0.6, 1)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_combat_log"]
 content_margin_left = 15.0
@@ -128,100 +61,6 @@ shadow_offset = Vector2(4, 4)
 
 [node name="CombatUI" type="CanvasLayer"]
 script = ExtResource("1_combat_ui")
-
-[node name="EnemyStatusPanel" type="Panel" parent="."]
-anchors_preset = 10
-anchor_right = 1.0
-offset_left = 461.0
-offset_top = 3.0
-offset_right = -1195.0
-offset_bottom = 103.0
-grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_enemy_panel")
-
-[node name="VBoxContainer" type="VBoxContainer" parent="EnemyStatusPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -5.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 8
-
-[node name="EnemyNameLabel" type="Label" parent="EnemyStatusPanel/VBoxContainer"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.7, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 18
-text = "Enemy Name"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="HSeparator" type="HSeparator" parent="EnemyStatusPanel/VBoxContainer"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="BarsContainer" type="HBoxContainer" parent="EnemyStatusPanel/VBoxContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 15
-
-[node name="HealthSection" type="VBoxContainer" parent="EnemyStatusPanel/VBoxContainer/BarsContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 4
-
-[node name="HealthLabel" type="Label" parent="EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
-theme_override_font_sizes/font_size = 12
-text = "HP"
-horizontal_alignment = 1
-
-[node name="HealthBar" type="ProgressBar" parent="EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection"]
-custom_minimum_size = Vector2(0, 18)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_styles/background = SubResource("StyleBoxFlat_1")
-theme_override_styles/fill = SubResource("StyleBoxFlat_2")
-show_percentage = false
-
-[node name="HealthValue" type="Label" parent="EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_font_sizes/font_size = 10
-text = "100/100"
-horizontal_alignment = 1
-
-[node name="ManaSection" type="VBoxContainer" parent="EnemyStatusPanel/VBoxContainer/BarsContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 4
-
-[node name="ManaLabel" type="Label" parent="EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.6, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "MP"
-horizontal_alignment = 1
-
-[node name="ManaBar" type="ProgressBar" parent="EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection"]
-custom_minimum_size = Vector2(0, 18)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_styles/background = SubResource("StyleBoxFlat_3")
-theme_override_styles/fill = SubResource("StyleBoxFlat_4")
-show_percentage = false
-
-[node name="ManaValue" type="Label" parent="EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_font_sizes/font_size = 10
-text = "50/50"
-horizontal_alignment = 1
 
 [node name="CombatLogPanel" type="Panel" parent="."]
 anchors_preset = 3
@@ -448,6 +287,14 @@ size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_font_sizes/font_size = 14
 text = "Spells"
+
+[node name="TargetButton" type="Button" parent="CombatPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Target Enemy (Tab)"
 
 [node name="HSeparator5" type="HSeparator" parent="CombatPanel/VBoxContainer"]
 layout_mode = 2

@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://3bjx3edc46mw"]
+[gd_scene load_steps=16 format=3 uid="uid://3bjx3edc46mw"]
 
 [ext_resource type="Script" uid="uid://xerxi770axkc" path="res://dungeon.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://character_body_3d.tscn" id="2_player"]
@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://dfxhvjmv27gqh" path="res://UI/EquipmentUI.tscn" id="24_equipment_ui_scene"]
 [ext_resource type="PackedScene" uid="uid://bqxxvmmv4pv12" path="res://UI/tooltip_manager.tscn" id="25_tooltip_manager"]
 [ext_resource type="Script" uid="uid://gry25qrjhawh" path="res://database_manager.gd" id="26_database_manager"]
+[ext_resource type="PackedScene" uid="uid://bqxvn8yqxqxqx" path="res://pause_menu.tscn" id="27_pause_menu"]
 
 [sub_resource type="StandardMaterial3D" id="3_wall_material"]
 albedo_color = Color(0.6, 0.6, 0.6, 1)
@@ -27,7 +28,7 @@ data = PackedVector3Array(-1.4998, -1.4997, -12.5552, -1.4998, -1.4997, -1.3458,
 script = ExtResource("1_script")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0231514, -0.988477, -0.0180228)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, -5)
 
 [node name="LevelMesh" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00109923, -0.00823307, -0.00316572)
@@ -69,7 +70,10 @@ light_energy = 0.8
 transform = Transform3D(0.549844, 0, 0, 0, 0.549844, 0, 0, 0, 0.549844, 11.0844, -1.52831, 0.177985)
 
 [node name="BigRat" parent="." instance=ExtResource("21_big_rat_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, -1.2, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.2, 0)
+
+[node name="BigRat2" parent="." instance=ExtResource("21_big_rat_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, -1.2, 0)
 
 [node name="CombatManager" type="Node" parent="."]
 script = ExtResource("22_combat_manager")
@@ -85,3 +89,5 @@ script = ExtResource("22_status_effects")
 
 [node name="DatabaseManager" type="Node" parent="."]
 script = ExtResource("26_database_manager")
+
+[node name="PauseMenu" parent="." instance=ExtResource("27_pause_menu")]

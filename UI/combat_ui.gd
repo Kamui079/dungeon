@@ -7,6 +7,7 @@ class_name CombatUI
 @onready var spells_button: Button = $CombatPanel/VBoxContainer/SpellsButton
 @onready var defend_button: Button = $CombatPanel/VBoxContainer/ActionsSection/DefendButton
 @onready var item_button: Button = $CombatPanel/VBoxContainer/ActionsSection/ItemButton
+# @onready var target_button: Button = $CombatPanel/VBoxContainer/TargetButton # REMOVED
 
 # Popup windows
 @onready var special_attacks_popup: Panel = $SpecialAttacksPopup
@@ -31,12 +32,10 @@ class_name CombatUI
 @onready var combat_log_text: TextEdit = $CombatLogPanel/VBoxContainer/CombatLogText
 
 # Enemy status panel (new top-screen display)
-@onready var enemy_status_panel: Panel = $EnemyStatusPanel
-@onready var enemy_name_label: Label = $EnemyStatusPanel/VBoxContainer/EnemyNameLabel
-@onready var health_bar: ProgressBar = $EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection/HealthBar
-@onready var health_value: Label = $EnemyStatusPanel/VBoxContainer/BarsContainer/HealthSection/HealthValue
-@onready var mana_bar: ProgressBar = $EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection/ManaBar
-@onready var mana_value: Label = $EnemyStatusPanel/VBoxContainer/BarsContainer/ManaSection/ManaValue
+# @onready var enemy_status_panel: Panel = $EnemyStatusPanel # REMOVED
+
+# Multi-Enemy Panel System
+# @onready var enemy_panels_container: HBoxContainer = $EnemyPanelsContainer # REMOVED
 
 var combat_manager: Node = null
 
@@ -52,6 +51,14 @@ func _ready():
 	# Add to CombatUI group for spirit updates
 	add_to_group("CombatUI")
 	
+	# Initialize UI elements
+	# enemy_status_panel = $EnemyStatusPanel
+	# enemy_name_label = $EnemyStatusPanel/VBoxContainer/EnemyNameLabel
+	# health_bar = $EnemyStatusPanel/VBoxContainer/HealthBar
+	# health_value = $EnemyStatusPanel/VBoxContainer/HealthValue
+	# mana_bar = $EnemyStatusPanel/VBoxContainer/ManaBar
+	# mana_value = $EnemyStatusPanel/VBoxContainer/ManaValue
+	
 	# Connect to status effects manager for updates - TEMPORARILY DISABLED
 	# var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
 	# if status_manager:
@@ -62,7 +69,7 @@ func _ready():
 	hide()
 	
 	# Hide enemy status panel initially
-	hide_enemy_status_panel()
+	# hide_enemy_status_panel() # REMOVED
 	
 	# Hide queued action indicator initially
 	if queued_action_label:
@@ -163,6 +170,12 @@ func _ready():
 	else:
 		print("ERROR: Item button not found!")
 	
+	# if target_button: # REMOVED
+	# 	target_button.pressed.connect(_on_target_button_pressed) # REMOVED
+	# 	print("Target button connected!") # REMOVED
+	# else: # REMOVED
+	# 	print("ERROR: Target button not found!") # REMOVED
+	
 	# Find combat manager
 	combat_manager = get_tree().get_first_node_in_group("CombatManager")
 	if combat_manager:
@@ -173,6 +186,12 @@ func _ready():
 		combat_manager.atb_bar_updated.connect(_on_atb_bar_updated)
 		combat_manager.action_queued.connect(_on_action_queued)
 		combat_manager.action_dequeued.connect(_on_action_dequeued)
+		
+		# Connect to enemy damage events to refresh panels
+		# if combat_manager.has_signal("enemy_damaged"): # REMOVED
+		# 	combat_manager.enemy_damaged.connect(_on_enemy_damaged) # REMOVED
+		# 	print("Combat UI: Connected to enemy damage signals!") # REMOVED
+		
 		print("Combat UI: Connected to combat manager signals!")
 	else:
 		print("WARNING: No combat manager found!")
@@ -192,6 +211,13 @@ func _input(event):
 		elif event.keycode == KEY_F11:
 			print("F11 pressed - Checking player turn readiness...")
 			check_player_turn_readiness()
+		elif event.keycode == KEY_TAB:
+			print("Tab pressed - Cycling target...")
+			if combat_manager:
+				combat_manager.cycle_target()
+				print("DEBUG: Target cycling completed")
+			else:
+				print("DEBUG: No combat manager found!")
 
 func check_player_turn_readiness():
 	"""Check if player can take actions right now"""
@@ -218,23 +244,41 @@ func check_player_turn_readiness():
 func _on_combat_started():
 	print("Combat UI: Combat started!")
 	show()
-	# Show enemy status panel
-	show_enemy_status_panel()
+	
 	# Ensure popups are hidden when combat starts
 	special_attacks_popup.hide()
 	spells_popup.hide()
+	
 	# Clear any previous button highlights
 	_clear_all_button_highlights()
+	
 	# Clear previous combat log
 	clear_combat_log()
+	
 	# Reset spirit display
 	update_spirit_display(0)
+	
 	# Update turn display
 	update_turn_display()
 	
-	# Try to update enemy status panel with current enemy
-	if combat_manager and combat_manager.current_enemy:
-		update_enemy_status_panel(combat_manager.current_enemy)
+	# SIMPLIFIED: Create enemy panels
+	# print("DEBUG: Creating enemy panels...") # REMOVED
+	# clear_enemy_panels() # REMOVED
+	
+	# if combat_manager: # REMOVED
+	# 	var enemies = combat_manager.get_combat_enemies() # REMOVED
+	# 	print("DEBUG: Found ", enemies.size(), " enemies") # REMOVED
+	# 	
+	# 	for enemy in enemies: # REMOVED
+	# 		print("DEBUG: Creating panel for: ", enemy.name) # REMOVED
+	# 		create_and_add_enemy_panel(enemy) # REMOVED
+	# 	
+	# 	print("DEBUG: Total panels created: ", enemy_panels_container.get_child_count()) # REMOVED
+	# 	
+	# 	# Highlight the focused enemy # REMOVED
+	# 	highlight_focused_enemy() # REMOVED
+	# else: # REMOVED
+	# 	print("ERROR: No combat manager found!") # REMOVED
 
 func update_spirit_display(_spirit_points: int):
 	"""Placeholder for spirit display update"""
@@ -253,7 +297,7 @@ func _on_combat_ended():
 	print("Combat UI: Combat ended!")
 	hide()
 	# Hide enemy status panel
-	hide_enemy_status_panel()
+	# hide_enemy_status_panel() # REMOVED
 	# Hide any open popups
 	special_attacks_popup.hide()
 	spells_popup.hide()
@@ -384,7 +428,8 @@ func _on_turn_changed(current_actor: Node, turn_type: String):
 	update_turn_display()
 	
 	# Refresh enemy status panel when turn changes
-	refresh_enemy_status_panel()
+	# refresh_enemy_status_panel()
+	pass
 
 func update_turn_display():
 	"""Update the turn system display with current information"""
@@ -580,7 +625,7 @@ func update_button_states():
 	if spells_button:
 		_set_button_state(spells_button, true, "Spells", 0, 0, "")
 
-func _check_if_player_has_usable_items(player: Node) -> bool:
+func _check_if_player_has_usable_items(_player: Node) -> bool:
 	"""Check if the player has any items they can use in combat"""
 	# This is a placeholder - you can expand this based on your inventory system
 	# For now, assume player always has some items
@@ -616,7 +661,7 @@ func _set_button_state(button: Button, can_afford: bool, ability_name: String, c
 		button.modulate = Color(1.0, 0.3, 0.3, 0.8)  # Red with slight transparency
 		button.tooltip_text = ability_name + " (Cost: " + str(cost) + " " + resource_type + ")\nYou have: " + str(current) + " " + resource_type + "\nNot enough resources!"
 
-func _process(delta):
+func _process(_delta):
 	"""Update button states every frame during combat"""
 	if visible and combat_manager:
 		update_button_states()
@@ -641,7 +686,8 @@ func _setup_action_button_mapping():
 	print("🔧 Action button mapping set up: ", action_button_map.keys())
 	for action in action_button_map.keys():
 		var button = action_button_map[action]
-		print("🔧 ", action, " -> ", button, " (valid: ", is_instance_valid(button) if button else "null", ")")
+		var button_valid = "valid" if button and is_instance_valid(button) else "null"
+		print("🔧 ", action, " -> ", button, " (", button_valid, ")")
 
 func _highlight_queued_action(action: String):
 	"""Highlight the button corresponding to the queued action in green"""
@@ -686,7 +732,7 @@ func _restore_button_appearance(action: String):
 	else:
 		print("⚠️ Could not restore button appearance for action: ", action)
 
-func _should_button_be_red(button: Button, action: String) -> bool:
+func _should_button_be_red(_button: Button, action: String) -> bool:
 	"""Check if a button should be red based on current resource availability"""
 	if not combat_manager or not combat_manager.current_player:
 		return false
@@ -723,90 +769,418 @@ func _clear_all_button_highlights():
 				button.modulate = button_states[button]["original_modulate"]
 	currently_queued_action = ""
 
-# Enemy Status Panel Methods
-func show_enemy_status_panel():
-	"""Show the enemy status panel"""
-	if enemy_status_panel:
-		enemy_status_panel.show()
-		print("Combat UI: Enemy status panel shown")
-	else:
-		print("ERROR: Enemy status panel not found!")
+# Enemy Status Panel Methods - REMOVED
+# func show_enemy_status_panel(): # REMOVED
+# 	"""Show the enemy status panel""" # REMOVED
+# 	print("DEBUG: show_enemy_status_panel called") # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: Enemy panels container is null!") # REMOVED
+# 		return # REMOVED
+# 		
+# 	print("DEBUG: Enemy panels container found, showing it...") # REMOVED
+# 	enemy_panels_container.show() # REMOVED
+# 	print("DEBUG: Enemy panels container shown, visible: ", enemy_panels_container.visible) # REMOVED
+# 	print("DEBUG: Enemy panels container position: ", enemy_panels_container.position) # REMOVED
+# 	print("DEBUG: Enemy panels container size: ", enemy_panels_container.size) # REMOVED
+# 	print("DEBUG: Enemy panels container global position: ", enemy_panels_container.global_position) # REMOVED
+# 	print("DEBUG: Enemy panels container has ", enemy_panels_container.get_child_count(), " children") # REMOVED
+# 	print("Combat UI: Enemy panels container shown") # REMOVED
 
-func hide_enemy_status_panel():
-	"""Hide the enemy status panel"""
-	if enemy_status_panel:
-		enemy_status_panel.hide()
-		print("Combat UI: Enemy status panel hidden")
-	else:
-		print("ERROR: Enemy status panel not found!")
+# func hide_enemy_status_panel(): # REMOVED
+# 	"""Hide the enemy status panel""" # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: Enemy panels container is null!") # REMOVED
+# 		return # REMOVED
+# 		
+# 	enemy_panels_container.hide() # REMOVED
+# 	print("Combat UI: Enemy panels container hidden") # REMOVED
 
-func update_enemy_status_panel(enemy: Node):
-	"""Update the enemy status panel with enemy data"""
-	if not enemy or not is_instance_valid(enemy):
-		return
-	
-	# Update enemy name
-	if enemy_name_label:
-		enemy_name_label.text = enemy.name
-	
-	# Try to get enemy stats
-	var enemy_stats = null
-	if enemy.has_method("get_stats"):
-		enemy_stats = enemy.get_stats()
-	elif enemy.has_method("stats"):
-		enemy_stats = enemy.stats
-	
-	if enemy_stats:
-		# Update health
-		if health_bar and health_value:
-			var current_health = enemy_stats.health if "health" in enemy_stats else 100
-			var max_health = enemy_stats.max_health if "max_health" in enemy_stats else 100
-			
-			health_bar.max_value = max_health
-			health_bar.value = current_health
-			health_value.text = str(current_health) + "/" + str(max_health)
-			
-			# Update health bar color based on percentage
-			var health_percent = float(current_health) / float(max_health)
-			if health_percent > 0.6:
-				health_bar.modulate = Color(0.3, 1.0, 0.3)  # Green
-			elif health_percent > 0.3:
-				health_bar.modulate = Color(1.0, 1.0, 0.3)  # Yellow
-			else:
-				health_bar.modulate = Color(1.0, 0.3, 0.3)  # Red
-		
-		# Update mana
-		if mana_bar and mana_value:
-			var current_mana = enemy_stats.mana if "mana" in enemy_stats else 50
-			var max_mana = enemy_stats.max_mana if "max_mana" in enemy_stats else 50
-			
-			mana_bar.max_value = max_mana
-			mana_bar.value = current_mana
-			mana_value.text = str(current_mana) + "/" + str(max_mana)
-	else:
-		# If no stats available, show default values
-		if health_bar and health_value:
-			health_bar.max_value = 100
-			health_bar.value = 100
-			health_value.text = "100/100"
-			health_bar.modulate = Color(0.3, 1.0, 0.3)  # Green
-		
-		if mana_bar and mana_value:
-			mana_bar.max_value = 50
-			mana_bar.value = 50
-			mana_value.text = "50/50"
-	
-	print("Combat UI: Updated enemy status panel for: ", enemy.name)
+# Multi-Enemy Panel System - REMOVED
+# func create_and_add_enemy_panel(enemy: Node): # REMOVED
+# 	"""Create and add an enemy panel in one simple step""" # REMOVED
+# 	print("DEBUG: === create_and_add_enemy_panel START ===") # REMOVED
+# 	
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: No enemy panels container!") # REMOVED
+# 		return # REMOVED
+# 	
+# 	# Create panel directly in code instead of using template # REMOVED
+# 	var panel = Panel.new() # REMOVED
+# 	panel.custom_minimum_size = Vector2(220, 90) # REMOVED
+# 	panel.name = "EnemyPanel_" + enemy.name # REMOVED
+# 	
+# 	# Apply panel style # REMOVED
+# 	panel.add_theme_stylebox_override("panel", create_panel_style()) # REMOVED
+# 	
+# 	# Create main container # REMOVED
+# 	var vbox = VBoxContainer.new() # REMOVED
+# 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT) # REMOVED
+# 	vbox.offset_left = 10 # REMOVED
+# 	vbox.offset_top = 8 # REMOVED
+# 	vbox.offset_right = -10 # REMOVED
+# 	vbox.offset_bottom = -8 # REMOVED
+# 	vbox.add_theme_constant_override("separation", 4) # REMOVED
+# 	panel.add_child(vbox) # REMOVED
+# 	
+# 	# Create enemy name label # REMOVED
+# 	var name_label = Label.new() # REMOVED
+# 	name_label.text = enemy.name # REMOVED
+# 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER # REMOVED
+# 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER # REMOVED
+# 	name_label.custom_minimum_size = Vector2(0, 20) # REMOVED
+# 	name_label.add_theme_color_override("font_color", Color(1, 0.95, 0.8, 1)) # REMOVED
+# 	name_label.add_theme_font_size_override("font_size", 14) # REMOVED
+# 	vbox.add_child(name_label) # REMOVED
+# 	
+# 	# Create separator # REMOVED
+# 	var separator = HSeparator.new() # REMOVED
+# 	separator.custom_minimum_size = Vector2(0, 2) # REMOVED
+# 	vbox.add_child(separator) # REMOVED
+# 	
+# 	# Create bars container # REMOVED
+# 	var bars_container = VBoxContainer.new() # REMOVED
+# 	bars_container.add_theme_constant_override("separation", 6) # REMOVED
+# 	vbox.add_child(bars_container) # REMOVED
+# 	
+# 	# Create health section # REMOVED
+# 	var health_section = VBoxContainer.new() # REMOVED
+# 	health_section.add_theme_constant_override("separation", 2) # REMOVED
+# 	bars_container.add_child(health_section) # REMOVED
+# 	
+# 	# Create health bar # REMOVED
+# 	var health_bar = Panel.new() # REMOVED
+# 	health_bar.custom_minimum_size = Vector2(0, 18) # REMOVED
+# 	health_bar.add_theme_stylebox_override("panel", create_health_bar_style()) # REMOVED
+# 	health_section.add_child(health_bar) # REMOVED
+# 	
+# 	# Create health fill # REMOVED
+# 	var health_fill = Panel.new() # REMOVED
+# 	health_fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT) # REMOVED
+# 	health_fill.offset_left = 1 # REMOVED
+# 	health_fill.offset_top = 1 # REMOVED
+# 	health_fill.offset_right = -1 # REMOVED
+# 	health_fill.offset_bottom = -1 # REMOVED
+# 	health_fill.add_theme_stylebox_override("panel", create_health_fill_style()) # REMOVED
+# 	health_bar.add_child(health_fill) # REMOVED
+# 	
+# 	# Create health value label # REMOVED
+# 	var health_value = Label.new() # REMOVED
+# 	health_value.text = "100/100" # REMOVED
+# 	health_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER # REMOVED
+# 	health_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER # REMOVED
+# 	health_value.add_theme_color_override("font_color", Color(1, 1, 1, 1)) # REMOVED
+# 	health_value.add_theme_font_size_override("font_size", 10) # REMOVED
+# 	health_bar.add_child(health_value) # REMOVED
+# 	
+# 	# Create mana section # REMOVED
+# 	var mana_section = VBoxContainer.new() # REMOVED
+# 	mana_section.add_theme_constant_override("separation", 2) # REMOVED
+# 	bars_container.add_child(mana_section) # REMOVED
+# 	
+# 	# Create mana bar # REMOVED
+# 	var mana_bar = Panel.new() # REMOVED
+# 	mana_bar.custom_minimum_size = Vector2(0, 18) # REMOVED
+# 	mana_bar.add_theme_stylebox_override("panel", create_mana_bar_style()) # REMOVED
+# 	mana_section.add_child(mana_bar) # REMOVED
+# 	
+# 	# Create mana fill # REMOVED
+# 	var mana_fill = Panel.new() # REMOVED
+# 	mana_fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT) # REMOVED
+# 	mana_fill.offset_left = 1 # REMOVED
+# 	mana_fill.offset_top = 1 # REMOVED
+# 	mana_fill.offset_right = -1 # REMOVED
+# 	mana_fill.offset_bottom = -1 # REMOVED
+# 	mana_fill.add_theme_stylebox_override("panel", create_mana_fill_style()) # REMOVED
+# 	mana_bar.add_child(mana_fill) # REMOVED
+# 	
+# 	# Create mana value label # REMOVED
+# 	var mana_value = Label.new() # REMOVED
+# 	health_value.text = "50/50" # REMOVED
+# 	mana_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER # REMOVED
+# 	mana_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER # REMOVED
+# 	mana_value.add_theme_color_override("font_color", Color(1, 1, 1, 1)) # REMOVED
+# 	mana_value.add_theme_font_size_override("font_size", 10) # REMOVED
+# 	mana_bar.add_child(mana_value) # REMOVED
+# 	
+# 	# Store references to the nodes we need to update # REMOVED
+# 	panel.set_meta("name_label", name_label) # REMOVED
+# 	panel.set_meta("health_value", health_value) # REMOVED
+# 	panel.set_meta("mana_value", mana_value) # REMOVED
+# 	panel.set_meta("health_fill", health_fill) # REMOVED
+# 	panel.set_meta("mana_fill", mana_fill) # REMOVED
+# 	
+# 	# Store enemy reference # REMOVED
+# 	panel.set_meta("enemy", enemy) # REMOVED
+# 	
+# 	# Add to container # REMOVED
+# 	enemy_panels_container.add_child(panel) # REMOVED
+# 	
+# 	# Update immediately # REMOVED
+# 	update_enemy_panel(panel, enemy) # REMOVED
+# 	
+# 	print("DEBUG: Panel created and added for: ", enemy.name) # REMOVED
+# 	print("DEBUG: Container now has ", enemy_panels_container.get_child_count(), " children") # REMOVED
+# 	print("DEBUG: === create_and_add_enemy_panel COMPLETE ===") # REMOVED
 
-func refresh_enemy_status_panel():
-	"""Refresh the enemy status panel with current enemy data"""
-	if combat_manager and combat_manager.current_enemy:
-		update_enemy_status_panel(combat_manager.current_enemy)
+# func create_panel_style() -> StyleBoxFlat: # REMOVED
+# 	var style = StyleBoxFlat.new() # REMOVED
+# 	style.bg_color = Color(0.2, 0.2, 0.25, 1.0) # REMOVED
+# 	style.border_color = Color(0.4, 0.4, 0.5, 1.0) # REMOVED
+# 	style.border_width_left = 1 # REMOVED
+# 	style.border_width_right = 1 # REMOVED
+# 	style.border_width_top = 1 # REMOVED
+# 	style.border_width_bottom = 1 # REMOVED
+# 	style.corner_radius_top_left = 3 # REMOVED
+# 	style.corner_radius_top_right = 3 # REMOVED
+# 	style.corner_radius_bottom_left = 3 # REMOVED
+# 	style.corner_radius_bottom_right = 3 # REMOVED
+# 	return style # REMOVED
 
-# Signal handlers - TEMPORARILY DISABLED
-# func _on_effects_changed(entity: Node):
-# 	"""Called when status effects change for an entity"""
-# 	# If this is the current enemy in combat, refresh the status panel
-# 	if enemy_status_panel and enemy_status_panel.current_enemy == entity:
-# 		enemy_status_panel.refresh_display()
-# 		print("Combat UI: Refreshed enemy status panel due to effects change")
+# func create_health_bar_style() -> StyleBoxFlat: # REMOVED
+# 	var style = StyleBoxFlat.new() # REMOVED
+# 	style.bg_color = Color(0.2, 0.2, 0.25, 1.0) # REMOVED
+# 	style.border_color = Color(0.4, 0.4, 0.5, 1.0) # REMOVED
+# 	style.border_width_left = 1 # REMOVED
+# 	style.border_width_right = 1 # REMOVED
+# 	style.border_width_top = 1 # REMOVED
+# 	style.border_width_bottom = 1 # REMOVED
+# 	style.corner_radius_top_left = 3 # REMOVED
+# 	style.corner_radius_top_right = 3 # REMOVED
+# 	style.corner_radius_bottom_left = 3 # REMOVED
+# 	style.corner_radius_bottom_right = 3 # REMOVED
+# 	return style # REMOVED
+
+# func create_health_fill_style() -> StyleBoxFlat: # REMOVED
+# 	var style = StyleBoxFlat.new() # REMOVED
+# 	style.bg_color = Color(1.0, 0.3, 0.3, 1.0)  # Red # REMOVED
+# 	style.corner_radius_top_left = 2 # REMOVED
+# 	style.corner_radius_top_right = 2 # REMOVED
+# 	style.corner_radius_bottom_left = 2 # REMOVED
+# 	style.corner_radius_bottom_right = 2 # REMOVED
+# 	return style # REMOVED
+
+# func create_mana_bar_style() -> StyleBoxFlat: # REMOVED
+# 	var style = StyleBoxFlat.new() # REMOVED
+# 	style.bg_color = Color(0.2, 0.2, 0.25, 1.0) # REMOVED
+# 	style.border_color = Color(0.4, 0.4, 0.5, 1.0) # REMOVED
+# 	style.border_width_left = 1 # REMOVED
+# 	style.border_width_right = 1 # REMOVED
+# 	style.border_width_top = 1 # REMOVED
+# 	style.border_width_bottom = 1 # REMOVED
+# 	style.corner_radius_top_left = 3 # REMOVED
+# 	style.corner_radius_top_right = 3 # REMOVED
+# 	style.corner_radius_bottom_left = 3 # REMOVED
+# 	style.corner_radius_bottom_right = 3 # REMOVED
+# 	return style # REMOVED
+
+# func create_mana_fill_style() -> StyleBoxFlat: # REMOVED
+# 	var style = StyleBoxFlat.new() # REMOVED
+# 	style.bg_color = Color(0.3, 0.6, 1.0, 1.0)  # Blue # REMOVED
+# 	style.corner_radius_top_left = 2 # REMOVED
+# 	style.corner_radius_top_right = 2 # REMOVED
+# 	style.corner_radius_bottom_left = 2 # REMOVED
+# 	style.corner_radius_bottom_right = 2 # REMOVED
+# 	return style # REMOVED
+
+# func update_enemy_panel(panel: Control, enemy: Node): # REMOVED
+# 	"""Update an individual enemy panel with current data""" # REMOVED
+# 	print("DEBUG: Updating panel for enemy: ", enemy.name) # REMOVED
+# 	
+# 	if not panel or not enemy or not is_instance_valid(enemy): # REMOVED
+# 		print("DEBUG: Invalid panel or enemy, returning") # REMOVED
+# 		return # REMOVED
+# 	
+# 	# Get the nodes from metadata # REMOVED
+# 	var name_label = panel.get_meta("name_label") # REMOVED
+# 	var health_value = panel.get_meta("health_value") # REMOVED
+# 	var mana_value = panel.get_meta("mana_value") # REMOVED
+# 	var health_fill = panel.get_meta("health_fill") # REMOVED
+# 	var mana_fill = panel.get_meta("mana_fill") # REMOVED
+# 	
+# 	# Check if all required nodes exist # REMOVED
+# 	if not name_label or not health_value or not mana_value or not health_fill or not mana_fill: # REMOVED
+# 		print("ERROR: Missing required nodes in panel!") # REMOVED
+# 		return # REMOVED
+# 	
+# 	# Set enemy name # REMOVED
+# 	name_label.text = enemy.name # REMOVED
+# 	
+# 	# Try to get enemy stats # REMOVED
+# 	var enemy_stats = null # REMOVED
+# 	if enemy.has_method("get_stats"): # REMOVED
+# 		enemy_stats = enemy.get_stats() # REMOVED
+# 	elif enemy.has_method("stats"): # REMOVED
+# 		enemy_stats = enemy.stats # REMOVED
+# 	
+# 	if enemy_stats: # REMOVED
+# 		# Update health # REMOVED
+# 		var _current_health = enemy_stats.health if "health" in enemy_stats else 100 # REMOVED
+# 		var max_health = enemy_stats.max_health if "max_health" in enemy_stats else 100 # REMOVED
+# 		
+# 		health_value.text = str(_current_health) + "/" + str(max_health) # REMOVED
+# 		
+# 		# Calculate health percentage and set alpha for visual effect # REMOVED
+# 		var health_percent = float(_current_health) / float(max_health) # REMOVED
+# 		health_fill.modulate.a = health_percent # REMOVED
+# 		
+# 		# Update mana # REMOVED
+# 		var current_mana = enemy_stats.mana if "mana" in enemy_stats else 50 # REMOVED
+# 		var max_mana = enemy_stats.max_mana if "max_mana" in enemy_stats else 50 # REMOVED
+# 	
+# 		mana_value.text = str(current_mana) + "/" + str(max_mana) # REMOVED
+# 		
+# 		# Calculate mana percentage and set alpha for visual effect # REMOVED
+# 		var mana_percent = float(current_mana) / float(max_mana) # REMOVED
+# 		mana_fill.modulate.a = mana_percent # REMOVED
+# 		
+# 		print("DEBUG: Panel updated successfully for: ", enemy.name) # REMOVED
+# 	else: # REMOVED
+# 		print("WARNING: No enemy stats found for: ", enemy.name) # REMOVED
+# 		# Set default values # REMOVED
+# 		health_value.text = "100/100" # REMOVED
+# 		mana_value.text = "50/50" # REMOVED
+# 		health_fill.modulate.a = 1.0 # REMOVED
+# 		mana_fill.modulate.a = 1.0 # REMOVED
+
+# func refresh_all_enemy_panels(): # REMOVED
+# 	"""Refresh all enemy panels with current data - SIMPLIFIED""" # REMOVED
+# 	print("DEBUG: refresh_all_enemy_panels called") # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: enemy_panels_container is null!") # REMOVED
+# 		return # REMOVED
+# 	
+# 	print("DEBUG: Refreshing ", enemy_panels_container.get_child_count(), " enemy panels") # REMOVED
+# 	
+# 	for child in enemy_panels_container.get_children(): # REMOVED
+# 		if child.has_meta("enemy"): # REMOVED
+# 			var enemy = child.get_meta("enemy") # REMOVED
+# 			if enemy and is_instance_valid(enemy): # REMOVED
+# 				update_enemy_panel(child, enemy) # REMOVED
+# 			else: # REMOVED
+# 				print("DEBUG: Enemy is invalid, removing panel") # REMOVED
+# 				child.queue_free() # REMOVED
+
+# func clear_enemy_panels(): # REMOVED
+# 	"""Clear all enemy panels from the container""" # REMOVED
+# 	print("DEBUG: Clearing enemy panels...") # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: enemy_panels_container is null!") # REMOVED
+# 		return # REMOVED
+# 	
+# 	for child in enemy_panels_container.get_children(): # REMOVED
+# 		child.queue_free() # REMOVED
+# 	print("DEBUG: All enemy panels cleared") # REMOVED
+
+# func add_enemy_panel(enemy: Node): # REMOVED
+# 	"""Add an enemy panel to the container - DEPRECATED, use create_and_add_enemy_panel instead""" # REMOVED
+# 	print("WARNING: add_enemy_panel is deprecated, use create_and_add_enemy_panel instead") # REMOVED
+# 	create_and_add_enemy_panel(enemy) # REMOVED
+
+# func remove_enemy_panel(enemy: Node): # REMOVED
+# 	"""Remove an enemy panel from the container""" # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: Enemy panels container is null!") # REMOVED
+# 		return # REMOVED
+# 		
+# 	for child in enemy_panels_container.get_children(): # REMOVED
+# 		if child.has_meta("enemy") and child.get_meta("enemy") == enemy: # REMOVED
+# 			child.queue_free() # REMOVED
+# 			print("Combat UI: Removed enemy panel for: ", enemy.name) # REMOVED
+# 			break # REMOVED
+
+# func highlight_focused_enemy(): # REMOVED
+# 	"""Highlight the currently focused enemy panel""" # REMOVED
+# 	if not enemy_panels_container or not combat_manager: # REMOVED
+# 		print("DEBUG: Cannot highlight - container or combat manager missing") # REMOVED
+# 		return # REMOVED
+# 	
+# 	var focused_enemy = combat_manager.get_focused_enemy() # REMOVED
+# 	if not focused_enemy: # REMOVED
+# 		print("DEBUG: No focused enemy to highlight") # REMOVED
+# 		return # REMOVED
+# 	
+# 	print("DEBUG: Highlighting focused enemy: ", focused_enemy.name) # REMOVED
+# 	print("DEBUG: Total enemy panels: ", enemy_panels_container.get_child_count()) # REMOVED
+# 	
+# 	# Reset all panels to normal appearance # REMOVED
+# 	for child in enemy_panels_container.get_children(): # REMOVED
+# 		if child.has_meta("enemy"): # REMOVED
+# 			apply_focus_glow(child, false) # REMOVED
+# 			print("DEBUG: Reset panel for: ", child.get_meta("enemy").name) # REMOVED
+# 	
+# 	# Highlight the focused enemy panel # REMOVED
+# 	for child in enemy_panels_container.get_children(): # REMOVED
+# 		if child.has_meta("enemy") and child.get_meta("enemy") == focused_enemy: # REMOVED
+# 			apply_focus_glow(child, true) # REMOVED
+# 			print("DEBUG: Focused panel for: ", focused_enemy.name) # REMOVED
+# 			break # REMOVED
+
+# func apply_focus_glow(panel: Control, is_focused: bool): # REMOVED
+# 	"""Apply or remove focus glow effect to an enemy panel""" # REMOVED
+# 	print("DEBUG: apply_focus_glow called for panel: ", panel.name, " focused: ", is_focused) # REMOVED
+# 	
+# 	if not panel: # REMOVED
+# 		print("DEBUG: Panel is null, returning") # REMOVED
+# 		return # REMOVED
+# 	
+# 	var style = panel.get_theme_stylebox("panel") # REMOVED
+# 	if not style: # REMOVED
+# 		print("DEBUG: No panel style found, creating new one") # REMOVED
+# 	# Create a new style if none exists # REMOVED
+# 	style = StyleBoxFlat.new() # REMOVED
+# 	panel.add_theme_stylebox_override("panel", style) # REMOVED
+# 	
+# 	print("DEBUG: Style found, applying focus glow: ", is_focused) # REMOVED
+# 	
+# 	if is_focused: # REMOVED
+# 		# Apply glowing blue border for focus # REMOVED
+# 		style.border_color = Color(0.2, 0.8, 1.0, 1.0)  # Bright cyan # REMOVED
+# 		style.border_width_left = 3 # REMOVED
+# 		style.border_width_right = 3 # REMOVED
+# 		style.border_width_top = 3 # REMOVED
+# 		style.border_width_bottom = 3 # REMOVED
+# 		# Add a subtle glow effect # REMOVED
+# 		style.shadow_color = Color(0.2, 0.8, 1.0, 0.3) # REMOVED
+# 		style.shadow_size = 4 # REMOVED
+# 		style.shadow_offset = Vector2(0, 0) # REMOVED
+# 		print("DEBUG: Applied focus glow - cyan border with shadow") # REMOVED
+# 	else: # REMOVED
+# 		# Reset to normal appearance # REMOVED
+# 		style.border_color = Color(0.6, 0.6, 0.8, 1.0)  # Normal blue # REMOVED
+# 		style.border_width_left = 2 # REMOVED
+# 		style.border_width_right = 2 # REMOVED
+# 		style.border_width_top = 2 # REMOVED
+# 		style.border_width_bottom = 2 # REMOVED
+# 		# Remove glow effect # REMOVED
+# 		style.shadow_size = 0 # REMOVED
+# 		print("DEBUG: Reset to normal appearance") # REMOVED
+# 	
+# 	# Force the style update # REMOVED
+# 	panel.queue_redraw() # REMOVED
+# 	print("DEBUG: Panel redraw queued") # REMOVED
+
+# func on_enemy_joined_combat(enemy: Node): # REMOVED
+# 	"""Called when an enemy joins ongoing combat""" # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: Enemy panels container is null!") # REMOVED
+# 		return # REMOVED
+# 	
+# 	# Check if panel already exists for this enemy # REMOVED
+# 	for child in enemy_panels_container.get_children(): # REMOVED
+# 		if child.has_meta("enemy") and child.get_meta("enemy") == enemy: # REMOVED
+# 			return  # Panel already exists # REMOVED
+# 	
+# 	# Add new panel for the enemy # REMOVED
+# 	add_enemy_panel(enemy) # REMOVED
+# 	# Refresh highlighting # REMOVED
+# 	highlight_focused_enemy() # REMOVED
+
+# func on_enemy_removed_from_combat(enemy: Node): # REMOVED
+# 	"""Called when an enemy is removed from combat""" # REMOVED
+# 	if not enemy_panels_container: # REMOVED
+# 		print("ERROR: Enemy panels container is null!") # REMOVED
+# 		return # REMOVED
+# 		
+# 	remove_enemy_panel(enemy) # REMOVED
+# 	# Refresh highlighting # REMOVED
+# 	highlight_focused_enemy() # REMOVED

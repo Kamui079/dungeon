@@ -36,10 +36,10 @@ extends Node
 @export var loot_chance_multiplier: float = 1.0  # Multiplier for loot drop chances
 
 # Combat state
-var player: Node = null
+var player: Node3D = null
 var in_combat: bool = false
 var combat_manager: Node = null
-var current_target: Node = null
+var current_target: Node3D = null
 var is_moving_to_target: bool = false
 var target_position: Vector3 = Vector3.ZERO
 var is_frozen: bool = false  # Flag to prevent movement during combat
@@ -73,6 +73,10 @@ var bone_break_timer: Timer = null
 
 # Status effects are now handled by the StatusEffectsManager
 # Individual poison/ignite/etc. variables removed in favor of centralized system
+
+# Focus indicator system
+var focus_indicator: Node3D = null
+var is_focused: bool = false
 
 # Enemy-specific stat modifiers
 @export var strength_modifier: int = 0
@@ -158,6 +162,13 @@ func _find_combat_manager():
 		if managers.size() > 0:
 			combat_manager = managers[0]
 
+func _find_valid_player() -> Node3D:
+	"""Safely find a valid Node3D player instance"""
+	var found_player = get_tree().get_first_node_in_group("Player")
+	if found_player and found_player is Node3D and is_instance_valid(found_player):
+		return found_player
+	return null
+
 func _physics_process(delta):
 	# If frozen (in combat), don't process movement
 	if is_frozen:
@@ -171,6 +182,11 @@ func _physics_process(delta):
 	var parent_body = get_parent()
 	if not parent_body or not parent_body is CharacterBody3D:
 		return
+	
+	# Additional safety check: ensure parent_body is a Node3D for global_position access
+	if not parent_body is Node3D:
+		print(enemy_name, " ERROR: Parent body is not a Node3D - cannot access global_position!")
+		return
 		
 	# Basic gravity
 	if not parent_body.is_on_floor():
@@ -182,7 +198,7 @@ func _physics_process(delta):
 	
 	# Find player if not already found
 	if player == null:
-		player = get_tree().get_first_node_in_group("Player")
+		player = _find_valid_player()
 		if player == null:
 			return
 	
@@ -192,6 +208,9 @@ func _physics_process(delta):
 		return
 		
 	# Check if player is in detection range
+	if not player is Node3D:
+		print(enemy_name, " ERROR: Player is not a Node3D - cannot access global_position!")
+		return
 	var distance_to_player = parent_body.global_position.distance_to(player.global_position)
 	
 	# Safety check: prevent extreme distance values
@@ -203,12 +222,22 @@ func _physics_process(delta):
 		end_combat()
 		return
 
+	# Check if there's nearby combat we should join
+	if not in_combat and combat_manager and combat_manager.in_combat:
+		var nearby_combat = _check_for_nearby_combat()
+		if nearby_combat:
+			join_nearby_combat()
+			return
+
 	if distance_to_player <= detection_range and not in_combat:
 		# Check if we should start combat
 		if distance_to_player <= combat_range:
 			start_combat()
 		else:
 			# Move towards player
+			if not player is Node3D:
+				print(enemy_name, " ERROR: Player is not a Node3D - cannot access global_position!")
+				return
 			var direction = (player.global_position - parent_body.global_position).normalized()
 			parent_body.velocity.x = direction.x * move_speed
 			parent_body.velocity.z = direction.z * move_speed
@@ -227,9 +256,8 @@ func start_combat():
 	
 	# Ensure we have a player reference
 	if not player:
-		player = get_tree().get_first_node_in_group("Player")
+		player = _find_valid_player()
 		if not player:
-
 			return
 	
 
@@ -249,7 +277,13 @@ func start_combat():
 	
 	in_combat = true
 	
-	combat_manager.start_combat(self, player)
+	# Pass the parent node (CharacterBody3D) to the combat manager, not this behavior node
+	var parent_body = get_parent()
+	if parent_body and parent_body is CharacterBody3D:
+		combat_manager.start_combat(parent_body, player)
+	else:
+		print(enemy_name, " ERROR: Cannot start combat - parent is not a CharacterBody3D!")
+		return
 
 func end_combat():
 	in_combat = false
@@ -259,7 +293,12 @@ func end_combat():
 	
 	# Notify combat manager if we have one
 	if combat_manager and combat_manager.has_method("end_combat"):
-		combat_manager.end_combat()
+		# Pass the parent node (CharacterBody3D) to the combat manager
+		var parent_body = get_parent()
+		if parent_body and parent_body is CharacterBody3D:
+			combat_manager.end_combat()
+		else:
+			print(enemy_name, " ERROR: Cannot end combat - parent is not a CharacterBody3D!")
 
 func take_damage(amount: int):
 	stats.take_damage(amount)
@@ -272,13 +311,62 @@ func take_damage(amount: int):
 	
 	# Update combat UI with new status
 	if combat_manager and combat_manager.has_method("_update_combat_ui_status"):
-		combat_manager._update_combat_ui_status()
+		# Pass the parent node (CharacterBody3D) to the combat manager
+		var parent_body = get_parent()
+		if parent_body and parent_body is CharacterBody3D:
+			combat_manager._update_combat_ui_status()
+		else:
+			print(enemy_name, " ERROR: Cannot update combat UI - parent is not a CharacterBody3D!")
 	
 	if stats.health <= 0:
 		print("💀 ", enemy_name, " DEFEATED! Calling die() function...")
 		# Use the new death system
 		die()
 		return
+
+func _check_for_nearby_combat() -> bool:
+	"""Check if there's combat happening nearby that this enemy should join"""
+	if not combat_manager or not combat_manager.in_combat:
+		return false
+	
+	# Check if we're close enough to the combat area
+	var parent_body = get_parent()
+	if not parent_body or not parent_body is Node3D:
+		return false
+	
+	# Get the current player position from combat manager
+	var current_player = combat_manager.current_player
+	if not current_player or not current_player is Node3D:
+		return false
+	
+	var distance_to_combat = parent_body.global_position.distance_to(current_player.global_position)
+	return distance_to_combat <= detection_range * 1.5  # Slightly larger range to join combat
+
+func join_nearby_combat():
+	"""Join an ongoing combat encounter"""
+	if in_combat or not combat_manager or not combat_manager.in_combat:
+		return
+	
+	print(enemy_name, " joining nearby combat!")
+	
+	# Get the parent body for the combat manager
+	var parent_body = get_parent()
+	if not parent_body or not parent_body is CharacterBody3D:
+		return
+	
+	# Join the combat
+	combat_manager.join_combat(parent_body)
+	
+	# Set combat state
+	in_combat = true
+	
+	# Face the player
+	var current_player = combat_manager.current_player
+	if current_player:
+		face_target(current_player)
+	
+	# Show status bars
+	show_status_bars()
 
 # Spirit management methods
 func gain_spirit(amount: int):
@@ -323,7 +411,15 @@ func melee_attack():
 	var parent_body = get_parent()
 	if not parent_body or not parent_body is CharacterBody3D:
 		return
+	
+	# Additional safety check: ensure parent_body is a Node3D for global_position access
+	if not parent_body is Node3D:
+		print(enemy_name, " ERROR: Parent body is not a Node3D - cannot access global_position!")
+		return
 		
+	if not current_target is Node3D:
+		print(enemy_name, " ERROR: Current target is not a Node3D - cannot access global_position!")
+		return
 	var distance_to_target = parent_body.global_position.distance_to(current_target.global_position)
 	if distance_to_target > 2.0:  # Need to get closer (increased from 1.5 to 2.0)
 		# Safety check: prevent infinite movement loops
@@ -343,7 +439,11 @@ func melee_attack():
 	
 	# Use combat manager's damage handler to apply defense
 	if combat_manager and combat_manager.has_method("handle_player_damage"):
-		combat_manager.handle_player_damage(damage, "basic attack")
+		# Pass the parent node (CharacterBody3D) to the combat manager
+		if parent_body and parent_body is CharacterBody3D:
+			combat_manager.handle_player_damage(damage, "basic attack")
+		else:
+			print(enemy_name, " ERROR: Cannot handle player damage - parent is not a CharacterBody3D!")
 	else:
 		# Fallback: direct damage if no combat manager
 		if current_target.has_method("take_damage"):
@@ -358,11 +458,14 @@ func melee_attack():
 		# Reset movement attempts for next turn
 		movement_attempts = 0
 		# In ATB system, we need to call the enemy turn end function
-		if combat_manager.has_method("end_enemy_turn"):
-			combat_manager.end_enemy_turn()
+		if parent_body and parent_body is CharacterBody3D:
+			if combat_manager.has_method("end_enemy_turn"):
+				combat_manager.end_current_turn()
+			else:
+				# Fallback to old method if ATB method doesn't exist
+				combat_manager.end_current_turn()
 		else:
-			# Fallback to old method if ATB method doesn't exist
-			combat_manager.end_current_turn()
+			print(enemy_name, " ERROR: Cannot end turn - parent is not a CharacterBody3D!")
 	else:
 		print(enemy_name, " WARNING: No combat manager to end turn!")
 
@@ -372,10 +475,19 @@ func move_to_target(target: Node):
 	if not target:
 		print(enemy_name, " ERROR: No target for movement!")
 		return
+	
+	if not target is Node3D:
+		print(enemy_name, " ERROR: Target must be a Node3D to access global_position!")
+		return
 		
 	# Get the parent CharacterBody3D for positioning
 	var parent_body = get_parent()
 	if not parent_body or not parent_body is CharacterBody3D:
+		return
+	
+	# Additional safety check: ensure parent_body is a Node3D for global_position access
+	if not parent_body is Node3D:
+		print(enemy_name, " ERROR: Parent body is not a Node3D - cannot access global_position!")
 		return
 		
 	print(enemy_name, " moving to target...")
@@ -402,6 +514,9 @@ func get_target_name(target: Node) -> String:
 	if not target:
 		return "null"
 	
+	if not target is Node3D:
+		return "non-spatial-node"
+	
 	if target.has_method("get_name"):
 		return target.get_name()
 	elif target.has_method("name"):
@@ -413,6 +528,10 @@ func set_combat_target(target: Node):
 	"""Set the target for combat"""
 	if not target:
 		print(enemy_name, " ERROR: Cannot set combat target to null!")
+		return
+	
+	if not target is Node3D:
+		print(enemy_name, " ERROR: Target must be a Node3D to access global_position!")
 		return
 	
 	var target_name: String = "Unknown"
@@ -444,6 +563,9 @@ func _on_move_to_target_complete():
 	# Debug: Check final positions
 	var parent_body = get_parent()
 	if parent_body and current_target:
+		if not current_target is Node3D:
+			print(enemy_name, " ERROR: Current target is not a Node3D - cannot access global_position!")
+			return
 		print(enemy_name, " DEBUG: Final position: ", parent_body.global_position)
 		print(enemy_name, " DEBUG: Target position: ", current_target.global_position)
 		print(enemy_name, " DEBUG: Final distance to target: ", parent_body.global_position.distance_to(current_target.global_position))
@@ -509,7 +631,7 @@ func _give_death_rewards():
 	if not player:
 		print("⚠️ ", enemy_name, " has no player reference for rewards!")
 		# Try to find player from scene
-		player = get_tree().get_first_node_in_group("Player")
+		player = _find_valid_player()
 		if not player:
 			print("⚠️ ", enemy_name, " still cannot find player - skipping rewards!")
 			return
@@ -518,7 +640,7 @@ func _give_death_rewards():
 	if not is_instance_valid(player):
 		print("⚠️ ", enemy_name, " player reference is no longer valid!")
 		# Try to find player from scene again
-		player = get_tree().get_first_node_in_group("Player")
+		player = _find_valid_player()
 		if not player or not is_instance_valid(player):
 			print("⚠️ ", enemy_name, " still cannot find valid player - skipping rewards!")
 			return
@@ -534,8 +656,8 @@ func _give_death_rewards():
 
 func _drop_loot():
 	"""Drop loot items when enemy dies"""
-	if not player or not player.has_method("receive_item"):
-		print("⚠️ No player to receive loot!")
+	if not player or not player is Node3D or not player.has_method("receive_item"):
+		print("⚠️ No valid Node3D player to receive loot!")
 		return
 	
 	print("📦 ", enemy_name, " dropping loot...")
@@ -571,8 +693,8 @@ func _drop_loot():
 
 func _drop_gold():
 	"""Drop gold when enemy dies"""
-	if not player or not player.has_method("receive_gold"):
-		print("⚠️ No player to receive gold!")
+	if not player or not player is Node3D or not player.has_method("receive_gold"):
+		print("⚠️ No valid Node3D player to receive gold!")
 		return
 	
 	var gold_amount = base_gold_reward
@@ -662,7 +784,12 @@ func _on_death_fade_complete():
 	if combat_manager and combat_manager.has_method("remove_enemy_from_combat"):
 		# Check if combat is still active before trying to remove
 		if combat_manager.in_combat:
-			combat_manager.remove_enemy_from_combat(self)
+			# Pass the parent node (CharacterBody3D) to the combat manager
+			var parent_body = get_parent()
+			if parent_body and parent_body is CharacterBody3D:
+				combat_manager.remove_enemy_from_combat(parent_body)
+			else:
+				print("💀 ERROR: Cannot remove from combat - parent is not a CharacterBody3D!")
 		else:
 			print("💀 Combat already ended, enemy will be removed directly")
 	
@@ -787,6 +914,22 @@ func get_stats() -> PlayerStats:
 	
 	return stats
 
+
+
+func get_camera() -> Camera3D:
+	"""Get the camera from the enemy's parent body for combat orientation"""
+	var parent_body = get_parent()
+	if parent_body and parent_body is CharacterBody3D:
+		# Look for camera in the parent's children
+		var camera = parent_body.get_node_or_null("SpringArm3D/Camera3D")
+		if camera:
+			return camera
+		# Fallback: look for any camera
+		camera = parent_body.get_node_or_null("Camera3D")
+		if camera:
+			return camera
+	return null
+
 func get_experience_reward() -> int:
 	"""Get the experience reward for defeating this enemy"""
 	# Base experience reward based on enemy level
@@ -888,12 +1031,19 @@ func face_target(target: Node):
 		print(enemy_name, " ERROR: No target for facing!")
 		return
 	
+	if not target is Node3D:
+		print(enemy_name, " ERROR: Target must be a Node3D to access global_position!")
+		return
+	
 	# Get the parent CharacterBody3D for positioning
 	var parent_body = get_parent()
 	if not parent_body or not parent_body is CharacterBody3D:
 		return
 	
 	# Calculate direction to target
+	if not target is Node3D:
+		print(enemy_name, " ERROR: Target is not a Node3D - cannot access global_position!")
+		return
 	var direction = (target.global_position - parent_body.global_position).normalized()
 	
 	# Only rotate around Y axis (don't tilt up/down)
@@ -943,18 +1093,16 @@ func update_status_bars():
 		print(enemy_name, " ERROR: Parent does not have update_status_bars method!")
 
 func show_status_bars():
-	"""Show the status bars above the enemy's head"""
-	# Delegate to parent if it has the function
-	if get_parent() and get_parent().has_method("show_status_bars"):
-		get_parent().show_status_bars()
-		return
+	"""Show the status bars above the enemy's head - DISABLED, now shown in top panel"""
+	# Status bars are now displayed in the top enemy status panel
+	# This function is kept for compatibility but does nothing
+	print(enemy_name, ": show_status_bars() called - Status bars now displayed in top panel")
 
 func hide_status_bars():
-	"""Hide the status bars"""
-	# Delegate to parent if it has the function
-	if get_parent() and get_parent().has_method("hide_status_bars"):
-		get_parent().hide_status_bars()
-		return
+	"""Hide the status bars - DISABLED, now handled by top panel"""
+	# Status bars are now handled by the top enemy status panel
+	# This function is kept for compatibility but does nothing
+	print(enemy_name, ": hide_status_bars() called - Status bars now handled by top panel")
 
 # Note: Health and mana bars are 2D UI elements positioned above the enemy
 # They automatically face the camera due to their 2D nature
@@ -974,17 +1122,20 @@ func _award_experience_on_death():
 	
 	# Second try: use combat manager's current player
 	elif combat_manager and combat_manager.current_player and is_instance_valid(combat_manager.current_player):
-		target_player = combat_manager.current_player
+		if combat_manager.current_player is Node3D:
+			target_player = combat_manager.current_player
 	
 	# Third try: find player in scene
 	else:
-		target_player = get_tree().get_first_node_in_group("Player")
-		if target_player and is_instance_valid(target_player):
-			pass
+		target_player = _find_valid_player()
 	
 	# Final check: ensure we have a valid player
 	if not target_player:
 		print(enemy_name, " cannot award XP - no valid player found anywhere")
+		return
+	
+	if not target_player is Node3D:
+		print(enemy_name, " ERROR: Target player is not a Node3D!")
 		return
 	
 	if not target_player.has_method("get_stats"):
@@ -1002,7 +1153,12 @@ func _award_experience_on_death():
 	
 	# Log the XP gain in combat UI if available
 	if combat_manager and combat_manager.has_method("_log_combat_event"):
-		combat_manager._log_combat_event("🎉 " + enemy_name + " awarded " + str(exp_reward) + " XP!")
+		# Pass the parent node (CharacterBody3D) to the combat manager
+		var parent_body = get_parent()
+		if parent_body and parent_body is CharacterBody3D:
+			combat_manager._log_combat_event("🎉 " + enemy_name + " awarded " + str(exp_reward) + " XP!")
+		else:
+			print(enemy_name, " ERROR: Cannot log combat event - parent is not a CharacterBody3D!")
 
 # Global systems integration methods
 func can_receive_status_effect(effect_type: String) -> bool:
@@ -1211,3 +1367,73 @@ func load_from_database_entry(entry: Dictionary):
 				guaranteed_loot.append(item)
 		if rewards.has("loot_table"):
 			loot_table = rewards.loot_table
+
+# Focus indicator methods
+func create_focus_indicator():
+	"""Create a visual indicator showing this enemy is focused"""
+	print("🎯 create_focus_indicator() called for: ", enemy_name)
+	
+	if focus_indicator:
+		print("🎯 Focus indicator already exists for: ", enemy_name)
+		return  # Already exists
+	
+	print("🎯 Creating focus indicator for: ", enemy_name)
+	
+	# Create a simple, highly visible focus indicator
+	focus_indicator = Node3D.new()
+	focus_indicator.name = "FocusIndicator"
+	
+	# Create a mesh instance for the glowing edge
+	var mesh_instance = MeshInstance3D.new()
+	var edge_mesh = CylinderMesh.new()
+	edge_mesh.radius = 1.5  # Larger radius for visibility
+	edge_mesh.height = 0.1  # Thicker for visibility
+	mesh_instance.mesh = edge_mesh
+	
+	# Position it at ground level
+	mesh_instance.position.y = 0.05
+	
+	# Create material for the glowing edge - make it very bright and visible
+	var material = StandardMaterial3D.new()
+	material.albedo_color = Color(0.0, 1.0, 1.0, 1.0)  # Bright cyan
+	material.emission_enabled = true
+	material.emission = Color(0.0, 1.0, 1.0, 1.0)  # Bright cyan glow
+	material.emission_energy = 3.0  # Very strong glow
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh_instance.material_override = material
+	
+	focus_indicator.add_child(mesh_instance)
+	add_child(focus_indicator)
+	
+	print("🎯 Focus indicator created and added to scene for: ", enemy_name)
+	print("🎯 Focus indicator node: ", focus_indicator)
+	print("🎯 Focus indicator parent: ", focus_indicator.get_parent())
+	print("🎯 Focus indicator visible: ", focus_indicator.visible)
+	
+	# Test: make it visible immediately
+	focus_indicator.show()
+	print("🎯 Focus indicator forced to show for testing")
+
+func show_focus_indicator():
+	"""Show the focus indicator"""
+	if not focus_indicator:
+		create_focus_indicator()
+	
+	focus_indicator.show()
+	is_focused = true
+	print("🎯 Focus indicator shown for: ", enemy_name)
+
+func hide_focus_indicator():
+	"""Hide the focus indicator"""
+	if focus_indicator:
+		focus_indicator.hide()
+		is_focused = false
+		print("🎯 Focus indicator hidden for: ", enemy_name)
+
+func remove_focus_indicator():
+	"""Remove the focus indicator completely"""
+	if focus_indicator:
+		focus_indicator.queue_free()
+		focus_indicator = null
+		is_focused = false
+		print("🎯 Focus indicator removed for: ", enemy_name)

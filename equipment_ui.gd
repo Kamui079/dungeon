@@ -109,9 +109,18 @@ func _initialize_equipment_slots():
 	add_to_group("EquipmentUI")
 	hide()
 
-func _input(_event):
+func _input(event):
 	if Input.is_action_just_pressed("character_screen"):
 		toggle_panel()
+		# Consume this input event so it doesn't interfere with other systems
+		get_viewport().set_input_as_handled()
+	elif Input.is_action_just_pressed("ui_cancel"):
+		# Handle ESC key to close the panel
+		if visible:
+			hide()
+			_update_cursor_mode()
+			# Consume this input event
+			get_viewport().set_input_as_handled()
 
 # Remove _unhandled_input since _input is already handling the character_screen action
 # Having both causes the key to be processed twice, toggling the panel twice
@@ -119,6 +128,8 @@ func _input(_event):
 func toggle_panel():
 	# Simple toggle behavior - just flip visibility
 	visible = not visible
+	print("EquipmentUI: Panel visibility toggled to: ", visible)
+	print("EquipmentUI: Current group membership: ", get_groups())
 	
 	# Force cleanup tooltips when hiding equipment panel
 	if not visible:
@@ -501,8 +512,16 @@ func _create_experience_bar():
 	experience_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	experience_bar.custom_minimum_size = Vector2(0, 25)  # Make it taller
 	experience_bar.show_percentage = false
-	experience_bar.max_value = 100
-	experience_bar.value = 0
+	
+	# Set initial values based on real player data if available
+	if player_stats:
+		var level_progress = player_stats.get_level_progress()
+		experience_bar.max_value = level_progress.experience_to_next_level
+		experience_bar.value = level_progress.experience
+	else:
+		# Fallback to reasonable defaults
+		experience_bar.max_value = 50
+		experience_bar.value = 0
 	
 	# Style the experience bar with more visible colors
 	var style_bg = StyleBoxFlat.new()
@@ -531,7 +550,15 @@ func _create_experience_bar():
 	
 	# Create experience text
 	experience_text = Label.new()
-	experience_text.text = "Level 1: 0 / 50 XP"
+	
+	# Set initial text based on real player data if available
+	if player_stats:
+		var level_progress = player_stats.get_level_progress()
+		experience_text.text = "Level " + str(level_progress.level) + ": " + str(level_progress.experience) + " / " + str(level_progress.experience_to_next_level) + " XP"
+	else:
+		# Fallback to reasonable defaults
+		experience_text.text = "Level 1: 0 / 50 XP"
+	
 	experience_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	experience_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	# Make the text more visible

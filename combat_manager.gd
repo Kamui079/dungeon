@@ -8,11 +8,14 @@ signal turn_changed(current_actor: Node, turn_type: String)
 signal atb_bar_updated(player_progress: float, enemy_progress: float)
 signal action_queued(action: String, data: Dictionary)
 signal action_dequeued()
+signal enemy_damaged(enemy: Node, damage_type: String, amount: int)
 
 var in_combat: bool = false
 var current_enemies: Array[Node] = []  # Array to support multiple enemies
 var current_enemy: Node = null  # Keep for backward compatibility
 var current_player: Node = null
+var focused_enemy_index: int = 0  # Index of currently focused enemy for targeting
+var focused_enemy: Node = null  # Currently focused enemy for attacks
 var combat_ui: Node = null
 var hud: Node = null  # Reference to the HUD for spirit bar control
 var current_actor: Node = null  # Who's currently acting
@@ -48,6 +51,10 @@ var max_turn_duration: float = 10.0  # Maximum 10 seconds per turn
 # Add damage calculator for armor calculations
 var damage_calculator: DamageCalculator
 
+# Visual targeting indicator
+var focus_indicators: Dictionary = {}  # Store focus circles for each enemy
+var focus_circle_scene: PackedScene = null
+
 func _ready():
 	# Add this node to the CombatManager group
 	add_to_group("CombatManager")
@@ -66,7 +73,7 @@ func is_valid_3d_node(node: Node) -> bool:
 		return false
 	if node == self:
 		return false
-	if not node.get("global_position"):
+	if not node is Node3D:
 		return false
 	return true
 
@@ -91,6 +98,17 @@ func start_combat(enemy: Node, player: Node):
 	if not current_enemies.has(enemy):
 		current_enemies.append(enemy)
 	current_enemy = enemy  # Maintain backward compatibility
+	focused_enemy = enemy  # Set as focused target
+	focused_enemy_index = 0  # First enemy is index 0
+	
+	# Show focus indicator on the first enemy
+	if focused_enemy.has_method("show_focus_indicator"):
+		focused_enemy.show_focus_indicator()
+	
+	# Highlight the focused enemy in the HUD
+	if hud and hud.has_method("highlight_focused_enemy"):
+		hud.highlight_focused_enemy(focused_enemy)
+	
 	current_player = player
 	combat_round = 1
 	
@@ -109,10 +127,22 @@ func start_combat(enemy: Node, player: Node):
 				break
 	
 	if hud and hud.has_method("show_spirit_bar"):
+		print("CombatManager: Calling HUD.show_spirit_bar()")
 		hud.show_spirit_bar()
+		print("CombatManager: HUD.show_spirit_bar() completed")
+		
+		# Clear any existing enemy panels and create new ones
+		if hud.has_method("clear_enemy_panels"):
+			hud.clear_enemy_panels()
+		if hud.has_method("create_enemy_panel"):
+			for enemy_node in current_enemies:
+				hud.create_enemy_panel(enemy_node)
+	else:
+		print("CombatManager: No HUD found or missing show_spirit_bar method!")
 	
 	# Log combat start
-	_log_combat_event("⚔️ Combat started! " + enemy.enemy_name + " vs " + player.name)
+	var enemy_name = enemy.enemy_name if enemy.has_method("enemy_name") else enemy.name
+	_log_combat_event("⚔️ Combat started! " + enemy_name + " vs " + player.name)
 	
 	# Reset player spirit at start of combat
 	if current_player and current_player.has_method("get_stats") and current_player.get_stats():
@@ -127,7 +157,131 @@ func start_combat(enemy: Node, player: Node):
 		current_enemy.on_combat_start()
 	
 	# Orient player and camera toward the enemy
+	print("🎯 Combat starting - orienting camera...")
 	_orient_player_toward_enemy()
+	
+	# Ensure camera is properly oriented even if player was looking away
+	print("🎯 Combat starting - ensuring camera faces enemy...")
+	_ensure_camera_faces_enemy()
+	
+	# Start periodic camera orientation checks during combat
+	_start_camera_orientation_checks()
+	
+	# Check if player is grounded before starting combat
+	if current_player and current_player is Node3D:
+		if current_player.has_method("is_on_floor") and not current_player.is_on_floor():
+			print("🎯 Player is in the air - delaying combat start until landing...")
+			# Wait for player to land naturally before freezing
+			var landing_check_timer = Timer.new()
+			landing_check_timer.name = "combat_landing_check_timer"
+			landing_check_timer.wait_time = 0.1  # Check every 0.1 seconds
+			landing_check_timer.timeout.connect(func():
+				_check_player_landing_and_freeze()
+			)
+			add_child(landing_check_timer)
+			landing_check_timer.start()
+			return  # Exit early, don't freeze yet
+		else:
+			print("🎯 Player is on ground - proceeding with combat freeze")
+	
+	# If we get here, player is grounded, so position at combat distance then freeze
+	_position_enemy_at_combat_distance()
+
+func _check_player_landing_and_freeze():
+	"""Check if player has landed and then freeze entities"""
+	if not current_player or not current_player is Node3D:
+		# Player is gone, clean up and exit
+		_cleanup_landing_timer()
+		return
+	
+	# Check if player is now on the ground
+	if current_player.has_method("is_on_floor") and current_player.is_on_floor():
+		print("🎯 Player has landed - now positioning at proper combat distance")
+		_cleanup_landing_timer()
+		_position_enemy_at_combat_distance()
+	else:
+		# Player still in air, keep checking
+		print("🎯 Player still in air, continuing to wait...")
+
+func _cleanup_landing_timer():
+	"""Clean up the landing check timer"""
+	var landing_timer = get_node_or_null("combat_landing_check_timer")
+	if landing_timer:
+		landing_timer.stop()
+		landing_timer.queue_free()
+		print("🎯 Cleaned up landing check timer")
+
+func _cleanup_positioning_timer():
+	"""Clean up the positioning timer"""
+	var positioning_timer = get_node_or_null("combat_positioning_timer")
+	if positioning_timer:
+		positioning_timer.stop()
+		positioning_timer.queue_free()
+		print("🎯 Cleaned up positioning timer")
+
+func _position_enemy_at_combat_distance():
+	"""Position the enemy at the proper combat distance from the player"""
+	if not current_player or not current_enemy or not current_player is Node3D or not current_enemy is Node3D:
+		# Fallback to immediate freeze if positioning fails
+		_freeze_entities()
+		return
+	
+	# Calculate the direction from player to enemy
+	var player_pos = current_player.global_position
+	var enemy_pos = current_enemy.global_position
+	var direction_to_enemy = (enemy_pos - player_pos).normalized()
+	
+	# Define the ideal combat distance (adjust this value as needed)
+	var ideal_combat_distance = 3.0  # 3 units away from player
+	
+	# Calculate the ideal position for the enemy
+	var ideal_enemy_pos = player_pos + (direction_to_enemy * ideal_combat_distance)
+	
+	# Keep the enemy's current Y position (ground level)
+	ideal_enemy_pos.y = enemy_pos.y
+	
+	print("🎯 Positioning enemy at combat distance - Current: ", player_pos.distance_to(enemy_pos), " Ideal: ", ideal_combat_distance)
+	
+	# Check if enemy needs to be moved
+	var current_distance = player_pos.distance_to(enemy_pos)
+	if abs(current_distance - ideal_combat_distance) > 0.5:  # If more than 0.5 units off
+		print("🎯 Moving enemy to proper combat distance...")
+		
+		# Create a timer to track positioning progress
+		var positioning_timer = Timer.new()
+		positioning_timer.name = "combat_positioning_timer"
+		positioning_timer.wait_time = 0.4  # Slightly longer than the tween
+		positioning_timer.one_shot = true
+		positioning_timer.timeout.connect(func():
+			# If timer expires, force freeze (safety measure)
+			print("⚠️ Positioning timer expired - forcing freeze")
+			_cleanup_positioning_timer()
+			_freeze_entities()
+		)
+		add_child(positioning_timer)
+		positioning_timer.start()
+		
+		# Move enemy to ideal position
+		var move_tween = create_tween()
+		move_tween.tween_property(current_enemy, "global_position", ideal_enemy_pos, 0.3)
+		move_tween.tween_callback(func():
+			print("✅ Enemy positioned at combat distance - now freezing")
+			_cleanup_positioning_timer()
+			_freeze_entities()
+		)
+	else:
+		print("🎯 Enemy already at proper combat distance - freezing immediately")
+		_freeze_entities()
+
+func _freeze_entities():
+	"""Freeze both player and enemy entities"""
+	# Clean up any landing check timer that might still be running
+	_cleanup_landing_timer()
+	
+	# Clean up the freeze timer since we're about to freeze
+	var freeze_timer = get_node_or_null("combat_freeze_timer")
+	if freeze_timer:
+		freeze_timer.queue_free()
 	
 	# Freeze both entities
 	if current_player and current_player.has_method("set_physics_process_enabled"):
@@ -312,9 +466,9 @@ func _update_atb_progress():
 	
 	# Safety check: prevent ATB from running indefinitely
 	if atb_progress_timer and has_meta("atb_timer_start_time"):
-		var current_time = Time.get_ticks_msec() / 1000.0
+		var timer_current_time = Time.get_ticks_msec() / 1000.0
 		var timer_start_time = get_meta("atb_timer_start_time", 0.0)
-		var timer_age = current_time - timer_start_time
+		var timer_age = timer_current_time - timer_start_time
 		
 		# If timer has been running for more than 60 seconds, something is wrong
 		if timer_age > 60.0:
@@ -530,6 +684,34 @@ func end_combat():
 		atb_progress_timer.queue_free()
 		atb_progress_timer = null
 	
+	# Stop and clean up camera orientation timer
+	var orientation_timer = get_node_or_null("camera_orientation_timer")
+	if orientation_timer:
+		orientation_timer.stop()
+		orientation_timer.queue_free()
+		print("🎥 Stopped camera orientation checks")
+	
+	# Stop and clean up any freeze timers
+	var freeze_timer = get_node_or_null("combat_freeze_timer")
+	if freeze_timer:
+		freeze_timer.stop()
+		freeze_timer.queue_free()
+		print("🎯 Cleaned up combat freeze timer")
+	
+	# Stop and clean up any landing check timers
+	var landing_timer = get_node_or_null("combat_landing_check_timer")
+	if landing_timer:
+		landing_timer.stop()
+		landing_timer.queue_free()
+		print("🎯 Cleaned up landing check timer")
+	
+	# Stop and clean up any positioning timers
+	var positioning_timer = get_node_or_null("combat_positioning_timer")
+	if positioning_timer:
+		positioning_timer.stop()
+		positioning_timer.queue_free()
+		print("🎯 Cleaned up positioning timer")
+	
 	# Unfreeze both entities
 	if current_player and current_player.has_method("set_physics_process_enabled"):
 		current_player.set_physics_process_enabled(true)
@@ -548,6 +730,10 @@ func end_combat():
 			enemy.set_process_mode(Node.PROCESS_MODE_INHERIT)
 		elif enemy and enemy.has_method("set_process"):
 			enemy.set_process(true)
+		
+		# Hide focus indicators on all enemies
+		if enemy.has_method("hide_focus_indicator"):
+			enemy.hide_focus_indicator()
 			
 	# Clear references
 	current_enemies.clear()
@@ -557,24 +743,23 @@ func end_combat():
 	# Emit signal for UI to respond
 	combat_ended.emit()
 	
+	# Clear enemy status panel when combat ends - TEMPORARILY DISABLED
+	# if combat_ui and combat_ui.has_method("clear_enemy_status_panel"):
+	# 	combat_ui.clear_enemy_status_panel()
+	# 	print("Enemy status panel cleared")
+	
+	# Reset camera control to player when combat ends
+	if current_player and current_player.has_method("reset_camera_control"):
+		current_player.reset_camera_control()
+		print("🎥 Camera control returned to player")
+	
 	# Hide spirit bar when combat ends
 	if hud and hud.has_method("hide_spirit_bar"):
+		print("CombatManager: Calling HUD.hide_spirit_bar()")
 		hud.hide_spirit_bar()
-		print("Spirit bar hidden!")
-	elif current_player:
-		# Try to find HUD as a child of the player
-		var hud_found = false
-		for child in current_player.get_children():
-			if child.has_method("hide_spirit_bar"):
-				child.hide_spirit_bar()
-				print("Spirit bar hidden via player child search!")
-				hud_found = true
-				break
-		
-		if not hud_found:
-			print("WARNING: No HUD found or missing hide_spirit_bar method!")
+		print("CombatManager: HUD.hide_spirit_bar() completed")
 	else:
-		print("WARNING: No HUD found or missing hide_spirit_bar method!")
+		print("CombatManager: No HUD found or missing hide_spirit_bar method!")
 
 # Player action methods with action queuing
 func player_basic_attack():
@@ -625,6 +810,9 @@ func player_basic_attack():
 	if current_enemy and current_enemy.has_method("take_damage"):
 		current_enemy.take_damage(final_damage)
 		_log_damage_dealt(current_player, current_enemy, final_damage)
+		
+		# Emit signal for UI updates
+		enemy_damaged.emit(current_enemy, "basic_attack", final_damage)
 	
 	# Gain spirit from basic attack
 	if player_stats.has_method("gain_spirit"):
@@ -993,6 +1181,10 @@ func _update_combat_ui_status():
 	"""Update the combat UI with current status"""
 	if combat_ui and combat_ui.has_method("update_status"):
 		combat_ui.update_status()
+	
+	# Update enemy status panel - TEMPORARILY DISABLED
+	# if combat_ui and combat_ui.has_method("set_enemy_for_status_panel") and current_enemy:
+	# 	combat_ui.set_enemy_for_status_panel(current_enemy)
 
 # ATB System helper methods
 func get_player_atb_progress() -> float:
@@ -1054,6 +1246,9 @@ func _apply_damage_to_enemy(damage: int) -> Dictionary:
 	
 	# Apply damage
 	current_enemy.take_damage(final_damage)
+	
+	# Emit signal for UI updates
+	enemy_damaged.emit(current_enemy, "attack", final_damage)
 	
 	return {"final_damage": final_damage, "armor_reduction": armor_reduction}
 
@@ -1168,6 +1363,9 @@ func _execute_basic_attack_directly():
 	if current_enemy and current_enemy.has_method("take_damage"):
 		current_enemy.take_damage(final_damage)
 		_log_damage_dealt(current_player, current_enemy, final_damage)
+		
+		# Emit signal for UI updates
+		enemy_damaged.emit(current_enemy, "basic_attack", final_damage)
 	
 	# Gain spirit from basic attack
 	if player_stats.has_method("gain_spirit"):
@@ -1343,7 +1541,7 @@ func _handle_throwable_weapon_combat(item: Resource):
 	var damage = item.custom_stats.get("damage", 0)
 	var damage_type = item.custom_stats.get("damage_type", "physical")
 	var armor_penetration = item.custom_stats.get("armor_penetration", 0)
-	var duration = item.custom_stats.get("duration", 0)
+	var _duration = item.custom_stats.get("duration", 0)  # Unused but kept for future use
 	
 	# Apply armor penetration
 	var final_damage = damage
@@ -1358,6 +1556,9 @@ func _handle_throwable_weapon_combat(item: Resource):
 	if current_enemy and current_enemy.has_method("take_damage"):
 		current_enemy.take_damage(final_damage)
 		_log_attack(current_player, current_enemy, final_damage, "throwable weapon (" + damage_type + ")")
+		
+		# Emit signal for UI updates
+		enemy_damaged.emit(current_enemy, "throwable_weapon", final_damage)
 		
 		# Handle special effects based on damage type
 		if damage_type == "acid":
@@ -1399,7 +1600,8 @@ func _handle_acid_effects(item: Resource):
 			_apply_manual_poison(poison_damage, poison_duration)
 		
 		# Log the poison effect
-		_log_combat_event("☠️ " + current_enemy.enemy_name + " is poisoned by acid! (" + str(poison_duration) + " turns)")
+		var enemy_name = current_enemy.enemy_name if current_enemy.has_method("enemy_name") else current_enemy.name
+		_log_combat_event("☠️ " + enemy_name + " is poisoned by acid! (" + str(poison_duration) + " turns)")
 	else:
 		print("Acid did not poison the enemy")
 
@@ -1430,7 +1632,8 @@ func _handle_piercing_effects(item: Resource):
 				_apply_manual_poison(poison_damage, poison_duration)
 			
 			# Log the poison effect
-			_log_combat_event("☠️ " + current_enemy.enemy_name + " is poisoned by " + item.name + "! (" + str(poison_duration) + " turns)")
+			var enemy_name = current_enemy.enemy_name if current_enemy.has_method("enemy_name") else current_enemy.name
+			_log_combat_event("☠️ " + enemy_name + " is poisoned by " + item.name + "! (" + str(poison_duration) + " turns)")
 		else:
 			print("Piercing weapon did not poison the enemy")
 	else:
@@ -1701,18 +1904,18 @@ func check_and_execute_queued_actions():
 	# Update the last check time using meta
 	set_meta("last_check_time", current_time)
 	
-	print("🔍 Checking queued actions - Player queued: ", player_action_queued, " Turn ready: ", player_turn_ready, " Action in progress: ", action_in_progress)
-	
-	if player_action_queued and player_turn_ready and not action_in_progress:
-		print("🎯 All conditions met - executing queued action now!")
-		_execute_queued_player_action()
-	elif player_action_queued:
-		print("⏸️ Queued action exists but conditions not met:")
-		print("  - Player queued: ", player_action_queued)
-		print("  - Turn ready: ", player_turn_ready)
-		print("  - Action in progress: ", action_in_progress)
-	else:
-		print("ℹ️ No queued actions to check")
+	# Only log when there are actually queued actions to check
+	if player_action_queued:
+		print("🔍 Checking queued actions - Player queued: ", player_action_queued, " Turn ready: ", player_turn_ready, " Action in progress: ", action_in_progress)
+		
+		if player_turn_ready and not action_in_progress:
+			print("🎯 All conditions met - executing queued action now!")
+			_execute_queued_player_action()
+		else:
+			print("⏸️ Queued action exists but conditions not met:")
+			print("  - Player queued: ", player_action_queued)
+			print("  - Turn ready: ", player_turn_ready)
+			print("  - Action in progress: ", action_in_progress)
 
 func _handle_enemy_damage_taken(base_damage: int, attacker: Node) -> Dictionary:
 	"""Apply armor reduction to damage taken by enemy"""
@@ -1841,31 +2044,45 @@ func _orient_player_toward_enemy(target_enemy: Node = null):
 	var enemy_to_face = target_enemy if target_enemy else current_enemy
 	
 	if not current_player or not enemy_to_face:
+		print("⚠️ Cannot orient: missing player or enemy")
 		return
 	
 	print("🎯 Orienting player and camera toward enemy: ", enemy_to_face.enemy_name if enemy_to_face.has_method("enemy_name") else enemy_to_face.name)
+	print("🎯 Player position: ", current_player.global_position, " Enemy position: ", enemy_to_face.global_position)
 	
 	# Make player face the enemy
 	if current_player.has_method("face_target"):
+		print("🎯 Calling player.face_target()...")
 		current_player.face_target(enemy_to_face)
 		print("✅ Player oriented toward enemy")
+	else:
+		print("⚠️ Player has no face_target method")
 	
 	# Orient camera toward enemy (if player has camera control methods)
 	if current_player.has_method("orient_camera_toward"):
+		print("🎯 Calling player.orient_camera_toward()...")
 		current_player.orient_camera_toward(enemy_to_face)
 		print("✅ Camera oriented toward enemy")
 	elif current_player.has_method("get_camera"):
 		# Alternative: get camera and orient it directly
 		var camera = current_player.get_camera()
 		if camera:
+			print("🎯 Using direct camera orientation...")
 			_orient_camera_toward_enemy(camera, enemy_to_face)
 			print("✅ Camera oriented toward enemy (direct method)")
+		else:
+			print("⚠️ Player.get_camera() returned null")
 	else:
 		print("⚠️ Player has no camera orientation methods")
 
 func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
 	"""Helper function to orient a camera toward the enemy"""
-	if not target_enemy or not camera:
+	if not target_enemy or not camera or not current_player:
+		return
+	
+	# Safety check: ensure both player and enemy are Node3D
+	if not current_player is Node3D or not target_enemy is Node3D:
+		print("⚠️ Cannot orient camera - player or enemy is not a Node3D")
 		return
 	
 	# Get the direction from player to enemy
@@ -1873,13 +2090,142 @@ func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
 	var enemy_pos = target_enemy.global_position
 	var direction = (enemy_pos - player_pos).normalized()
 	
-	# Calculate the target rotation for the camera
+	# Calculate the target rotation for the player (not the camera)
+	# Use the standard atan2 approach but with better debugging
 	var target_rotation = atan2(direction.x, direction.z)
 	
-	# Smoothly rotate the camera to face the enemy
-	var tween = create_tween()
-	tween.tween_property(camera, "rotation:y", target_rotation, 0.5)
-	print("🎥 Camera rotating to face enemy (rotation: ", target_rotation, ")")
+	# Debug the direction and rotation
+	print("🎯 Direction vector: ", direction, " Target rotation: ", target_rotation)
+	print("🎯 Player current rotation: ", current_player.rotation.y)
+	print("🎯 Expected forward direction: ", Vector3(sin(target_rotation), 0, cos(target_rotation)))
+	
+	# Try flipping the rotation 180 degrees to fix the orientation issue
+	target_rotation += PI
+	
+	# Rotate the PLAYER to face the enemy (this will rotate the entire camera system)
+	var player_tween = create_tween()
+	player_tween.tween_property(current_player, "rotation:y", target_rotation, 0.8)
+	
+	# Also reset the camera's local rotation to look forward
+	var camera_tween = create_tween()
+	camera_tween.tween_property(camera, "rotation:y", 0.0, 0.8)
+	
+	print("🎥 Camera system oriented toward enemy (player rotation: ", target_rotation, ")")
+
+
+
+func _ensure_camera_faces_enemy():
+	"""Double-check that the camera is properly facing the enemy"""
+	if not current_player or not current_enemy or not current_player.has_method("get_camera"):
+		return
+	
+	var camera = current_player.get_camera()
+	if not camera:
+		return
+	
+	# Safety check: ensure both player and enemy are Node3D
+	if not current_player is Node3D or not current_enemy is Node3D:
+		print("⚠️ Cannot ensure camera faces enemy - player or enemy is not a Node3D")
+		return
+	
+	# Get the direction from player to enemy
+	var player_pos = current_player.global_position
+	var enemy_pos = current_enemy.global_position
+	var direction = (enemy_pos - player_pos).normalized()
+	
+	# Calculate the target rotation for the player
+	# Use a more reliable method to calculate the angle
+	var target_rotation = atan2(direction.x, direction.z)
+	
+	# Get current player rotation first
+	var current_rotation = current_player.rotation.y
+	
+	# Debug the direction and rotation
+	print("🎯 Direction vector: ", direction, " Target rotation: ", target_rotation)
+	print("🎯 Player current rotation: ", current_rotation)
+	
+	# Try flipping the rotation 180 degrees to fix the orientation issue
+	target_rotation += PI
+	
+	# Check if player is already facing the right direction (within 0.1 radians)
+	var rotation_diff = abs(current_rotation - target_rotation)
+	
+	# Normalize rotation difference to handle wrapping around 2π
+	if rotation_diff > PI:
+		rotation_diff = 2 * PI - rotation_diff
+	
+	if rotation_diff > 0.1:  # If player is not facing enemy (within ~6 degrees)
+		print("🔄 Player not facing enemy, correcting orientation...")
+		# Use smooth tweening instead of immediate orientation
+		var player_tween = create_tween()
+		player_tween.tween_property(current_player, "rotation:y", target_rotation, 0.8)
+		
+		# Also smoothly reset camera to look forward
+		var camera_tween = create_tween()
+		camera_tween.tween_property(camera, "rotation:y", 0.0, 0.8)
+		print("✅ Player orientation smoothly corrected to face enemy")
+
+func _start_camera_orientation_checks():
+	"""Start periodic checks to ensure camera stays oriented toward enemy during combat"""
+	if not in_combat or not current_player or not current_enemy:
+		return
+	
+	# Create a timer to check camera orientation every 0.5 seconds during combat
+	var orientation_timer = Timer.new()
+	orientation_timer.name = "camera_orientation_timer"
+	orientation_timer.wait_time = 0.5
+	orientation_timer.timeout.connect(_check_camera_orientation)
+	add_child(orientation_timer)
+	orientation_timer.start()
+	
+	print("🎥 Started periodic camera orientation checks")
+
+func _check_camera_orientation():
+	"""Check if camera is still properly oriented toward enemy"""
+	if not in_combat or not current_player or not current_enemy:
+		# Stop the timer if combat ended
+		var timer = get_node_or_null("camera_orientation_timer")
+		if timer:
+			timer.queue_free()
+		return
+	
+	# Only check if player has a camera
+	if not current_player.has_method("get_camera"):
+		return
+	
+	var camera = current_player.get_camera()
+	if not camera:
+		return
+	
+	# Safety check: ensure both player and enemy are Node3D
+	if not current_player is Node3D or not current_enemy is Node3D:
+		return
+	
+	# Get the direction from player to enemy
+	var player_pos = current_player.global_position
+	var enemy_pos = current_enemy.global_position
+	var direction = (enemy_pos - player_pos).normalized()
+	
+	# Calculate the target rotation for the player
+	var target_rotation = atan2(direction.x, direction.z)
+	
+	# Check if player is facing the right direction (within 0.2 radians for periodic checks)
+	var current_rotation = current_player.rotation.y
+	var rotation_diff = abs(current_rotation - target_rotation)
+	
+	# Normalize rotation difference to handle wrapping around 2π
+	if rotation_diff > PI:
+		rotation_diff = 2 * PI - rotation_diff
+	
+	if rotation_diff > 0.2:  # If player is not facing enemy (within ~11 degrees)
+		print("🔄 Periodic check: Player not facing enemy, correcting...")
+		# Use the player's orientation methods to smoothly correct
+		if current_player.has_method("orient_camera_toward"):
+			current_player.orient_camera_toward(current_enemy)
+		else:
+			# Fallback: force immediate correction
+			current_player.rotation.y = target_rotation
+			camera.rotation.y = 0.0
 
 func add_enemy_to_combat(enemy: Node):
 	"""Add an enemy to an ongoing combat encounter"""
@@ -1896,6 +2242,11 @@ func add_enemy_to_combat(enemy: Node):
 	if not current_enemies.has(enemy):
 		current_enemies.append(enemy)
 		print("➕ Enemy added to combat: ", enemy.enemy_name if enemy.has_method("enemy_name") else enemy.name)
+		
+		# Create HUD panel for the new enemy
+		if hud and hud.has_method("create_enemy_panel"):
+			hud.create_enemy_panel(enemy)
+			print("CombatManager: Created HUD panel for new enemy: ", enemy.name)
 		
 		# Reorient player and camera toward the new enemy
 		_orient_player_toward_enemy(enemy)
@@ -1937,6 +2288,11 @@ func remove_enemy_from_combat(enemy: Node):
 		current_enemies.erase(enemy)
 		print("💀 Enemy removed from combat: ", enemy.enemy_name if enemy.has_method("enemy_name") else enemy.name)
 		
+		# Remove HUD panel for the defeated enemy
+		if hud and hud.has_method("remove_enemy_panel"):
+			hud.remove_enemy_panel(enemy)
+			print("CombatManager: Removed HUD panel for defeated enemy: ", enemy.name)
+		
 		# If this was the current enemy, update current_enemy
 		if current_enemy == enemy:
 			if current_enemies.size() > 0:
@@ -1970,15 +2326,24 @@ func get_nearest_living_enemy() -> Node:
 	if current_enemies.is_empty():
 		return null
 	
+	# Safety check: ensure current_player is Node3D
+	if not current_player is Node3D:
+		print("⚠️ Cannot get nearest enemy - player is not a Node3D")
+		return null
+	
 	var nearest_enemy = null
 	var nearest_distance = INF
 	
 	for enemy in current_enemies:
 		if enemy.has_method("get_stats") and enemy.get_stats().health > 0:
-			var distance = current_player.global_position.distance_to(enemy.global_position)
-			if distance < nearest_distance:
-				nearest_distance = distance
-				nearest_enemy = enemy
+			# Safety check: ensure enemy is Node3D
+			if enemy is Node3D:
+				var distance = current_player.global_position.distance_to(enemy.global_position)
+				if distance < nearest_distance:
+					nearest_distance = distance
+					nearest_enemy = enemy
+			else:
+				print("⚠️ Enemy is not a Node3D - skipping distance calculation")
 	
 	return nearest_enemy
 
@@ -2002,6 +2367,61 @@ func join_combat(enemy: Node):
 	add_enemy_to_combat(enemy)
 	return true
 
+func cycle_target():
+	"""Cycle to the next enemy target"""
+	if current_enemies.size() <= 1:
+		return  # No need to cycle if there's only one enemy
+	
+	# Move to next enemy
+	focused_enemy_index = (focused_enemy_index + 1) % current_enemies.size()
+	focused_enemy = current_enemies[focused_enemy_index]
+	
+	# Update current enemy for backward compatibility
+	current_enemy = focused_enemy
+	
+	# Force camera movement to the new target
+	_force_camera_movement_to_enemy(focused_enemy)
+	
+	# Update UI elements
+	if combat_ui and combat_ui.has_method("update_enemy_status_panel"):
+		combat_ui.update_enemy_status_panel(focused_enemy)
+	
+	# Highlight the focused enemy in the HUD
+	if hud and hud.has_method("highlight_focused_enemy"):
+		hud.highlight_focused_enemy(focused_enemy)
+	
+	print("🎯 Target changed to: ", focused_enemy.enemy_name if focused_enemy.has_method("enemy_name") else focused_enemy.name)
+
+func get_focused_enemy() -> Node:
+	"""Get the currently focused enemy for targeting"""
+	return focused_enemy
+
+func set_focused_enemy(enemy: Node):
+	"""Set a specific enemy as the focused target"""
+	if not enemy or not current_enemies.has(enemy):
+		print("Cannot set focused enemy: enemy not in combat")
+		return
+	
+	# Update focused enemy
+	focused_enemy_index = current_enemies.find(enemy)
+	focused_enemy = enemy
+	
+	# Update current enemy for backward compatibility
+	current_enemy = focused_enemy
+	
+	# Force camera movement to the new target
+	_force_camera_movement_to_enemy(focused_enemy)
+	
+	# Update UI elements
+	if combat_ui and combat_ui.has_method("update_enemy_status_panel"):
+		combat_ui.update_enemy_status_panel(focused_enemy)
+	
+	# Highlight the focused enemy in the HUD
+	if hud and hud.has_method("highlight_focused_enemy"):
+		hud.highlight_focused_enemy(focused_enemy)
+	
+	print("🎯 Target set to: ", focused_enemy.enemy_name if focused_enemy.has_method("enemy_name") else focused_enemy.name)
+
 func get_combat_enemies() -> Array[Node]:
 	"""Get all enemies currently in combat"""
 	return current_enemies.duplicate()
@@ -2009,5 +2429,58 @@ func get_combat_enemies() -> Array[Node]:
 func get_combat_enemy_count() -> int:
 	"""Get the number of enemies currently in combat"""
 	return current_enemies.size()
+
+func _force_camera_movement_to_enemy(target_enemy: Node):
+	"""Force camera movement to make target switching more noticeable"""
+	if not current_player or not target_enemy:
+		return
+	
+	print("🎯 Forcing camera movement to enemy: ", target_enemy.name)
+	
+	# Hide focus indicators on all enemies first
+	for enemy in current_enemies:
+		if enemy.has_method("hide_focus_indicator"):
+			enemy.hide_focus_indicator()
+	
+	# Show focus indicator on the target enemy
+	if target_enemy.has_method("show_focus_indicator"):
+		target_enemy.show_focus_indicator()
+	
+	# Get the direction from player to enemy
+	var player_pos = current_player.global_position
+	var enemy_pos = target_enemy.global_position
+	var direction = (enemy_pos - player_pos).normalized()
+	
+	# Calculate target rotation
+	var target_rotation = atan2(direction.x, direction.z) + PI
+	
+	# Create a dramatic camera movement: look slightly away first, then to the target
+	var look_away_rotation = target_rotation + 0.5  # Look 0.5 radians (about 28 degrees) away
+	
+	# First, look away from the target
+	var tween1 = create_tween()
+	tween1.tween_property(current_player, "rotation:y", look_away_rotation, 0.3)
+	
+	# Then, look back to the target
+	tween1.tween_callback(func():
+		var tween2 = create_tween()
+		tween2.tween_property(current_player, "rotation:y", target_rotation, 0.5)
+		print("🎯 Camera movement completed to target: ", target_enemy.name)
+	)
+
+func on_enemy_damaged(enemy: Node, damage_type: String, amount: int):
+	"""Called when an enemy takes damage"""
+	print("CombatManager: Enemy ", enemy.name, " damaged by ", amount, " (", damage_type, ")")
+	
+	# Update HUD enemy panel if it exists
+	if hud and hud.has_method("update_enemy_panel"):
+		# Find the enemy panel and update it
+		if hud.has_method("get_enemy_panel"):
+			var panel = hud.get_enemy_panel(enemy)
+			if panel:
+				hud.update_enemy_panel(panel, enemy)
+	
+	# Emit signal for other systems
+	enemy_damaged.emit(enemy, damage_type, amount)
 
 # End of CombatManager class

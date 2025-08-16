@@ -1,6 +1,14 @@
 extends Node
 class_name StatusEffectsManager
 
+# Signal emitted when effects change for an entity
+signal effects_changed(entity: Node)
+
+# Configuration for visual quality
+const USE_CLEAN_FALLBACK_EFFECTS = false  # Set to false to use full PNG animation with quality settings
+
+
+
 # Note: GIF files are not natively supported by Godot as textures.
 # For better visual effects, consider converting GIFs to PNG or using animated sprites.
 # This system will fall back to colored sprites if GIF loading fails.
@@ -83,8 +91,8 @@ class EntityStatusEffects:
 		visual_effects_container.name = "StatusEffectsContainer"
 		entity.add_child(visual_effects_container)
 		
-		# Position the container above the entity's head
-		visual_effects_container.position = Vector3(0, 2.5, 0)  # Adjust height as needed
+		# Position the container at the base level - individual effects will position themselves above
+		visual_effects_container.position = Vector3(0, 0, 0)
 
 	
 	func add_effect(effect_type: EFFECT_TYPE, damage: int, duration: int, source: Node):
@@ -144,44 +152,51 @@ class EntityStatusEffects:
 		"""Create a poison visual effect"""
 		# Safety check: ensure entity is still valid
 		if not entity or not is_instance_valid(entity):
-	
 			return
-			
-
 		
 		# Create a Sprite3D to display the poison effect
 		var poison_sprite = Sprite3D.new()
 		poison_sprite.name = "PoisonEffect"
 		
-		# Try to load the poison GIF texture, but fall back to a colored sprite if it fails
+		# Try to load a proper poison effect texture first
 		var poison_texture = null
-		# Note: GIF files are not natively supported in Godot, so we'll use a fallback approach
-
+		var texture_paths = [
+			"res://status_effects/PoisonEffect-export1.png",
+			"res://status_effects/PoisonEffect-export2.png",
+			"res://status_effects/PoisonEffect-export3.png"
+		]
 		
-		# Try to create a simple colored sprite using a default texture
-		# First try to load a basic texture, then fall back to just color
-		var fallback_texture = null
-		if ResourceLoader.exists("res://icon.svg"):
-			fallback_texture = load("res://icon.svg")
+		# Try to load one of the poison effect textures
+		for path in texture_paths:
+			if ResourceLoader.exists(path):
+				poison_texture = load(path)
+				break
 		
-		if fallback_texture:
-			poison_sprite.texture = fallback_texture
-			poison_sprite.modulate = Color(0.2, 1.0, 0.2, 0.8)  # Green with transparency
+		if poison_texture:
+			# Use the actual poison effect texture
+			poison_sprite.texture = poison_texture
+			poison_sprite.modulate = Color(1.0, 1.0, 1.0, 0.8)  # White with transparency to preserve original colors
 		else:
-			# No texture available, just use color
-			poison_sprite.modulate = Color(0.2, 1.0, 0.2, 0.8)  # Green with transparency
+			# Create a simple colored circle effect without using the problematic icon.svg
+			# We'll create a small, simple visual effect
+			poison_sprite.modulate = Color(0.2, 1.0, 0.2, 0.6)  # Green with transparency
 		
-		poison_sprite.pixel_size = 0.15  # Slightly larger for visibility
+		# Set appropriate size - much smaller for a subtle status indicator
+		poison_sprite.pixel_size = 0.008  # Much smaller size for status effect
 		poison_sprite.billboard = true  # Always face the camera
 		
-		# Add some animation with a limited number of loops to prevent infinite loops
-		var tween = null
-		if entity.has_method("create_tween"):
-			tween = entity.create_tween()
-			if tween:
-				tween.set_loops(3)  # Loop 3 times then stop
-				tween.tween_property(poison_sprite, "position:y", poison_sprite.position.y + 0.2, 1.0)
-				tween.tween_property(poison_sprite, "position:y", poison_sprite.position.y, 1.0)
+		# Improve sprite rendering quality to reduce artifacts
+		poison_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR  # Smooth filtering
+		
+		# Set alpha properties only if they exist to avoid crashes
+		if "alpha_cut" in poison_sprite:
+			poison_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD  # Clean alpha handling
+		
+		# Note: Some advanced alpha properties may not be available in this Godot version
+		
+		# Advanced quality settings for latest Godot versions
+		# Note: Some advanced properties may not be available in all Godot 4.x versions
+		# We'll use safe property access to avoid errors
 		
 		# Store reference to the visual effect
 		effect.set_visual_effect(poison_sprite)
@@ -189,33 +204,227 @@ class EntityStatusEffects:
 		# Add to visual effects container with safety check
 		if visual_effects_container and is_instance_valid(visual_effects_container):
 			visual_effects_container.add_child(poison_sprite)
+			
+			# Automatically position the sprite above the enemy based on their actual dimensions
+			_auto_position_status_effect(poison_sprite, entity)
+			
+			# Create the 9-frame animation system
+			_create_poison_frame_animation(poison_sprite)
 	
-	func _create_ignite_effect(effect: StatusEffect):
+	func _create_poison_frame_animation(poison_sprite: Sprite3D):
+		"""Create a 9-frame animation system for the poison effect"""
+		# Check if we should use clean fallback effects to avoid texture artifacts
+		if USE_CLEAN_FALLBACK_EFFECTS:
+			print("Using clean fallback poison effect (texture artifacts disabled)")
+			_create_clean_fallback_poison_effect(poison_sprite)
+			return
+		
+		# Load all 9 poison effect frames
+		var frames: Array[Texture2D] = []
+		var frame_paths = [
+			"res://status_effects/PoisonEffect-export1.png",
+			"res://status_effects/PoisonEffect-export2.png",
+			"res://status_effects/PoisonEffect-export3.png",
+			"res://status_effects/PoisonEffect-export4.png",
+			"res://status_effects/PoisonEffect-export5.png",
+			"res://status_effects/PoisonEffect-export6.png",
+			"res://status_effects/PoisonEffect-export7.png",
+			"res://status_effects/PoisonEffect-export8.png",
+			"res://status_effects/PoisonEffect-export9.png"
+		]
+		
+		# Load all available frames with quality improvements
+		for path in frame_paths:
+			if ResourceLoader.exists(path):
+				var texture = load(path)
+				if texture:
+					# Apply quality improvements to reduce artifacts
+					if texture is Texture2D:
+						# Note: filter property may not be directly settable on CompressedTexture2D
+						# We'll rely on the sprite's texture_filter setting instead
+						pass
+					frames.append(texture)
+		
+		if frames.size() == 0:
+			print("Warning: No poison effect frames found, using fallback")
+			# Create a simple, clean visual effect without texture artifacts
+			_create_clean_fallback_poison_effect(poison_sprite)
+			return
+		
+		print("Poison effect: Loaded ", frames.size(), " animation frames")
+		
+		# Create a timer to cycle through frames
+		var frame_timer = Timer.new()
+		frame_timer.name = "PoisonFrameTimer"
+		frame_timer.wait_time = 0.12  # ~8.3 frames per second for smooth but not too fast animation
+		frame_timer.timeout.connect(func(): _update_poison_frame(poison_sprite, frames, frame_timer))
+		poison_sprite.add_child(frame_timer)
+		frame_timer.start()
+		
+		# Set initial frame
+		poison_sprite.texture = frames[0]
+		
+		# Store frame data in the sprite for the update function
+		poison_sprite.set_meta("poison_frames", frames)
+		poison_sprite.set_meta("current_frame", 0)
+	
+	func _auto_position_status_effect(sprite: Sprite3D, target_entity: Node):
+		"""Automatically position status effect above the enemy based on their dimensions"""
+		if not target_entity or not is_instance_valid(target_entity):
+			return
+		
+		var effect_height = 0.0
+		
+		# Try to find the enemy's visual representation (CharacterBody3D, CollisionShape3D, etc.)
+		var entity_root = target_entity
+		if target_entity.get_parent() and target_entity.get_parent() is CharacterBody3D:
+			entity_root = target_entity.get_parent()
+		
+		# Method 0: Check if entity has a custom height property
+		if entity_root.has_method("get_status_effect_height"):
+			effect_height = entity_root.get_status_effect_height()
+		elif "status_effect_height" in entity_root:
+			effect_height = entity_root.status_effect_height
+		
+		# Method 1: Check if entity has a CollisionShape3D to get dimensions
+		if effect_height == 0.0:
+			var collision_shape = _find_collision_shape(entity_root)
+			if collision_shape:
+				var shape = collision_shape.shape
+				if shape is BoxShape3D:
+					effect_height = shape.size.y
+				elif shape is CapsuleShape3D:
+					effect_height = shape.radius * 2 + shape.height
+				elif shape is SphereShape3D:
+					effect_height = shape.radius * 2
+				elif shape is CylinderShape3D:
+					effect_height = shape.height
+		
+		# Method 2: Check if entity has a Sprite3D or MeshInstance3D to get visual bounds
+		if effect_height == 0.0:
+			effect_height = _get_visual_bounds_height(entity_root)
+		
+		# Method 3: Fallback to a reasonable default based on entity type
+		if effect_height == 0.0:
+			effect_height = _get_default_entity_height(entity_root)
+		
+		# Position the effect above the enemy with some padding
+		var padding = 0.2  # Small gap between enemy and effect
+		sprite.position.y = effect_height + padding
+		
+		print("Auto-positioned status effect at height: ", effect_height + padding, " (entity height: ", effect_height, ")")
+	
+	func _find_collision_shape(target_entity: Node) -> CollisionShape3D:
+		"""Find the CollisionShape3D node in the entity hierarchy"""
+		if target_entity is CollisionShape3D:
+			return target_entity
+		
+		# Search children recursively
+		for child in target_entity.get_children():
+			if child is CollisionShape3D:
+				return child
+			var result = _find_collision_shape(child)
+			if result:
+				return result
+		
+		return null
+	
+	func _get_visual_bounds_height(target_entity: Node) -> float:
+		"""Get the height of visual elements (Sprite3D, MeshInstance3D, etc.)"""
+		var max_height = 0.0
+		
+		# Check for Sprite3D
+		if target_entity is Sprite3D:
+			max_height = max(max_height, target_entity.pixel_size * 64.0)  # Approximate height
+		
+		# Check for MeshInstance3D
+		if target_entity is MeshInstance3D and target_entity.mesh:
+			var aabb = target_entity.mesh.get_aabb()
+			max_height = max(max_height, aabb.size.y)
+		
+		# Check for AnimatedSprite3D
+		if target_entity is AnimatedSprite3D:
+			max_height = max(max_height, target_entity.pixel_size * 64.0)  # Approximate height
+		
+		# Search children recursively
+		for child in target_entity.get_children():
+			max_height = max(max_height, _get_visual_bounds_height(child))
+		
+		return max_height
+	
+	func _get_default_entity_height(target_entity: Node) -> float:
+		"""Get a reasonable default height based on entity type/name"""
+		var entity_name = target_entity.name.to_lower()
+		
+		# Common enemy types and their approximate heights
+		if "rat" in entity_name or "mouse" in entity_name or "small" in entity_name:
+			return 0.5
+		elif "goblin" in entity_name or "humanoid" in entity_name or "medium" in entity_name:
+			return 1.8
+		elif "troll" in entity_name or "giant" in entity_name or "large" in entity_name:
+			return 3.0
+		elif "dragon" in entity_name or "huge" in entity_name or "massive" in entity_name:
+			return 4.0
+		elif "boss" in entity_name:
+			return 2.5  # Boss enemies are typically larger
+		else:
+			return 1.5  # Default human-sized height
+	
+	func _create_clean_fallback_poison_effect(poison_sprite: Sprite3D):
+		"""Create a clean, simple poison effect without texture artifacts"""
+		# Remove any existing texture to avoid artifacts
+		poison_sprite.texture = null
+		
+		# Create a simple colored effect with clean edges
+		poison_sprite.modulate = Color(0.2, 1.0, 0.2, 0.7)  # Green with transparency
+		
+		# Use a simple shape instead of texture for cleaner appearance
+		# Note: Sprite3D uses BaseMaterial3D.TextureFilter, not CanvasItem.TextureFilter
+		poison_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Sharp pixels
+		
+		# Set alpha properties only if they exist to avoid crashes
+		if "alpha_cut" in poison_sprite:
+			poison_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+		
+		print("Created clean fallback poison effect")
+	
+	func _update_poison_frame(poison_sprite: Sprite3D, frames: Array[Texture2D], timer: Timer):
+		"""Update to the next frame in the poison animation"""
+		if not is_instance_valid(poison_sprite) or not is_instance_valid(timer):
+			return
+		
+		var current_frame = poison_sprite.get_meta("current_frame", 0)
+		current_frame = (current_frame + 1) % frames.size()
+		
+		poison_sprite.texture = frames[current_frame]
+		poison_sprite.set_meta("current_frame", current_frame)
+	
+	func _create_ignite_effect(_effect: StatusEffect):
 		"""Create an ignite visual effect"""
 		# Placeholder for future ignite effects
 		pass
 	
-	func _create_bone_break_effect(effect: StatusEffect):
+	func _create_bone_break_effect(_effect: StatusEffect):
 		"""Create a bone break visual effect"""
 		# Placeholder for future bone break effects
 		pass
 	
-	func _create_stun_effect(effect: StatusEffect):
+	func _create_stun_effect(_effect: StatusEffect):
 		"""Create a stun visual effect"""
 		# Placeholder for future stun effects
 		pass
 	
-	func _create_slow_effect(effect: StatusEffect):
+	func _create_slow_effect(_effect: StatusEffect):
 		"""Create a slow visual effect"""
 		# Placeholder for future slow effects
 		pass
 	
-	func _create_bleed_effect(effect: StatusEffect):
+	func _create_bleed_effect(_effect: StatusEffect):
 		"""Create a bleed visual effect"""
 		# Placeholder for future bleed effects
 		pass
 	
-	func _create_freeze_effect(effect: StatusEffect):
+	func _create_freeze_effect(_effect: StatusEffect):
 		"""Create a freeze visual effect"""
 		# Placeholder for future freeze effects
 		pass
@@ -341,11 +550,19 @@ class EntityStatusEffects:
 			_:
 				return "Unknown Effect"
 
+# End of EntityStatusEffects class
+
 # Global status effects manager
 var entity_effects: Dictionary = {}  # entity -> EntityStatusEffects
 
 func _ready():
 	add_to_group("StatusEffectsManager")
+	
+	# Version check for debugging
+	print("StatusEffectsManager: Godot version check")
+	var version_info = Engine.get_version_info()
+	print("  - Engine version: ", version_info.get("version_string", "Unknown"))
+	print("  - Engine version hash: ", version_info.get("hash", "Unknown"))
 
 func get_entity_effects(entity: Node) -> EntityStatusEffects:
 	"""Get or create status effects for an entity"""
@@ -357,6 +574,9 @@ func apply_effect(entity: Node, effect_type: EFFECT_TYPE, damage: int, duration:
 	"""Apply a status effect to an entity"""
 	var effects = get_entity_effects(entity)
 	effects.add_effect(effect_type, damage, duration, source)
+	
+	# Emit signal for UI updates
+	effects_changed.emit(entity)
 
 func remove_effect(entity: Node, effect_type: EFFECT_TYPE):
 	"""Remove a specific effect from an entity"""
@@ -441,4 +661,3 @@ func refresh_visual_effects(entity: Node):
 			if effect.is_active and effect.visual_effect == null:
 				# Recreate visual effect if it's missing
 				effects._create_visual_effect(effect)
-		

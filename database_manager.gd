@@ -41,11 +41,23 @@ func _load_all_databases():
 		
 		# Check if file exists first
 		if not FileAccess.file_exists(db_path):
+			print("DatabaseManager: File not found: ", db_path)
 			continue
 		
-		var db_resource = load(db_path)
+		# Try to load the database with error handling
+		var db_resource = null
+		var load_error = false
 		
-		if db_resource:
+		# Use a try-catch approach for loading
+		if ResourceLoader.exists(db_path):
+			db_resource = load(db_path)
+		else:
+			load_error = true
+			print("DatabaseManager: Resource not found at: ", db_path)
+		
+		# Check if loading was successful
+		if db_resource and not load_error:
+			print("DatabaseManager: Successfully loaded ", db_name, " database")
 			match db_name:
 				"weapons":
 					weapons_database = db_resource
@@ -65,9 +77,11 @@ func _load_all_databases():
 				"abilities":
 					abilities_database = db_resource
 					_cache_database_data(db_resource, _abilities_cache)
-
 		else:
-			pass
+			print("DatabaseManager: Failed to load ", db_name, " database from ", db_path)
+			if load_error:
+				print("DatabaseManager: This usually means the database needs to be imported by Godot first.")
+				print("DatabaseManager: Try opening the project in the editor to trigger import.")
 	
 	# Check how many databases loaded successfully
 	var loaded_count = 0
@@ -78,10 +92,14 @@ func _load_all_databases():
 	if spells_database: loaded_count += 1
 	if abilities_database: loaded_count += 1
 	
+	print("DatabaseManager: Loaded ", loaded_count, " out of ", DATABASE_PATHS.size(), " databases")
+	
 	if loaded_count == 0:
-		pass
+		print("DatabaseManager: CRITICAL ERROR - No databases loaded!")
+		print("DatabaseManager: The game may not function properly.")
+		print("DatabaseManager: Please open the project in Godot Editor to fix import issues.")
 	else:
-		pass
+		print("DatabaseManager: All databases loaded successfully!")
 
 func _cache_database_data(database: Resource, cache: Dictionary):
 	"""Cache database data for faster access"""

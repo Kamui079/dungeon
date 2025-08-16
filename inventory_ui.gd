@@ -46,6 +46,12 @@ func _initialize_inventory_slots():
 
 func _input(_event):
 	if Input.is_action_just_pressed("toggle_inventory"):
+		# Check if we're in combat mode - if so, don't allow inventory toggle
+		var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+		if combat_manager and combat_manager.in_combat:
+			# In combat mode - don't toggle inventory
+			return
+		
 		toggle_panel()
 
 func toggle_panel():

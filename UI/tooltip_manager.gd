@@ -18,6 +18,9 @@ var last_cleanup_time: int = 0  # Track last cleanup to prevent rapid cycles (in
 var cleanup_cooldown: int = 100  # Minimum time between cleanups (100ms)
 
 func _ready():
+	# Add to group for easy finding
+	add_to_group("TooltipManager")
+	
 	# Get references to UI elements
 	tooltip_panel = $TooltipPanel
 	item_name_label = $TooltipPanel/VBoxContainer/ItemNameLabel
