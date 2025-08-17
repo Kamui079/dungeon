@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://abilities_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"abilities": {
+		"ints_to_locators": {
+			0: "res://abilities/power_strike.tres"
+		},
+		"ints_to_strings": {
+			0: "power_strike"
+		},
+		"strings_to_ints": {
+			"power_strike": 0
+		},
+		"categories_to_ints": {
+			"physical": {0: true},
+			"combat": {0: true},
+			"starter": {0: true},
+			"melee": {0: true}
+		}
+	}
+} 

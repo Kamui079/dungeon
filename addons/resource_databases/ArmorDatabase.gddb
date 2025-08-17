@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://armor_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"armor": {
+		"ints_to_locators": {
+			0: "res://armor/leather_cap.tres",
+			1: "res://armor/leather_vest.tres",
+			2: "res://armor/ice_gloves.tres"
+		},
+		"ints_to_strings": {
+			0: "leather_cap",
+			1: "leather_vest",
+			2: "ice_gloves"
+		},
+		"strings_to_ints": {
+			"leather_cap": 0,
+			"leather_vest": 1,
+			"ice_gloves": 2
+		},
+		"categories_to_ints": {
+			"head": {0: true},
+			"chest": {1: true},
+			"hands": {2: true},
+			"light": {0: true, 1: true},
+			"starter": {0: true, 1: true}
+		}
+	}
+}

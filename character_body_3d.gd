@@ -237,6 +237,12 @@ func is_fire_attack(attack_type: String) -> bool:
 		"fireball", "fire_weapon_basic", "fire_weapon_special": return true
 		_: return false
 
+func get_lightning_paralysis_chance() -> float: return 30.0
+func is_lightning_attack(attack_type: String) -> bool:
+	match attack_type:
+		"lightning_bolt", "lightning_weapon_basic", "lightning_weapon_special": return true
+		_: return false
+
 func get_ice_freeze_chance() -> float: return 25.0
 func is_ice_attack(attack_type: String) -> bool:
 	match attack_type:

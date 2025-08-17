@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://spells_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"spells": {
+		"ints_to_locators": {
+			0: "res://combat_manager.gd",
+			1: "res://combat_manager.gd",
+			2: "res://combat_manager.gd",
+			3: "res://combat_manager.gd"
+		},
+		"ints_to_strings": {
+			0: "fireball",
+			1: "lightning_bolt",
+			2: "icicle",
+			3: "smite"
+		},
+		"strings_to_ints": {
+			"fireball": 0,
+			"lightning_bolt": 1,
+			"icicle": 2,
+			"smite": 3
+		},
+		"categories_to_ints": {
+			"fire": {0: true},
+			"lightning": {1: true},
+			"ice": {2: true},
+			"holy": {3: true},
+			"elemental": {0: true, 1: true, 2: true},
+			"combat": {0: true, 1: true, 2: true, 3: true}
+		}
+	}
+} 

@@ -2,16 +2,20 @@ extends CharacterBody3D
 class_name BigRat
 
 # Import AnimationManager for type safety
-const AnimationManager = preload("res://animation_manager.gd")
+const AnimationManagerScript = preload("res://animation_manager.gd")
 
 # Test if AnimationManager is accessible
 func _test_animation_manager_access():
 	print("🎯 Big Rat - Testing AnimationManager access")
-	print("🎯 Big Rat - AnimationManager constant: ", AnimationManager)
-	print("🎯 Big Rat - AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK: ", AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK)
+	print("🎯 Big Rat - AnimationManagerScript constant: ", AnimationManagerScript)
+	print("🎯 Big Rat - AnimationManagerScript.ANIMATION_TYPE.PHYSICAL_ATTACK: ", AnimationManagerScript.ANIMATION_TYPE.PHYSICAL_ATTACK)
 
 # Enemy functionality will be added via composition
 var enemy_behavior: Node = null
+
+# Custom display name override (optional)
+func get_custom_display_name() -> String:
+	return "Big Rat"
 
 # Status effects are now handled by the StatusEffectsManager
 # Individual poison variables removed in favor of centralized system
@@ -34,13 +38,19 @@ func _ready():
 	enemy_behavior.base_mana = 10
 	enemy_behavior.damage_range_min = 5
 	enemy_behavior.damage_range_max = 8
-	enemy_behavior.enemy_level = 3
+	enemy_behavior.enemy_level = 1
+	
+	# Note: Display name is now handled automatically by the base class
 	
 	# Enemy database integration
 	enemy_behavior.enemy_id = "big_rat"
 	enemy_behavior.enemy_category = "beasts"
 	enemy_behavior.enemy_rarity = 1  # Common
 	enemy_behavior.enemy_tags = ["rodent", "dungeon", "low_level"]
+	
+	# Enemy type system
+	enemy_behavior.enemy_type = enemy_behavior.ENEMY_TYPE.CREATURE
+	enemy_behavior.enemy_subtype = enemy_behavior.ENEMY_SUBTYPE.BEAST
 	
 	# Global systems integration - Big Rats are vulnerable to most effects
 	enemy_behavior.can_be_poisoned = true
@@ -89,6 +99,8 @@ func enemy_name() -> String:
 	if enemy_behavior:
 		return enemy_behavior.enemy_name
 	return "Big Rat"  # Fallback name
+
+# Note: get_enemy_name() is now inherited from the base enemy class
 
 # Attack functions
 func get_basic_attack_damage() -> int:

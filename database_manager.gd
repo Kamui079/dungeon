@@ -22,12 +22,12 @@ var _abilities_cache: Dictionary = {}
 
 # Database paths
 const DATABASE_PATHS = {
-	"weapons": "res://WeaponsDatabase.gddb",
-	"armor": "res://ArmorDatabase.gddb",
-	"consumables": "res://ConsumablesDatabase.gddb",
-	"enemies": "res://EnemiesDatabase.gddb",
-	"spells": "res://SpellsDatabase.gddb",
-	"abilities": "res://SpecialAbilitiesDatabase.gddb"
+	"weapons": "res://addons/resource_databases/WeaponsDatabase.gddb",
+	"armor": "res://addons/resource_databases/ArmorDatabase.gddb",
+	"consumables": "res://addons/resource_databases/ConsumablesDatabase.gddb",
+	"enemies": "res://addons/resource_databases/EnemiesDatabase.gddb",
+	"spells": "res://addons/resource_databases/SpellsDatabase.gddb",
+	"abilities": "res://addons/resource_databases/SpecialAbilitiesDatabase.gddb"
 }
 
 func _ready():

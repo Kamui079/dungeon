@@ -14,6 +14,9 @@ class_name CombatUI
 @onready var spells_popup: Panel = $SpellsPopup
 @onready var haymaker_button: Button = $SpecialAttacksPopup/VBoxContainer/ScrollContainer/VBoxContainer/HaymakerButton
 @onready var fireball_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/FireballButton
+@onready var lightning_bolt_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/LightningBoltButton
+@onready var icicle_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/IcicleButton
+@onready var smite_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/SmiteButton
 @onready var special_attacks_close_button: Button = $SpecialAttacksPopup/VBoxContainer/CloseButton
 @onready var spells_close_button: Button = $SpellsPopup/VBoxContainer/CloseButton
 
@@ -29,7 +32,8 @@ class_name CombatUI
 @onready var queued_action_label: Label = $CombatPanel/VBoxContainer/QueuedActionSection/QueuedActionLabel
 
 # Combat log
-@onready var combat_log_text: TextEdit = $CombatLogPanel/VBoxContainer/CombatLogText
+@onready var combat_log_text: RichTextLabel = $CombatLogPanel/VBoxContainer/CombatLogText
+@onready var combat_log_panel: Panel = $CombatLogPanel
 
 # Enemy status panel (new top-screen display)
 # @onready var enemy_status_panel: Panel = $EnemyStatusPanel # REMOVED
@@ -46,10 +50,19 @@ var button_states = {}
 var action_button_map = {}
 var currently_queued_action: String = ""
 
+# Combat log visibility state
+var combat_log_visible: bool = true
+
+# Track last turn type to avoid spam logging
+var last_turn_type: String = ""
+
 func _ready():
 	print("=== COMBAT UI READY ===")
 	# Add to CombatUI group for spirit updates
 	add_to_group("CombatUI")
+	
+	# Set up input handling for combat log toggle
+	set_process_input(true)
 	
 	# Initialize UI elements
 	# enemy_status_panel = $EnemyStatusPanel
@@ -110,6 +123,10 @@ func _ready():
 	print("=== ENEMY STATUS ELEMENTS ===")
 	print("Enemy status now displayed above enemy head")
 	
+	# Initialize combat log visibility state
+	combat_log_visible = true
+	print("Combat log initialized as visible")
+	
 	# Connect button signals only if buttons exist
 	if basic_attack_button:
 		basic_attack_button.pressed.connect(_on_basic_attack_pressed)
@@ -144,6 +161,24 @@ func _ready():
 		print("Fireball button connected!")
 	else:
 		print("ERROR: Fireball button not found!")
+	
+	if lightning_bolt_button:
+		lightning_bolt_button.pressed.connect(_on_lightning_bolt_pressed)
+		print("Lightning Bolt button connected!")
+	else:
+		print("ERROR: Lightning Bolt button not found!")
+	
+	if icicle_button:
+		icicle_button.pressed.connect(_on_icicle_pressed)
+		print("Icicle button connected!")
+	else:
+		print("ERROR: Icicle button not found!")
+	
+	if smite_button:
+		smite_button.pressed.connect(_on_smite_pressed)
+		print("Smite button connected!")
+	else:
+		print("ERROR: Smite button not found!")
 		
 	# Connect close buttons
 	if special_attacks_close_button:
@@ -203,43 +238,22 @@ func _ready():
 	set_process_input(true)
 
 func _input(event):
-	"""Handle input for debug functions"""
+	"""Handle input for combat log toggle and target cycling"""
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_F12:
-			print("F12 pressed - Debugging ATB system...")
-			debug_atb_status()
-		elif event.keycode == KEY_F11:
-			print("F11 pressed - Checking player turn readiness...")
-			check_player_turn_readiness()
-		elif event.keycode == KEY_TAB:
+		if event.keycode == KEY_TAB:
 			print("Tab pressed - Cycling target...")
 			if combat_manager:
 				combat_manager.cycle_target()
 				print("DEBUG: Target cycling completed")
 			else:
 				print("DEBUG: No combat manager found!")
+	
+	# Handle combat log toggle (only when combat UI is visible)
+	if event.is_action_pressed("toggle_combat_log") and visible:
+		toggle_combat_log_visibility()
+		get_viewport().set_input_as_handled()
 
-func check_player_turn_readiness():
-	"""Check if player can take actions right now"""
-	if not combat_manager:
-		add_combat_log_entry("❌ No combat manager found!")
-		return
-	
-	var atb_status = combat_manager.get_atb_status()
-	if not atb_status:
-		add_combat_log_entry("❌ Could not get ATB status!")
-		return
-	
-	var can_act = combat_manager.is_player_turn_ready()
-	var status_text = "🔍 Player Turn Readiness Check:\n"
-	status_text += "Can take actions: " + str(can_act) + "\n"
-	status_text += "Player ATB: " + str(int(atb_status.player_atb_progress * 100)) + "%\n"
-	status_text += "Player ready: " + str(atb_status.player_turn_ready) + "\n"
-	status_text += "Action in progress: " + str(atb_status.action_in_progress) + "\n"
-	status_text += "Turn type: " + str(atb_status.turn_type)
-	
-	add_combat_log_entry(status_text)
-	print("Player Turn Readiness: ", status_text)
+
 
 func _on_combat_started():
 	print("Combat UI: Combat started!")
@@ -260,6 +274,17 @@ func _on_combat_started():
 	
 	# Update turn display
 	update_turn_display()
+	
+	# Ensure combat log is visible when combat starts
+	ensure_combat_log_visible()
+	
+	# Log combat start message
+	add_combat_log_entry("Combat started!")
+	
+
+	
+	# Log initial combat status
+	log_combat_status()
 	
 	# SIMPLIFIED: Create enemy panels
 	# print("DEBUG: Creating enemy panels...") # REMOVED
@@ -337,10 +362,48 @@ func _on_haymaker_pressed():
 		print("ERROR: No combat manager found!")
 
 func _on_fireball_pressed():
-	print("Fireball button pressed!")
+	print("🔥 Fireball button pressed!")
+	print("🔥 DEBUG: This is the Fireball button handler")
+	print("🔥 DEBUG: Button name: ", fireball_button.name if fireball_button else "null")
+	print("🔥 DEBUG: Button text: ", fireball_button.text if fireball_button else "null")
 	if combat_manager:
 		# Always call the combat manager - it will handle queuing if needed
-		combat_manager.player_cast_spell()
+		combat_manager.player_cast_spell("fireball")
+		spells_popup.hide()  # Close popup after selection
+	else:
+		print("ERROR: No combat manager found!")
+
+func _on_lightning_bolt_pressed():
+	print("⚡ Lightning Bolt button pressed!")
+	print("⚡ DEBUG: This is the Lightning Bolt button handler")
+	print("⚡ DEBUG: Button name: ", lightning_bolt_button.name if lightning_bolt_button else "null")
+	print("⚡ DEBUG: Button text: ", lightning_bolt_button.text if lightning_bolt_button else "null")
+	print("⚡ DEBUG: lightning_bolt_button reference: ", lightning_bolt_button)
+	print("⚡ DEBUG: lightning_bolt_button is valid: ", is_instance_valid(lightning_bolt_button) if lightning_bolt_button else "null")
+	if combat_manager:
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_cast_spell("lightning_bolt")
+		spells_popup.hide()  # Close popup after selection
+	else:
+		print("ERROR: No combat manager found!")
+
+func _on_icicle_pressed():
+	print("❄️ Icicle button pressed!")
+	print("❄️ DEBUG: This is the Icicle button handler")
+	print("❄️ DEBUG: Button name: ", icicle_button.name if icicle_button else "null")
+	print("❄️ DEBUG: Button text: ", icicle_button.text if icicle_button else "null")
+	if combat_manager:
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_cast_spell("icicle")
+		spells_popup.hide()  # Close popup after selection
+	else:
+		print("ERROR: No combat manager found!")
+
+func _on_smite_pressed():
+	print("Smite button pressed!")
+	if combat_manager:
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_cast_spell("smite")
 		spells_popup.hide()  # Close popup after selection
 	else:
 		print("ERROR: No combat manager found!")
@@ -445,19 +508,17 @@ func update_turn_display():
 		elif turn_type_text == "enemy":
 			turn_type_text = "Enemy"
 		turn_info_label.text = "Turn: " + actor_name + " (" + turn_type_text + ")"
+		
+		# Track turn changes but don't log status every time
+		if turn_type_text != last_turn_type:
+			last_turn_type = turn_type_text
 
 # Combat log methods
 func add_combat_log_entry(message: String):
-	"""Add a new entry to the combat log"""
-	print("=== ADDING COMBAT LOG ENTRY ===")
-	print("Message: ", message)
-	print("Combat log text element: ", combat_log_text)
-	
+	"""Add a new entry to the combat log with color-coded damage numbers"""
 	if not combat_log_text:
 		print("ERROR: Combat log text element not found!")
 		return
-	
-	print("Combat log text element is valid: ", is_instance_valid(combat_log_text))
 	
 	# Get current time for timestamp
 	var current_time = Time.get_datetime_string_from_system()
@@ -466,58 +527,126 @@ func add_combat_log_entry(message: String):
 	if time_parts.size() > 1:
 		time_stamp = time_parts[1]  # Get just the time part
 	
+	# Apply color coding to damage numbers in the message
+	var colored_message = _apply_damage_color_coding(message)
+	
+	
+	
 	# Format the log entry with better visual separation
-	var log_entry = "[" + time_stamp + "] " + message + "\n"
+	var log_entry = "[" + time_stamp + "] " + colored_message + "\n"
 	
-	# Add to the beginning of the log (newest entries at top)
+	# Use RichTextLabel's append_text method which handles BBCode better
+	# Clear the log first if it's getting too long
+	var current_lines = combat_log_text.text.split("\n")
+	if current_lines.size() > 100:
+		combat_log_text.clear()
+		# Re-add the last 90 lines to keep some history
+		var start_index = max(0, current_lines.size() - 90)
+		for i in range(start_index, current_lines.size()):
+			if current_lines[i].strip_edges() != "":
+				combat_log_text.append_text(current_lines[i] + "\n")
+	
+	# Use append_text with BBCode for better handling
+	# Clear and rebuild the log to maintain proper BBCode formatting
 	var current_text = combat_log_text.text
-	combat_log_text.text = log_entry + current_text
-	
-	# Auto-scroll to top to show newest entry
-	combat_log_text.scroll_vertical = 0
-	
-	# Force UI update to ensure the text is displayed immediately
-	combat_log_text.queue_redraw()
+	var all_text = log_entry + current_text
 	
 	# Limit log size to prevent memory issues (keep last 100 entries)
-	var lines = combat_log_text.text.split("\n")
+	var lines = all_text.split("\n")
 	if lines.size() > 100:
 		var trimmed_lines = lines.slice(0, 100)
-		combat_log_text.text = "\n".join(trimmed_lines)
+		all_text = "\n".join(trimmed_lines)
 	
-	print("Combat log entry added successfully!")
+	# Set the text with BBCode formatting
+	combat_log_text.text = all_text
+	
+	
+	
+
+	
+	# Auto-scroll to top to show newest entry
+	combat_log_text.scroll_to_line(0)
 
 func clear_combat_log():
 	"""Clear the combat log"""
 	if combat_log_text:
-		combat_log_text.text = ""
+		combat_log_text.clear()
 
 func add_combat_log_separator():
 	"""Add a visual separator in the combat log"""
 	add_combat_log_entry("--- Turn Separator ---")
 
-func debug_atb_status():
-	"""Debug function to check ATB system status"""
+func log_combat_status():
+	"""Log essential combat status information to the combat log"""
+	# Only log combat status when combat starts, not on every turn change
+	# This reduces spam while keeping essential information
 	if not combat_manager:
-		add_combat_log_entry("❌ No combat manager found!")
 		return
 	
 	var atb_status = combat_manager.get_atb_status()
 	if not atb_status:
-		add_combat_log_entry("❌ Could not get ATB status!")
 		return
 	
-	var status_text = "🔍 ATB Debug Info:\n"
-	status_text += "Player Progress: " + str(int(atb_status.player_atb_progress * 100)) + "%\n"
+	# Only log if this is the first status log (combat start)
+	if last_turn_type == "":
+		var status_text = "📊 Combat Status:\n"
+		status_text += "Player ATB: " + str(int(atb_status.player_atb_progress * 100)) + "%\n"
+		status_text += "Turn Type: " + str(atb_status.turn_type).capitalize()
+		add_combat_log_entry(status_text)
 
-	status_text += "Player Ready: " + str(atb_status.player_turn_ready) + "\n"
-	status_text += "Enemy Ready: " + str(atb_status.enemy_turn_ready) + "\n"
-	status_text += "Action in Progress: " + str(atb_status.action_in_progress) + "\n"
-	status_text += "Turn Type: " + str(atb_status.turn_type) + "\n"
-	status_text += "Timer Active: " + str(atb_status.atb_progress_timer_active)
+func _apply_damage_color_coding(message: String) -> String:
+	"""Apply color coding to damage numbers and text based on action type in combat log messages"""
+	# Determine if this is a player action or enemy action
+	var is_player_action = _is_player_action_message(message)
+	var text_color = "#ffffff" if is_player_action else "#888888"  # White for player, Dark grey for enemy
 	
-	add_combat_log_entry(status_text)
-	print("ATB Debug Info: ", atb_status)
+	# Apply the text color using BBCode
+	var colored_message = "[color=" + text_color + "]" + message + "[/color]"
+	
+	return colored_message
+
+func _is_player_action_message(message: String) -> bool:
+	"""Determine if a combat log message is about a player action or enemy action"""
+	# Convert to lowercase for case-insensitive matching
+	var lower_message = message.to_lower()
+	
+	# Clear indicators of player actions
+	if lower_message.find("player") != -1 and lower_message.find("deals") != -1:
+		return true  # "Player deals X damage to Enemy"
+	if lower_message.find("you") != -1:
+		return true  # "You attack", "You cast", etc.
+	if lower_message.find("your") != -1:
+		return true  # "Your turn", "Your action", etc.
+	if lower_message.find("cast") != -1:
+		return true  # "Player casts", "You cast", etc.
+	if lower_message.find("queued") != -1:
+		return true  # "Action queued", "Spell queued", etc.
+	if lower_message.find("combat started") != -1:
+		return true  # "Combat started!" is a neutral system message
+	
+	# Clear indicators of enemy actions (these should be grey)
+	if lower_message.find("big rat") != -1 and lower_message.find("attacks") != -1:
+		return false  # "Big Rat attacks Player for X damage" - GREY
+	if lower_message.find("goblin") != -1 and lower_message.find("attacks") != -1:
+		return false  # "Goblin attacks Player for X damage" - GREY
+	if lower_message.find("enemy") != -1 and lower_message.find("attacks") != -1:
+		return false  # Generic enemy attacks - GREY
+	if lower_message.find("attacks") != -1 and lower_message.find("player") != -1:
+		return false  # Any enemy attacking player - GREY
+	if lower_message.find("casts") != -1 and lower_message.find("player") != -1:
+		return false  # Any enemy casting on player - GREY
+	
+	# System messages that should be white (neutral)
+	if lower_message.find("joined the battle") != -1:
+		return true  # "Big Rat x 2 have joined the battle!" - WHITE (system message)
+	if lower_message.find("combat started") != -1:
+		return true  # "Combat started!" - WHITE (system message)
+	
+	# Default to player action for neutral messages
+	# This handles status effects, system messages, etc.
+	return true
+
+
 
 # Queued action handlers
 func _on_action_queued(action: String, data: Dictionary):
@@ -529,12 +658,17 @@ func _on_action_queued(action: String, data: Dictionary):
 		return
 	
 	# Map action types to specific ability names for better clarity
-	var action_name = _get_action_display_name(action)
+	var action_name = _get_action_display_name(action, data)
 	var action_text = "⏳ Queued: " + action_name
 	
 	# Add item name if it's an item use action
 	if data.has("item_name"):
-		action_text += " (" + data["item_name"] + ")"
+		var item_name = data["item_name"]
+		# Ensure item_name is a string
+		if item_name is String:
+			action_text += " (" + item_name + ")"
+		else:
+			action_text += " (" + str(item_name) + ")"
 	
 	queued_action_label.text = action_text
 	queued_action_label.show()
@@ -543,7 +677,7 @@ func _on_action_queued(action: String, data: Dictionary):
 	# Combat log entry is now handled by the combat manager with detailed messages
 	_highlight_queued_action(action)
 
-func _get_action_display_name(action: String) -> String:
+func _get_action_display_name(action: String, data: Dictionary = {}) -> String:
 	"""Convert action type to specific ability name for better display"""
 	match action:
 		"basic_attack":
@@ -551,7 +685,17 @@ func _get_action_display_name(action: String) -> String:
 		"special_attack":
 			return "Haymaker"
 		"cast_spell":
-			return "Fireball"
+			# For spells, get the actual spell name from the data
+			if data.has("spell_id"):
+				var spell_id = data["spell_id"]
+				# Get spell data from combat manager to display proper name
+				if combat_manager:
+					var spells = combat_manager.get_available_spells()
+					if spells.has(spell_id):
+						return spells[spell_id].get("name", spell_id.capitalize())
+				# Fallback to capitalized spell ID
+				return spell_id.capitalize()
+			return "Spell"
 		"defend":
 			return "Defend"
 		"use_item":
@@ -595,11 +739,33 @@ func update_button_states():
 		var can_afford_haymaker = current_spirit >= haymaker_cost
 		_set_button_state(haymaker_button, can_afford_haymaker, "Haymaker", haymaker_cost, current_spirit, "SP")
 	
-	# Update Fireball button (costs 15 mana)
-	if fireball_button:
-		var fireball_cost = 15
-		var can_afford_fireball = current_mana >= fireball_cost
-		_set_button_state(fireball_button, can_afford_fireball, "Fireball", fireball_cost, current_mana, "MP")
+	# Update spell buttons with dynamic costs from combat manager
+	if combat_manager:
+		var spells = combat_manager.get_available_spells()
+		
+		# Update Fireball button
+		if fireball_button and "fireball" in spells:
+			var fireball_cost = spells["fireball"]["mana_cost"]
+			var can_afford_fireball = current_mana >= fireball_cost
+			_set_button_state(fireball_button, can_afford_fireball, "Fireball", fireball_cost, current_mana, "MP")
+		
+		# Update Lightning Bolt button
+		if lightning_bolt_button and "lightning_bolt" in spells:
+			var lightning_cost = spells["lightning_bolt"]["mana_cost"]
+			var can_afford_lightning = current_mana >= lightning_cost
+			_set_button_state(lightning_bolt_button, can_afford_lightning, "Lightning Bolt", lightning_cost, current_mana, "MP")
+		
+		# Update Icicle button
+		if icicle_button and "icicle" in spells:
+			var icicle_cost = spells["icicle"]["mana_cost"]
+			var can_afford_icicle = current_mana >= icicle_cost
+			_set_button_state(icicle_button, can_afford_icicle, "Icicle", icicle_cost, current_mana, "MP")
+		
+		# Update Smite button
+		if smite_button and "smite" in spells:
+			var smite_cost = spells["smite"]["mana_cost"]
+			var can_afford_smite = current_mana >= smite_cost
+			_set_button_state(smite_button, can_afford_smite, "Smite", smite_cost, current_mana, "MP")
 	
 	# Update Basic Attack button (always available)
 	if basic_attack_button:
@@ -621,6 +787,9 @@ func update_button_states():
 	# Update Spells button (menu opener - always available)
 	if spells_button:
 		_set_button_state(spells_button, true, "Spells", 0, 0, "")
+	
+	# Update button texts to show current costs
+	_update_button_texts()
 
 func _check_if_player_has_usable_items(_player: Node) -> bool:
 	"""Check if the player has any items they can use in combat"""
@@ -669,8 +838,23 @@ func _setup_action_button_mapping():
 	print("🔧 Basic attack button: ", basic_attack_button)
 	print("🔧 Haymaker button: ", haymaker_button)
 	print("🔧 Fireball button: ", fireball_button)
+	print("🔧 Lightning Bolt button: ", lightning_bolt_button)
+	print("🔧 Icicle button: ", icicle_button)
+	print("🔧 Smite button: ", smite_button)
 	print("🔧 Defend button: ", defend_button)
 	print("🔧 Item button: ", item_button)
+	
+	# Debug: Check if buttons are unique
+	print("🔧 DEBUG: Checking button uniqueness...")
+	var button_refs = [fireball_button, lightning_bolt_button, icicle_button, smite_button]
+	var button_names = ["fireball_button", "lightning_bolt_button", "icicle_button", "smite_button"]
+	
+	for i in range(button_refs.size()):
+		for j in range(i + 1, button_refs.size()):
+			if button_refs[i] == button_refs[j] and button_refs[i] != null:
+				print("⚠️ WARNING: ", button_names[i], " and ", button_names[j], " point to the same button!")
+			else:
+				print("✅ ", button_names[i], " and ", button_names[j], " are different")
 	
 	action_button_map = {
 		"basic_attack": basic_attack_button,
@@ -685,6 +869,61 @@ func _setup_action_button_mapping():
 		var button = action_button_map[action]
 		var button_valid = "valid" if button and is_instance_valid(button) else "null"
 		print("🔧 ", action, " -> ", button, " (", button_valid, ")")
+
+func _update_button_texts():
+	"""Update button text to show current costs and resources"""
+	if not combat_manager:
+		return
+	
+	var player = combat_manager.current_player
+	if not player or not player.has_method("get_stats"):
+		return
+	
+	var player_stats = player.get_stats()
+	if not player_stats:
+		return
+	
+	var current_mana = player_stats.mana
+	var current_spirit = player_stats.spirit
+	
+	# Update spell button texts with current costs
+	if combat_manager:
+		var spells = combat_manager.get_available_spells()
+		
+		if fireball_button and "fireball" in spells:
+			var cost = spells["fireball"]["mana_cost"]
+			fireball_button.text = "Fireball (" + str(cost) + " MP)"
+		
+		if lightning_bolt_button and "lightning_bolt" in spells:
+			var cost = spells["lightning_bolt"]["mana_cost"]
+			lightning_bolt_button.text = "Lightning Bolt (" + str(cost) + " MP)"
+		
+		if icicle_button and "icicle" in spells:
+			var cost = spells["icicle"]["mana_cost"]
+			icicle_button.text = "Icicle (" + str(cost) + " MP)"
+		
+		if smite_button and "smite" in spells:
+			var cost = spells["smite"]["mana_cost"]
+			smite_button.text = "Smite (" + str(cost) + " MP)"
+	
+	# Update other button texts
+	if haymaker_button:
+		haymaker_button.text = "Haymaker (3 SP)"
+	
+	if basic_attack_button:
+		basic_attack_button.text = "Basic Attack"
+	
+	if defend_button:
+		defend_button.text = "Defend"
+	
+	if item_button:
+		item_button.text = "Use Item"
+	
+	if special_attacks_button:
+		special_attacks_button.text = "Special Attacks"
+	
+	if spells_button:
+		spells_button.text = "Spells"
 
 func _highlight_queued_action(action: String):
 	"""Highlight the button corresponding to the queued action in green"""
@@ -1181,3 +1420,34 @@ func _clear_all_button_highlights():
 # 	remove_enemy_panel(enemy) # REMOVED
 # 	# Refresh highlighting # REMOVED
 # 	highlight_focused_enemy() # REMOVED
+
+
+
+func toggle_combat_log_visibility():
+	"""Toggle the combat log panel visibility"""
+	if not combat_log_panel:
+		print("ERROR: Combat log panel not found!")
+		return
+	
+	combat_log_visible = !combat_log_visible
+	combat_log_panel.visible = combat_log_visible
+	
+	var status = "visible" if combat_log_visible else "hidden"
+	print("🎯 Combat log toggled: ", status)
+	
+	# Log the toggle action to the combat log if it's visible
+	if combat_log_visible:
+		add_combat_log_entry("📋 Combat log toggled ON")
+	else:
+		# Since the log is hidden, we can't add to it, but we can print to console
+		print("📋 Combat log toggled OFF")
+
+func ensure_combat_log_visible():
+	"""Ensure the combat log is visible (called when combat starts)"""
+	if not combat_log_panel:
+		return
+	
+	if not combat_log_visible:
+		combat_log_visible = true
+		combat_log_panel.visible = true
+		print("🎯 Combat log restored to visible state")

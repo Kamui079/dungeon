@@ -353,7 +353,7 @@ func set_level(new_level: int):
 	
 	print("Level set to ", level, " with ", total_stat_points, " stat points to distribute")
 
-func take_damage(amount: int, damage_type: String = "physical") -> void:
+func take_damage(amount: int, _damage_type: String = "physical") -> void:
 	health = max(0, health - amount)
 	emit_signal("health_changed", health, max_health)
 	if health <= 0:
@@ -821,3 +821,14 @@ func get_all_elemental_bonuses() -> Dictionary:
 		"earth": earth_damage_bonus,
 		"holy": holy_damage_bonus
 	}
+
+func can_receive_status_effect(_effect_type: String) -> bool:
+	"""Check if the player can receive a specific status effect"""
+	# For now, players can receive all status effects
+	# This can be expanded later with equipment-based immunities
+	return true
+
+func get_lightning_paralysis_chance() -> float:
+	"""Get the chance for lightning attacks to paralyze targets"""
+	# Base chance can be modified by equipment or stats later
+	return 30.0

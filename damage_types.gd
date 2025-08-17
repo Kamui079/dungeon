@@ -17,7 +17,8 @@ enum DAMAGE_TYPE {
 	FREEZE,
 	SHOCK,
 	STUN,
-	SLOW
+	SLOW,
+	SPELL_DAMAGE
 }
 
 # Color mapping for damage numbers
@@ -37,7 +38,8 @@ const DAMAGE_COLORS = {
 	DAMAGE_TYPE.FREEZE: Color.LIGHT_BLUE,
 	DAMAGE_TYPE.SHOCK: Color.YELLOW,
 	DAMAGE_TYPE.STUN: Color.GRAY,
-	DAMAGE_TYPE.SLOW: Color.BLUE
+	DAMAGE_TYPE.SLOW: Color.BLUE,
+	DAMAGE_TYPE.SPELL_DAMAGE: Color.MAGENTA
 }
 
 # Damage type names for display
@@ -57,7 +59,8 @@ const DAMAGE_NAMES = {
 	DAMAGE_TYPE.FREEZE: "Freeze",
 	DAMAGE_TYPE.SHOCK: "Shock",
 	DAMAGE_TYPE.STUN: "Stun",
-	DAMAGE_TYPE.SLOW: "Slow"
+	DAMAGE_TYPE.SLOW: "Slow",
+	DAMAGE_TYPE.SPELL_DAMAGE: "Spell"
 }
 
 # Convert string damage type to enum
@@ -97,6 +100,8 @@ static func get_damage_type_enum(damage_type_string: String) -> DAMAGE_TYPE:
 			return DAMAGE_TYPE.STUN
 		"slow", "slowed":
 			return DAMAGE_TYPE.SLOW
+		"spell_damage", "spell":
+			return DAMAGE_TYPE.SPELL_DAMAGE
 		_:
 			return DAMAGE_TYPE.PHYSICAL  # Default fallback
 

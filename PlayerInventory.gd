@@ -90,8 +90,13 @@ func _consume_item(bag_slot: int):
 	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
 	if combat_manager and combat_manager.in_combat:
 		# Queue the item usage for combat
-
-		combat_manager.queue_item_usage(item_resource.name)
+		# Get the item name safely - name is a property, not a method
+		var item_name = item_resource.name
+		# Ensure it's a string
+		if not (item_name is String):
+			item_name = str(item_name)
+		
+		combat_manager.queue_item_usage(item_name)
 		return
 	
 	# Not in combat - use item immediately

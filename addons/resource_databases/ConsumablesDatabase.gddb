@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Database" load_steps=2 format=3 uid="uid://consumables_db"]
+
+[ext_resource type="Script" path="res://addons/resource_databases/database.gd" id="1_database"]
+
+[resource]
+script = ExtResource("1_database")
+_collections_data = {
+	"all_consumables": {
+		"ints_to_locators": {
+			0: "res://Consumables/SmallHealingPotion.tres",
+			1: "res://Consumables/SmallManaPotion.tres",
+			2: "res://Consumables/VenomDart.tres",
+			3: "res://Consumables/AcidFlask.tres"
+		},
+		"ints_to_strings": {
+			0: "small_healing_potion",
+			1: "small_mana_potion",
+			2: "venom_dart",
+			3: "acid_flask"
+		},
+		"strings_to_ints": {
+			"small_healing_potion": 0,
+			"small_mana_potion": 1,
+			"venom_dart": 2,
+			"acid_flask": 3
+		},
+		"categories_to_ints": {
+			"healing": {0: true},
+			"mana": {1: true},
+			"throwable": {2: true, 3: true},
+			"poison": {2: true},
+			"acid": {3: true}
+		}
+	}
+}

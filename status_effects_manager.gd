@@ -4,6 +4,8 @@ class_name StatusEffectsManager
 # Signal emitted when effects change for an entity
 signal effects_changed(entity: Node)
 
+
+
 # Configuration for visual quality
 const USE_CLEAN_FALLBACK_EFFECTS = false  # Set to false to use full PNG animation with quality settings
 
@@ -22,7 +24,10 @@ enum EFFECT_TYPE {
 	SLOW,
 	BLEED,
 	FREEZE,
-	SHOCK
+	SHOCK,
+	PARALYSIS,
+	FROSTBITE,
+	BLESSING
 }
 
 # Base status effect class
@@ -59,6 +64,8 @@ class StatusEffect:
 			var target_node = _find_take_damage_target()
 			if target_node and target_node.has_method("take_damage"):
 				target_node.take_damage(damage_dealt, damage_type)
+				
+
 		
 		if remaining_duration <= 0:
 			is_active = false
@@ -92,6 +99,12 @@ class StatusEffect:
 				return "freeze"
 			EFFECT_TYPE.SHOCK:
 				return "shock"
+			EFFECT_TYPE.BLESSING:
+				return "holy"
+			EFFECT_TYPE.PARALYSIS:
+				return "lightning"  # Paralysis is lightning-based
+			EFFECT_TYPE.FROSTBITE:
+				return "ice"  # Frostbite is ice damage
 			EFFECT_TYPE.BONE_BREAK:
 				return "physical"  # Bone break is physical damage
 			EFFECT_TYPE.STUN:
@@ -112,6 +125,32 @@ class StatusEffect:
 	
 	func get_visual_effect() -> Node:
 		return visual_effect
+	
+	func _get_effect_name(effect_type: EFFECT_TYPE) -> String:
+		"""Get the display name for a status effect type"""
+		match effect_type:
+			EFFECT_TYPE.POISON:
+				return "poison"
+			EFFECT_TYPE.IGNITE:
+				return "ignite"
+			EFFECT_TYPE.BLEED:
+				return "bleed"
+			EFFECT_TYPE.FREEZE:
+				return "freeze"
+			EFFECT_TYPE.SHOCK:
+				return "shock"
+			EFFECT_TYPE.PARALYSIS:
+				return "paralysis"
+			EFFECT_TYPE.BONE_BREAK:
+				return "bone break"
+			EFFECT_TYPE.STUN:
+				return "stun"
+			EFFECT_TYPE.SLOW:
+				return "slow"
+			_:
+				return "unknown effect"
+	
+
 
 # Status effects manager for a single entity (player or enemy)
 class EntityStatusEffects:
@@ -193,6 +232,8 @@ class EntityStatusEffects:
 				_create_freeze_effect(effect)
 			EFFECT_TYPE.SHOCK:
 				_create_shock_effect(effect)
+			EFFECT_TYPE.PARALYSIS:
+				_create_paralysis_effect(effect)
 	
 	func _create_poison_effect(effect: StatusEffect):
 		"""Create a poison visual effect"""
@@ -480,6 +521,37 @@ class EntityStatusEffects:
 		# Placeholder for future shock effects
 		pass
 	
+	func _create_paralysis_effect(_effect: StatusEffect):
+		"""Create a paralysis visual effect with lightning/electrical theme"""
+		# Create a Sprite3D to display the paralysis effect
+		var paralysis_sprite = Sprite3D.new()
+		paralysis_sprite.name = "ParalysisEffect"
+		
+		# Create a simple lightning/electrical effect
+		paralysis_sprite.modulate = Color(1.0, 1.0, 0.3, 0.8)  # Bright yellow with transparency
+		
+		# Position the effect above the entity
+		var effect_height = _get_visual_bounds_height(entity) + 0.5
+		paralysis_sprite.position = Vector3(0, effect_height, 0)
+		
+		# Add to visual effects container
+		visual_effects_container.add_child(paralysis_sprite)
+		
+		# Store reference to visual effect
+		_effect.set_visual_effect(paralysis_sprite)
+		
+		# Create a pulsing animation effect using the entity's create_tween
+		if entity.has_method("create_tween"):
+			var tween = entity.create_tween()
+			tween.set_loops()  # Loop indefinitely
+			tween.tween_property(paralysis_sprite, "modulate:a", 0.3, 0.5)
+			tween.tween_property(paralysis_sprite, "modulate:a", 0.8, 0.5)
+		else:
+			# Fallback: just set a static alpha value if tweening isn't available
+			paralysis_sprite.modulate.a = 0.6
+		
+		print("⚡ Created paralysis visual effect for ", entity.name)
+	
 	func remove_effect(effect_type: EFFECT_TYPE):
 		"""Remove a specific status effect"""
 		for i in range(effects.size()):
@@ -641,26 +713,33 @@ func apply_effect(entity: Node, effect_type: EFFECT_TYPE, damage: int, duration:
 	# Log status effect to combat log
 	var entity_name = "Unknown"
 	if entity.has_method("enemy_name"):
-		entity_name = entity.enemy_name
+		entity_name = entity.enemy_name()
 	elif entity.has_method("get_name"):
 		entity_name = entity.get_name()
-	elif entity.name:
-		entity_name = entity.name
+	elif "name" in entity:
+		var name_property = entity.name
+		entity_name = name_property if name_property is String else str(name_property)
 	
 	var effect_name = ""
 	match effect_type:
-		EFFECT_TYPE.POISON:
-			effect_name = "poisoned"
-		EFFECT_TYPE.IGNITE:
-			effect_name = "ignited"
-		EFFECT_TYPE.BONE_BREAK:
-			effect_name = "bone broken"
-		EFFECT_TYPE.STUN:
-			effect_name = "stunned"
-		EFFECT_TYPE.SLOW:
-			effect_name = "slowed"
-		_:
-			effect_name = "affected by status effect"
+			EFFECT_TYPE.POISON:
+				effect_name = "poisoned"
+			EFFECT_TYPE.IGNITE:
+				effect_name = "ignited"
+			EFFECT_TYPE.BONE_BREAK:
+				effect_name = "bone broken"
+			EFFECT_TYPE.STUN:
+				effect_name = "stunned"
+			EFFECT_TYPE.SLOW:
+				effect_name = "slowed"
+			EFFECT_TYPE.FREEZE:
+				effect_name = "frozen"
+			EFFECT_TYPE.FROSTBITE:
+				effect_name = "frostbitten"
+			EFFECT_TYPE.BLESSING:
+				effect_name = "blessed"
+			_:
+				effect_name = "affected by status effect"
 	
 	# Try to log to combat manager if available
 	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
@@ -678,11 +757,12 @@ func remove_effect(entity: Node, effect_type: EFFECT_TYPE):
 		# Log status effect removal to combat log
 		var entity_name = "Unknown"
 		if entity.has_method("enemy_name"):
-			entity_name = entity.enemy_name
+			entity_name = entity.enemy_name()
 		elif entity.has_method("get_name"):
 			entity_name = entity.get_name()
-		elif entity.name:
-			entity_name = entity.name
+		elif "name" in entity:
+			var name_property = entity.name
+			entity_name = name_property if name_property is String else str(name_property)
 		
 		var effect_name = ""
 		match effect_type:
@@ -696,6 +776,14 @@ func remove_effect(entity: Node, effect_type: EFFECT_TYPE):
 				effect_name = "stun"
 			EFFECT_TYPE.SLOW:
 				effect_name = "slow"
+			EFFECT_TYPE.FREEZE:
+				effect_name = "freeze"
+			EFFECT_TYPE.PARALYSIS:
+				effect_name = "paralysis"
+			EFFECT_TYPE.FROSTBITE:
+				effect_name = "frostbite"
+			EFFECT_TYPE.BLESSING:
+				effect_name = "blessing"
 			_:
 				effect_name = "status effect"
 		
@@ -737,7 +825,7 @@ func get_effects_debug_info(entity: Node) -> Dictionary:
 		return {"error": "No effects found for entity"}
 	
 	var info = {
-		"entity_name": entity.name,
+		"entity_name": str(entity.name),
 		"total_effects": entity_effects[entity].effects.size(),
 		"active_effects": []
 	}
@@ -773,6 +861,79 @@ func apply_stun(entity: Node, duration: int, source: Node):
 func apply_slow(entity: Node, duration: int, source: Node):
 	"""Apply slow effect (no damage, just duration)"""
 	apply_effect(entity, EFFECT_TYPE.SLOW, 0, duration, source)
+
+func apply_paralysis(entity: Node, duration: int, source: Node):
+	"""Apply paralysis effect with overload mechanic"""
+	# Check if entity already has paralysis from lightning
+	if has_effect(entity, EFFECT_TYPE.PARALYSIS):
+		# Trigger overload - lightning explosion in radius
+		_trigger_lightning_overload(entity, source)
+		# Remove the existing paralysis effect
+		remove_effect(entity, EFFECT_TYPE.PARALYSIS)
+		return
+	
+	# Apply normal paralysis effect
+	apply_effect(entity, EFFECT_TYPE.PARALYSIS, 0, duration, source)
+
+func apply_freeze(entity: Node, duration: int, source: Node):
+	"""Apply freeze effect (no damage, just duration)"""
+	apply_effect(entity, EFFECT_TYPE.FREEZE, 0, duration, source)
+
+func apply_frostbite(entity: Node, damage_per_action: int, duration: int, source: Node):
+	"""Apply frostbite effect - deals damage when entity takes actions"""
+	apply_effect(entity, EFFECT_TYPE.FROSTBITE, damage_per_action, duration, source)
+
+func apply_blessing(entity: Node, duration: int, source: Node):
+	"""Apply blessing effect - provides random buffs"""
+	apply_effect(entity, EFFECT_TYPE.BLESSING, 0, duration, source)
+
+func _trigger_lightning_overload(entity: Node, source: Node):
+	"""Trigger lightning overload explosion when paralysis is applied again"""
+	var entity_name = str(entity.name)
+	print("⚡ Lightning overload triggered on ", entity_name, "!")
+	
+	# Calculate overload damage (based on source's lightning damage or fixed value)
+	var overload_damage = 25  # Base overload damage
+	if source and source.has_method("get_lightning_damage"):
+		overload_damage = source.get_lightning_damage()
+	
+	# Find entities in radius for area damage
+	var radius = 3.0  # 3 unit radius
+	var entities_in_radius = _find_entities_in_radius(entity.global_position, radius)
+	
+	# Apply lightning damage to all entities in radius (including the source of overload)
+	for target_entity in entities_in_radius:
+		if target_entity.has_method("take_damage"):
+			target_entity.take_damage(overload_damage, "lightning")
+			var target_name = str(target_entity.name)
+			print("⚡ Overload hit ", target_name, " for ", overload_damage, " lightning damage!")
+	
+	# Log to combat manager if available
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager and combat_manager.has_method("_log_combat_event"):
+		var overload_entity_name = str(entity.name)
+		combat_manager._log_combat_event("⚡ " + overload_entity_name + " overloaded with lightning, dealing " + str(overload_damage) + " damage to nearby targets!")
+
+func _find_entities_in_radius(center_position: Vector3, radius: float) -> Array:
+	"""Find all entities within a radius of the given position"""
+	var entities = []
+	
+	# Get all nodes in the scene
+	var scene_tree = get_tree()
+	if not scene_tree:
+		return entities
+	
+	# Look for entities with take_damage method (players, enemies, etc.)
+	var all_nodes = scene_tree.get_nodes_in_group("Player")
+	all_nodes.append_array(scene_tree.get_nodes_in_group("Enemy"))
+	
+	for node in all_nodes:
+		if node.has_method("take_damage") and is_instance_valid(node):
+			var distance = center_position.distance_to(node.global_position)
+			if distance <= radius:
+				entities.append(node)
+	
+	return entities
 
 func refresh_visual_effects(entity: Node):
 	"""Manually refresh visual effects for an entity (useful for debugging)"""

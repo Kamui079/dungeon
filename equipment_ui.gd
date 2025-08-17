@@ -126,7 +126,7 @@ func _initialize_equipment_slots():
 	add_to_group("EquipmentUI")
 	hide()
 
-func _input(event):
+func _input(_event):
 	if Input.is_action_just_pressed("character_screen"):
 		toggle_panel()
 		# Consume this input event so it doesn't interfere with other systems

@@ -5,6 +5,9 @@ class_name AnimationManager
 enum ANIMATION_TYPE {
 	FIRE_MAGIC,
 	FROST_MAGIC,
+	LIGHTNING_MAGIC,
+	ICE_MAGIC,
+	HOLY_MAGIC,
 	PHYSICAL_ATTACK,
 	THROW_ATTACK
 }
@@ -13,6 +16,9 @@ enum ANIMATION_TYPE {
 var animation_durations = {
 	ANIMATION_TYPE.FIRE_MAGIC: 3.0,
 	ANIMATION_TYPE.FROST_MAGIC: 4.0,
+	ANIMATION_TYPE.LIGHTNING_MAGIC: 2.5,
+	ANIMATION_TYPE.ICE_MAGIC: 3.5,
+	ANIMATION_TYPE.HOLY_MAGIC: 3.5,
 	ANIMATION_TYPE.PHYSICAL_ATTACK: 2.0,
 	ANIMATION_TYPE.THROW_ATTACK: 2.5
 }
@@ -110,8 +116,8 @@ func play_attack_animation_with_damage(actor: Node, animation_type: ANIMATION_TY
 	if will_use_moving_effect:
 		# For moving effects, don't create a timer - the visual animation will trigger damage when it completes
 		print("🎬 Using moving attack effect - damage will trigger when animation completes")
-		# Store the damage info for the moving effect to use
-		actor.set_meta("pending_damage", {"damage": damage, "damage_type": damage_type, "target": target})
+		# Store the damage info for the moving effect to use, including the animation type
+		actor.set_meta("pending_damage", {"damage": damage, "damage_type": damage_type, "target": target, "animation_type": animation_type})
 	else:
 		# For static effects, use the timer system as before
 		print("🎬 Using static attack effect - creating timer for damage")
@@ -222,6 +228,12 @@ func _play_animation_effect(actor: Node, animation_type: ANIMATION_TYPE) -> void
 			_play_fire_magic_effect(actor, "🔥 FIRE MAGIC", "fire")
 		ANIMATION_TYPE.FROST_MAGIC:
 			_play_frost_magic_effect(actor, "❄️ FROST MAGIC", "ice")
+		ANIMATION_TYPE.LIGHTNING_MAGIC:
+			_play_lightning_magic_effect(actor, "⚡ LIGHTNING MAGIC", "lightning")
+		ANIMATION_TYPE.ICE_MAGIC:
+			_play_ice_magic_effect(actor, "❄️ ICE MAGIC", "ice")
+		ANIMATION_TYPE.HOLY_MAGIC:
+			_play_holy_magic_effect(actor, "✨ HOLY MAGIC", "holy")
 		ANIMATION_TYPE.PHYSICAL_ATTACK:
 			_play_physical_attack_effect(actor, "⚔️ PHYSICAL ATTACK", "physical")
 		ANIMATION_TYPE.THROW_ATTACK:
@@ -280,6 +292,69 @@ func _play_frost_magic_effect(actor: Node, attack_name: String, attack_type: Str
 		actor_name = str(actor)
 	
 	print("❄️ Playing frost magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
+func _play_lightning_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play lightning magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("⚡ Playing lightning magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
+func _play_ice_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play ice magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("❄️ Playing ice magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
+func _play_holy_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play holy magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("✨ Playing holy magic effect for ", actor_name)
 	
 	# Get the target for this attack
 	var target = _get_target_for_actor(actor)
@@ -507,6 +582,12 @@ func _get_animation_name(animation_type: ANIMATION_TYPE) -> String:
 			return "Fire Magic"
 		ANIMATION_TYPE.FROST_MAGIC:
 			return "Frost Magic"
+		ANIMATION_TYPE.LIGHTNING_MAGIC:
+			return "Lightning Magic"
+		ANIMATION_TYPE.ICE_MAGIC:
+			return "Ice Magic"
+		ANIMATION_TYPE.HOLY_MAGIC:
+			return "Holy Magic"
 		ANIMATION_TYPE.PHYSICAL_ATTACK:
 			return "Physical Attack"
 		ANIMATION_TYPE.THROW_ATTACK:
@@ -633,22 +714,40 @@ func _create_moving_attack_effect(actor: Node, text: String, attack_type: String
 			var damage = damage_info.get("damage", 0)
 			var damage_type = damage_info.get("damage_type", "")
 			var damage_target = damage_info.get("target", target)
+			var animation_type = damage_info.get("animation_type", ANIMATION_TYPE.PHYSICAL_ATTACK)
 			
 			print("🎬 Emitting damage signal immediately for moving attack effect")
-			animation_damage_ready.emit(AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK, actor, damage_target, damage, damage_type)
+			animation_damage_ready.emit(animation_type, actor, damage_target, damage, damage_type)
 			
 			# Clean up the stored damage info
 			actor.remove_meta("pending_damage")
 			
-			# Finish the animation
-			_finish_animation(actor, AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK)
+			# Finish the animation with the correct animation type
+			_finish_animation(actor, animation_type)
+		elif actor.has_meta("pending_spell_damage"):
+			# Handle spell damage (this will be processed by the combat manager)
+			var spell_info = actor.get_meta("pending_spell_damage")
+			var damage = spell_info.get("elemental_damage", 0) + spell_info.get("spell_damage", 0)
+			var damage_type = spell_info.get("elemental_type", "physical")
+			var spell_id = spell_info.get("spell_id", "unknown")
+			
+			print("🎬 Emitting damage signal immediately for moving spell effect: ", spell_id)
+			# Use the animation type from the stored pending damage if available
+			var animation_type = spell_info.get("animation_type", ANIMATION_TYPE.FIRE_MAGIC)
+			animation_damage_ready.emit(animation_type, actor, target, damage, damage_type)
+			
+			# Clean up the stored spell data
+			actor.remove_meta("pending_spell_damage")
+			
+			# Finish the animation with the correct animation type
+			_finish_animation(actor, animation_type)
 		else:
 			print("⚠️ No pending damage info found for moving attack effect")
 	)
 	
 	print("🎬 Started moving attack effect animation")
 
-func _will_use_moving_effect(actor: Node, animation_type: ANIMATION_TYPE) -> bool:
+func _will_use_moving_effect(actor: Node, _animation_type: ANIMATION_TYPE) -> bool:
 	"""Check if this animation will use a moving attack effect"""
 	# Check if there's a target available for this actor
 	var target = _get_target_for_actor(actor)

@@ -93,7 +93,7 @@ theme_override_constants/separation = 6
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
 theme_override_font_sizes/font_size = 18
-text = "COMBAT LOG"
+text = "COMBAT LOG (Press L to toggle)"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -101,23 +101,16 @@ vertical_alignment = 1
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="CombatLogText" type="TextEdit" parent="CombatLogPanel/VBoxContainer"]
+[node name="CombatLogText" type="RichTextLabel" parent="CombatLogPanel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_colors/background_color = Color(0.1, 0.12, 0.14, 0.8)
-theme_override_colors/font_readonly_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-placeholder_text = "Combat events will appear here..."
-editable = false
-context_menu_enabled = false
-shortcut_keys_enabled = false
-selecting_enabled = false
-deselect_on_focus_loss_enabled = false
-drag_and_drop_selection_enabled = false
-virtual_keyboard_enabled = false
-middle_mouse_paste_enabled = false
+theme_override_colors/default_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5)
+bbcode_enabled = true
+scroll_following = true
 
 [node name="CombatPanel" type="Panel" parent="."]
 anchors_preset = 3
@@ -412,6 +405,22 @@ tooltip_text = "A ranged fire spell that deals fire damage and may ignite the ta
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_font_sizes/font_size = 14
 text = "Fireball (15 MP)"
+
+[node name="LightningBoltButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "A lightning spell that deals lightning damage and may paralyze the target"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Lightning Bolt (20 MP)"
+
+[node name="IcicleButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "An ice spell that deals ice damage and may freeze or frostbite the target"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Icicle (18 MP)"
 
 [node name="HSeparator2" type="HSeparator" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2

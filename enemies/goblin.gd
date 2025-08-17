@@ -7,6 +7,10 @@ const AnimationManager = preload("res://animation_manager.gd")
 # Enemy functionality will be added via composition
 var enemy_behavior: Node = null
 
+# Custom display name override (optional)
+func get_custom_display_name() -> String:
+	return "Goblin"
+
 func _ready():
 	# Create enemy behavior component
 	enemy_behavior = preload("enemy.gd").new()
@@ -22,13 +26,19 @@ func _ready():
 	enemy_behavior.base_mana = 20
 	enemy_behavior.damage_range_min = 8
 	enemy_behavior.damage_range_max = 12
-	enemy_behavior.enemy_level = 4
+	enemy_behavior.enemy_level = 1
+	
+	# Note: Display name is now handled automatically by the base class
 	
 	# Enemy database integration
 	enemy_behavior.enemy_id = "goblin"
 	enemy_behavior.enemy_category = "humanoids"
 	enemy_behavior.enemy_rarity = 1  # Common
 	enemy_behavior.enemy_tags = ["goblin", "humanoid", "dungeon", "low_level"]
+	
+	# Enemy type system
+	enemy_behavior.enemy_type = enemy_behavior.ENEMY_TYPE.HUMANOID
+	enemy_behavior.enemy_subtype = enemy_behavior.ENEMY_SUBTYPE.WARRIOR
 	
 	# Global systems integration - Goblins are vulnerable to most effects
 	enemy_behavior.can_be_poisoned = true
@@ -72,6 +82,8 @@ func enemy_name() -> String:
 	if enemy_behavior:
 		return enemy_behavior.enemy_name
 	return "Goblin"  # Fallback name
+
+# Note: get_enemy_name() is now inherited from the base enemy class
 
 # Override virtual functions - these are inherited from Enemy class
 # Custom behavior can be added here if needed

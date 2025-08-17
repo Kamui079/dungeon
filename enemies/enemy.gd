@@ -1,7 +1,35 @@
 extends Node
 
+# Enemy type constants
+# These define the main categories of enemies in the game
+const ENEMY_TYPE = {
+	"CREATURE": "creature",      # Natural animals and beasts (rats, wolves, bears)
+	"UNDEAD": "undead",          # Undead creatures (skeletons, zombies, ghosts)
+	"HUMANOID": "humanoid",      # Human-like beings (goblins, orcs, humans)
+	"DEMONIC": "demonic",        # Demons and infernal beings (imps, succubi, demon lords)
+	"ELEMENTAL": "elemental",    # Pure elemental beings (fire spirits, ice wraiths)
+	"CONSTRUCT": "construct"     # Artificial or magically created (golems, robots, enchanted armor)
+}
+
+# Enemy subtype constants
+# These provide more specific categorization within each enemy type
+const ENEMY_SUBTYPE = {
+	"BEAST": "beast",                    # General animal subtype
+	"SKELETON": "skeleton",              # Undead skeleton subtype
+	"WARRIOR": "warrior",                # Combat-focused humanoid
+	"DEMON": "demon",                    # General demon subtype
+	"FIRE_ELEMENTAL": "fire_elemental",  # Fire-based elemental
+	"ICE_ELEMENTAL": "ice_elemental",    # Ice-based elemental
+	"LIGHTNING_ELEMENTAL": "lightning_elemental", # Lightning-based elemental
+	"EARTH_ELEMENTAL": "earth_elemental", # Earth-based elemental
+	"GOLEM": "golem",                    # Magical construct made of stone/earth
+	"ROBOT": "robot",                    # Mechanical construct
+	"ENCHANTED_ARMOR": "enchanted_armor" # Magically animated armor
+}
+
 # Base enemy properties
 @export var enemy_name: String = "Enemy"
+@export var display_name: String = ""  # Custom display name override
 @export var move_speed: float = 2.5
 @export var detection_range: float = 4.0
 @export var combat_range: float = 2.0
@@ -18,6 +46,18 @@ extends Node
 @export var enemy_rarity: int = 1  # Rarity level (1=common, 2=uncommon, 3=rare, 4=epic, 5=legendary)
 @export var enemy_tags: Array = []  # Tags for filtering and effects
 
+# Enemy type system
+# Use the constants above for consistent typing across the game
+# Examples:
+# - Big Rat: type="creature", subtype="beast"
+# - Skeleton: type="undead", subtype="skeleton" 
+# - Goblin: type="humanoid", subtype="warrior"
+# - Fire Imp: type="demonic", subtype="demon"
+# - Ice Wraith: type="elemental", subtype="ice_elemental"
+# - Stone Golem: type="construct", subtype="golem"
+@export var enemy_type: String = "creature"  # Main type: creature, undead, humanoid, demonic, elemental, construct, etc.
+@export var enemy_subtype: String = ""  # Subtype: beast, skeleton, warrior, demon, fire_elemental, golem, etc.
+
 # Global systems integration flags
 @export var can_be_poisoned: bool = true
 @export var can_be_ignited: bool = true
@@ -27,6 +67,7 @@ extends Node
 @export var can_be_shocked: bool = true
 @export var can_be_bleeding: bool = true
 @export var can_be_bone_broken: bool = true
+@export var can_be_paralyzed: bool = true
 
 # Loot and rewards
 @export var base_gold_reward: int = 5
@@ -308,10 +349,21 @@ func take_damage(amount: int, damage_type: String = "physical"):
 	if is_dead or is_processing_death:
 		return
 	
+	# Check for holy damage bonus against undead and demonic
+	var final_amount = amount
+	if damage_type == "holy":
+		var effectiveness = get_type_effectiveness("holy")
+		if effectiveness > 1.0:
+			var bonus_multiplier = effectiveness - 1.0
+			var holy_bonus = int(amount * bonus_multiplier)
+			final_amount = amount + holy_bonus
+			var enemy_type_name = get_effective_enemy_type()
+			print("✨ Holy damage deals bonus damage to ", enemy_type_name, "! Base: ", amount, " + Bonus: ", holy_bonus, " = Total: ", final_amount)
+	
 	# Apply damage to stats
 	if stats:
-		stats.take_damage(amount)
-		print(enemy_name, " took ", amount, " ", damage_type, " damage! Health: ", stats.health, "/", stats.max_health)
+		stats.take_damage(final_amount)
+		print(enemy_name, " took ", final_amount, " ", damage_type, " damage! Health: ", stats.health, "/", stats.max_health)
 	
 	# Spawn damage number
 	_spawn_damage_number(amount, damage_type)
@@ -417,6 +469,104 @@ func spend_spirit(cost: int) -> bool:
 	print(enemy_name, " spent ", cost, " spirit! Remaining: ", spirit, "/", max_spirit)
 	return true
 
+func _is_undead() -> bool:
+	"""Check if this enemy is undead (skeleton, zombie, etc.)"""
+	# Check the enemy type first
+	if enemy_type == "undead":
+		return true
+	
+	# Check enemy tags for undead-related tags
+	for tag in enemy_tags:
+		if tag.to_lower() in ["undead", "skeleton", "zombie", "ghost", "specter", "wraith"]:
+			return true
+	
+	# Fallback: check if the enemy name contains undead keywords
+	var enemy_name_lower = enemy_name.to_lower()
+	return enemy_name_lower.contains("skeleton") or enemy_name_lower.contains("zombie") or enemy_name_lower.contains("ghost") or enemy_name_lower.contains("undead")
+
+func is_enemy_type(check_type: String) -> bool:
+	"""Check if this enemy is of a specific type"""
+	return enemy_type == check_type
+
+func has_enemy_tag(check_tag: String) -> bool:
+	"""Check if this enemy has a specific tag"""
+	for tag in enemy_tags:
+		if tag.to_lower() == check_tag.to_lower():
+			return true
+	return false
+
+func get_enemy_type_info() -> Dictionary:
+	"""Get comprehensive enemy type information"""
+	return {
+		"type": enemy_type,
+		"subtype": enemy_subtype,
+		"tags": enemy_tags,
+		"rarity": enemy_rarity,
+		"category": enemy_category
+	}
+
+func is_demonic() -> bool:
+	"""Check if this enemy is demonic"""
+	return enemy_type == ENEMY_TYPE.DEMONIC or has_enemy_tag("demon") or has_enemy_tag("demonic")
+
+func is_elemental() -> bool:
+	"""Check if this enemy is elemental"""
+	return enemy_type == ENEMY_TYPE.ELEMENTAL or has_enemy_tag("elemental") or has_enemy_tag("fire") or has_enemy_tag("ice") or has_enemy_tag("lightning") or has_enemy_tag("earth")
+
+func is_undead() -> bool:
+	"""Check if this enemy is undead (skeleton, zombie, ghost, etc.)"""
+	return enemy_type == ENEMY_TYPE.UNDEAD or has_enemy_tag("undead") or has_enemy_tag("skeleton") or has_enemy_tag("zombie") or has_enemy_tag("ghost")
+
+func is_construct() -> bool:
+	"""Check if this enemy is a construct (golem, robot, enchanted armor, etc.)"""
+	return enemy_type == ENEMY_TYPE.CONSTRUCT or has_enemy_tag("construct") or has_enemy_tag("golem") or has_enemy_tag("robot") or has_enemy_tag("enchanted") or has_enemy_tag("artificial")
+
+func get_effective_enemy_type() -> String:
+	"""Get the effective enemy type, considering both type and tags"""
+	if is_undead():
+		return ENEMY_TYPE.UNDEAD
+	elif is_demonic():
+		return ENEMY_TYPE.DEMONIC
+	elif is_elemental():
+		return ENEMY_TYPE.ELEMENTAL
+	elif is_construct():
+		return ENEMY_TYPE.CONSTRUCT
+	elif is_enemy_type(ENEMY_TYPE.HUMANOID):
+		return ENEMY_TYPE.HUMANOID
+	else:
+		return enemy_type
+
+func get_type_effectiveness(damage_type: String) -> float:
+	"""Get damage effectiveness multiplier based on enemy type vs damage type"""
+	# This can be expanded for future type-based damage systems
+	match damage_type.to_lower():
+		"holy":
+			if is_undead():
+				return 1.5  # Holy damage is 50% more effective against undead
+			elif is_demonic():
+				return 1.3  # Holy damage is 30% more effective against demons
+			else:
+				return 1.0  # Normal effectiveness
+		"lightning":
+			if is_construct():
+				return 1.4  # Lightning is 40% more effective against constructs
+			elif is_elemental() and enemy_subtype.find("water") >= 0:
+				return 1.6  # Lightning is 60% more effective against water elementals
+			else:
+				return 1.0  # Normal effectiveness
+		"fire":
+			if is_elemental() and enemy_subtype.find("ice") >= 0:
+				return 1.5  # Fire is 50% more effective against ice elementals
+			else:
+				return 1.0  # Normal effectiveness
+		"ice":
+			if is_elemental() and enemy_subtype.find("fire") >= 0:
+				return 1.5  # Ice is 50% more effective against fire elementals
+			else:
+				return 1.0  # Normal effectiveness
+		_:
+			return 1.0  # Default effectiveness for other damage types
+
 func can_use_special_attack() -> bool:
 	# Override in specific enemy types to check spirit cost
 	return true
@@ -503,6 +653,13 @@ func melee_attack():
 				combat_manager.end_current_turn()
 		else:
 			print(enemy_name, " WARNING: No combat manager to end turn!")
+
+# Lightning paralysis methods for enemies
+func get_lightning_paralysis_chance() -> float: return 25.0
+func is_lightning_attack(attack_type: String) -> bool:
+	match attack_type:
+		"lightning_bolt", "lightning_weapon_basic", "lightning_weapon_special": return true
+		_: return false
 
 func move_to_target(target: Node):
 	print(enemy_name, " DEBUG: BASE ENEMY move_to_target() called!")
@@ -965,6 +1122,25 @@ func get_camera() -> Camera3D:
 			return camera
 	return null
 
+func get_enemy_name() -> String:
+	"""Get the enemy's display name - automatically derived from custom override or fallback"""
+	# Check if there's a custom display name set
+	if has_method("get_custom_display_name"):
+		var custom_name = get_custom_display_name()
+		if custom_name and custom_name != "":
+			return custom_name
+	
+	# Check if display_name property is set
+	if display_name != "":
+		return display_name
+	
+	# Fallback to the enemy_name property
+	return enemy_name
+
+func get_custom_display_name() -> String:
+	"""Override this method in subclasses to provide custom display names"""
+	return ""
+
 func get_experience_reward() -> int:
 	"""Get the experience reward for defeating this enemy"""
 	# Base experience reward based on enemy level
@@ -1215,6 +1391,8 @@ func can_receive_status_effect(effect_type: String) -> bool:
 			return can_be_bleeding
 		"bone_break":
 			return can_be_bone_broken
+		"paralysis":
+			return can_be_paralyzed
 		_:
 			return true  # Default to allowing unknown effects
 
@@ -1264,6 +1442,8 @@ func apply_status_effect(effect_type: String, damage: int, duration: int, source
 				status_manager.apply_poison(self, adjusted_damage, adjusted_duration, source)
 			"ignite":
 				status_manager.apply_ignite(self, adjusted_damage, adjusted_duration, source)
+			"paralysis":
+				status_manager.apply_paralysis(self, adjusted_duration, source)
 			"stun":
 				status_manager.apply_stun(self, adjusted_duration, source)
 			"slow":
