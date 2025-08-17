@@ -1,10 +1,10 @@
-extends CanvasLayer
+extends Control
 
 class_name HUD
 
-@onready var health_bar: ProgressBar = $Margin/VBox/HBoxHealth/HealthBar
-@onready var mana_bar: ProgressBar = $Margin/VBox/HBoxMana/ManaBar
-@onready var spirit_bar: ProgressBar = $Margin/VBox/HBoxSpirit/SpiritBar
+@onready var health_bar: ProgressBar = $Margin/HBox/VBox/HBoxHealth/HealthBar
+@onready var mana_bar: ProgressBar = $Margin/HBox/VBox/HBoxMana/ManaBar
+@onready var spirit_bar: ProgressBar = $Margin/HBox/VBox/HBoxSpirit/SpiritBar
 @onready var health_value: Label = $Margin/HBox/VBox/HBoxHealth/HealthBar/HealthValue
 @onready var mana_value: Label = $Margin/HBox/VBox/HBoxMana/ManaBar/ManaValue
 @onready var spirit_value: Label = $Margin/HBox/VBox/HBoxSpirit/SpiritBar/SpiritValue
@@ -17,6 +17,9 @@ func _ready():
 	
 	# Hide spirit bar by default (only show during combat)
 	hide_spirit_bar()
+	
+	# Connect to combat manager signals for enemy panel updates
+	call_deferred("_connect_combat_signals")
 
 func set_health(current: int, maximum: int) -> void:
 	if not health_bar:
@@ -97,12 +100,53 @@ func flash_damage() -> void:
 	# Placeholder for effects
 	pass
 
+func _connect_combat_signals():
+	"""Connect to combat manager signals for enemy panel updates"""
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager:
+		# Connect to enemy damaged signal to update panels
+		if combat_manager.has_signal("enemy_damaged"):
+			combat_manager.enemy_damaged.connect(_on_enemy_damaged)
+			print("HUD: Connected to enemy_damaged signal")
+		else:
+			print("HUD: CombatManager missing enemy_damaged signal")
+	else:
+		print("HUD: No CombatManager found for signal connection")
+
+func _on_enemy_damaged(enemy: Node, attack_type: String, damage: int):
+	"""Called when an enemy takes damage - update their panel"""
+	if enemy and is_instance_valid(enemy):
+		var panel = get_enemy_panel(enemy)
+		if panel:
+			update_enemy_panel(panel, enemy)
+			var enemy_display_name = "Unknown Enemy"
+			if enemy.has_method("enemy_name"):
+				enemy_display_name = enemy.enemy_name()
+			elif enemy.name:
+				enemy_display_name = enemy.name
+			print("HUD: Updated enemy panel for ", enemy_display_name, " after taking ", damage, " damage")
+		else:
+			var enemy_display_name = "Unknown Enemy"
+			if enemy.has_method("enemy_name"):
+				enemy_display_name = enemy.enemy_name()
+			elif enemy.name:
+				enemy_display_name = enemy.name
+			print("HUD: No panel found for enemy ", enemy_display_name)
+
 # Enemy Panel Management
 func create_enemy_panel(enemy: Node) -> void:
 	"""Create a simple enemy info panel"""
 	var panel = Panel.new()
 	panel.custom_minimum_size = Vector2(200, 80)
-	panel.name = "EnemyPanel_" + enemy.name
+	
+	# Use proper enemy name for panel identification, not internal node name
+	var enemy_display_name = "Unknown Enemy"
+	if enemy.has_method("enemy_name"):
+		enemy_display_name = enemy.enemy_name()
+	elif enemy.name:
+		enemy_display_name = enemy.name
+	
+	panel.name = "EnemyPanel_" + enemy_display_name
 	
 	# Create panel style
 	var style = StyleBoxFlat.new()
@@ -130,7 +174,7 @@ func create_enemy_panel(enemy: Node) -> void:
 	
 	# Enemy name
 	var name_label = Label.new()
-	name_label.text = enemy.name
+	name_label.text = enemy_display_name
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_color_override("font_color", Color(1, 0.95, 0.8, 1))
 	name_label.add_theme_font_size_override("font_size", 12)
@@ -244,7 +288,15 @@ func highlight_focused_enemy(enemy: Node) -> void:
 	var focused_panel = get_enemy_panel(enemy)
 	if focused_panel:
 		_apply_panel_glow(focused_panel, true)
-		print("HUD: Highlighted focused enemy panel: ", enemy.name)
+		
+		# Get proper enemy display name for logging
+		var enemy_display_name = "Unknown Enemy"
+		if enemy.has_method("enemy_name"):
+			enemy_display_name = enemy.enemy_name()
+		elif enemy.name:
+			enemy_display_name = enemy.name
+		
+		print("HUD: Highlighted focused enemy panel: ", enemy_display_name)
 
 func _apply_panel_glow(panel: Control, is_focused: bool) -> void:
 	"""Apply or remove glow effect to an enemy panel"""

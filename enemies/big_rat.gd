@@ -1,6 +1,15 @@
 extends CharacterBody3D
 class_name BigRat
 
+# Import AnimationManager for type safety
+const AnimationManager = preload("res://animation_manager.gd")
+
+# Test if AnimationManager is accessible
+func _test_animation_manager_access():
+	print("🎯 Big Rat - Testing AnimationManager access")
+	print("🎯 Big Rat - AnimationManager constant: ", AnimationManager)
+	print("🎯 Big Rat - AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK: ", AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK)
+
 # Enemy functionality will be added via composition
 var enemy_behavior: Node = null
 
@@ -8,6 +17,9 @@ var enemy_behavior: Node = null
 # Individual poison variables removed in favor of centralized system
 
 func _ready():
+	# Add to Enemy group for easy finding by combat systems
+	add_to_group("Enemy")
+	
 	# Create enemy behavior component
 	enemy_behavior = preload("enemy.gd").new()
 	add_child(enemy_behavior)
@@ -65,9 +77,18 @@ func _ready():
 	# Initialize status bars
 	_create_bar_textures()
 	hide_status_bars()
+	
+	# Test AnimationManager access
+	_test_animation_manager_access()
 
 # Override virtual functions - these are inherited from Enemy class
 # Custom behavior can be added here if needed
+
+# Getter method for enemy name (used by combat system)
+func enemy_name() -> String:
+	if enemy_behavior:
+		return enemy_behavior.enemy_name
+	return "Big Rat"  # Fallback name
 
 # Attack functions
 func get_basic_attack_damage() -> int:
@@ -103,7 +124,9 @@ func can_use_special_attack() -> bool:
 
 # Combat functions
 func melee_attack():
+	print("🎯 Big Rat melee_attack() called!")
 	if not enemy_behavior or not enemy_behavior.in_combat or not enemy_behavior.current_target:
+		print("❌ Big Rat melee_attack() - Invalid conditions")
 		return
 	
 	if enemy_behavior.current_target.has_method("get_stats"):
@@ -113,22 +136,82 @@ func melee_attack():
 				enemy_behavior.combat_manager.end_current_turn()
 			return
 	
-	# Performs Tail Slap attack
+		# Performs Tail Slap attack
 	var damage = get_basic_attack_damage()
 	
-	if enemy_behavior.combat_manager and enemy_behavior.combat_manager.has_method("handle_player_damage"):
-		enemy_behavior.combat_manager.handle_player_damage(damage, "basic attack")
-	elif enemy_behavior.current_target.has_method("take_damage"):
-		enemy_behavior.current_target.take_damage(damage)
+	# Play animation with damage - damage will be applied when animation completes
+	print("🎯 Big Rat melee_attack() - About to play animation")
+	
+	# Try to get animation manager from multiple sources
+	var animation_manager = null
+	var combat_manager = null
+	
+	# First try: through enemy_behavior.combat_manager
+	if enemy_behavior and enemy_behavior.combat_manager:
+		combat_manager = enemy_behavior.combat_manager
+		if combat_manager.has_method("get_animation_manager"):
+			animation_manager = combat_manager.get_animation_manager()
+			print("🎯 Big Rat melee_attack() - Found animation manager through enemy_behavior: ", animation_manager)
+	
+	# Second try: through scene tree lookup
+	if not animation_manager:
+		var managers = get_tree().get_nodes_in_group("CombatManager")
+		print("🎯 Big Rat melee_attack() - Scene tree lookup found ", managers.size(), " CombatManager nodes")
+		if managers.size() > 0:
+			combat_manager = managers[0]
+			print("🎯 Big Rat melee_attack() - First CombatManager: ", combat_manager)
+			if combat_manager.has_method("get_animation_manager"):
+				animation_manager = combat_manager.get_animation_manager()
+				print("🎯 Big Rat melee_attack() - Found animation manager through scene tree: ", animation_manager)
+			else:
+				print("🎯 Big Rat melee_attack() - CombatManager missing get_animation_manager method")
+		else:
+			print("🎯 Big Rat melee_attack() - No CombatManager nodes found in group")
+	
+	# Third try: direct scene lookup
+	if not animation_manager:
+		var scene = get_tree().current_scene
+		print("🎯 Big Rat melee_attack() - Current scene: ", scene)
+		if scene:
+			var cm = scene.get_node_or_null("CombatManager")
+			print("🎯 Big Rat melee_attack() - Direct scene lookup found: ", cm)
+			if cm and cm.has_method("get_animation_manager"):
+				combat_manager = cm
+				animation_manager = cm.get_animation_manager()
+				print("🎯 Big Rat melee_attack() - Found animation manager through direct lookup: ", animation_manager)
+			else:
+				print("🎯 Big Rat melee_attack() - Direct scene lookup CombatManager missing get_animation_manager method")
+		else:
+			print("🎯 Big Rat melee_attack() - No current scene found")
+	
+	if animation_manager and animation_manager.has_method("play_attack_animation_with_damage"):
+		print("🎯 Big Rat melee_attack() - Playing animation with damage: ", damage)
+		animation_manager.play_attack_animation_with_damage(
+			self, 
+			AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK, 
+			enemy_behavior.current_target, 
+			damage, 
+			"physical"
+		)
+		print("🎯 Big Rat melee_attack() - Animation started, turn will end when animation completes")
+	else:
+		# Fallback to old system
+		print("🎯 Big Rat melee_attack() - No animation manager available, using fallback")
+		if enemy_behavior.current_target.has_method("take_damage"):
+			enemy_behavior.current_target.take_damage(damage, "physical")
+		# End turn immediately if no animation system
+		if combat_manager and combat_manager.has_method("end_current_turn"):
+			combat_manager.end_current_turn()
+		elif enemy_behavior and enemy_behavior.combat_manager and enemy_behavior.combat_manager.has_method("end_current_turn"):
+			enemy_behavior.combat_manager.end_current_turn()
 	
 	if enemy_behavior:
 		enemy_behavior.gain_spirit(1)
 	
-	if enemy_behavior and enemy_behavior.combat_manager:
-		enemy_behavior.combat_manager.end_current_turn()
-
 func bite_attack():
+	print("🎯 Big Rat bite_attack() called!")
 	if not enemy_behavior or not enemy_behavior.in_combat or not enemy_behavior.current_target:
+		print("❌ Big Rat bite_attack() - Invalid conditions")
 		return
 	
 	if enemy_behavior.current_target.has_method("get_stats"):
@@ -147,13 +230,71 @@ func bite_attack():
 		enemy_behavior.spend_spirit(get_special_attack_cost())
 	var damage = get_special_attack_damage()
 	
-	if enemy_behavior.combat_manager and enemy_behavior.combat_manager.has_method("handle_player_damage"):
-		enemy_behavior.combat_manager.handle_player_damage(damage, "bite")
-	elif enemy_behavior.current_target.has_method("take_damage"):
-		enemy_behavior.current_target.take_damage(damage)
+	# Play animation with damage - damage will be applied when animation completes
+	print("🎯 Big Rat bite_attack() - About to play animation")
 	
+	# Try to get animation manager from multiple sources
+	var animation_manager = null
+	var combat_manager = null
+	
+	# First try: through enemy_behavior.combat_manager
 	if enemy_behavior and enemy_behavior.combat_manager:
-		enemy_behavior.combat_manager.end_current_turn()
+		combat_manager = enemy_behavior.combat_manager
+		if combat_manager.has_method("get_animation_manager"):
+			animation_manager = combat_manager.get_animation_manager()
+			print("🎯 Big Rat bite_attack() - Found animation manager through enemy_behavior: ", animation_manager)
+	
+	# Second try: through scene tree lookup
+	if not animation_manager:
+		var managers = get_tree().get_nodes_in_group("CombatManager")
+		print("🎯 Big Rat bite_attack() - Scene tree lookup found ", managers.size(), " CombatManager nodes")
+		if managers.size() > 0:
+			combat_manager = managers[0]
+			print("🎯 Big Rat bite_attack() - First CombatManager: ", combat_manager)
+			if combat_manager.has_method("get_animation_manager"):
+				animation_manager = combat_manager.get_animation_manager()
+				print("🎯 Big Rat bite_attack() - Found animation manager through scene tree: ", animation_manager)
+			else:
+				print("🎯 Big Rat bite_attack() - CombatManager missing get_animation_manager method")
+		else:
+			print("🎯 Big Rat bite_attack() - No CombatManager nodes found in group")
+	
+	# Third try: direct scene lookup
+	if not animation_manager:
+		var scene = get_tree().current_scene
+		print("🎯 Big Rat bite_attack() - Current scene: ", scene)
+		if scene:
+			var cm = scene.get_node_or_null("CombatManager")
+			print("🎯 Big Rat bite_attack() - Direct scene lookup found: ", cm)
+			if cm and cm.has_method("get_animation_manager"):
+				combat_manager = cm
+				animation_manager = cm.get_animation_manager()
+				print("🎯 Big Rat bite_attack() - Found animation manager through direct lookup: ", animation_manager)
+			else:
+				print("🎯 Big Rat bite_attack() - Direct scene lookup CombatManager missing get_animation_manager method")
+		else:
+			print("🎯 Big Rat bite_attack() - No current scene found")
+	
+	if animation_manager and animation_manager.has_method("play_attack_animation_with_damage"):
+		print("🎯 Big Rat bite_attack() - Playing animation with damage: ", damage)
+		animation_manager.play_attack_animation_with_damage(
+			self, 
+			AnimationManager.ANIMATION_TYPE.PHYSICAL_ATTACK, 
+			enemy_behavior.current_target, 
+			damage, 
+			"physical"
+		)
+		print("🎯 Big Rat bite_attack() - Animation started, turn will end when animation completes")
+	else:
+		# Fallback to old system
+		print("🎯 Big Rat bite_attack() - No animation manager available, using fallback")
+		if enemy_behavior.current_target.has_method("take_damage"):
+			enemy_behavior.current_target.take_damage(damage, "physical")
+		# End turn immediately if no animation system
+		if combat_manager and combat_manager.has_method("end_current_turn"):
+			combat_manager.end_current_turn()
+		elif enemy_behavior and enemy_behavior.combat_manager and enemy_behavior.combat_manager.has_method("end_current_turn"):
+			enemy_behavior.combat_manager.end_current_turn()
 
 # AI logic
 func choose_attack() -> String:
@@ -212,7 +353,9 @@ func perform_delayed_attack():
 		melee_attack()
 
 func take_turn():
+	print("🎯 Big Rat take_turn() called!")
 	if not enemy_behavior or not enemy_behavior.in_combat or not enemy_behavior.current_target:
+		print("❌ Big Rat take_turn() - Invalid enemy_behavior or not in combat or no target")
 		if enemy_behavior and enemy_behavior.combat_manager:
 			enemy_behavior.combat_manager.end_current_turn()
 		return
@@ -220,11 +363,13 @@ func take_turn():
 	if enemy_behavior.current_target.has_method("get_stats"):
 		var target_stats = enemy_behavior.current_target.get_stats()
 		if target_stats and target_stats.health <= 0:
+			print("❌ Big Rat take_turn() - Target is dead")
 			if enemy_behavior and enemy_behavior.combat_manager:
 				enemy_behavior.combat_manager.end_current_turn()
 			return
 	
 	if not is_instance_valid(enemy_behavior.current_target):
+		print("❌ Big Rat take_turn() - Target is not valid")
 		if enemy_behavior and enemy_behavior.combat_manager:
 			enemy_behavior.combat_manager.end_current_turn()
 		return
@@ -233,20 +378,29 @@ func take_turn():
 		print("Big Rat ERROR: Self is not a Node3D - cannot access global_position!")
 		return
 	if not enemy_behavior.current_target is Node3D:
-		print("Big Rat ERROR: Current target is not a Node3D - cannot access global_position!")
+		print("Big Rat ERROR: Target is not a Node3D - cannot access global_position!")
 		return
 	var distance_to_target = global_position.distance_to(enemy_behavior.current_target.global_position)
+	print("🎯 Big Rat distance to target: ", distance_to_target)
 	if distance_to_target > 1.5:
+		print("🎯 Big Rat moving to target for attack")
 		move_to_target_for_attack(enemy_behavior.current_target)
 		return
 	
 	var attack_choice = choose_attack()
+	print("🎯 Big Rat chose attack: ", attack_choice)
 	if attack_choice == "basic":
+		print("🎯 Big Rat calling melee_attack()")
 		melee_attack()
 	elif attack_choice == "special":
+		print("🎯 Big Rat calling bite_attack()")
 		bite_attack()
 	else:
+		print("🎯 Big Rat fallback to melee_attack()")
 		melee_attack()
+	
+	# Safety check: if no attack was performed, end turn manually
+	print("🎯 Big Rat take_turn() completed")
 
 # Proxy functions to maintain compatibility with combat system
 func get_stats():
@@ -254,9 +408,9 @@ func get_stats():
 		return enemy_behavior.get_stats()
 	return null
 
-func take_damage(amount: int):
+func take_damage(amount: int, damage_type: String = "physical"):
 	if enemy_behavior:
-		enemy_behavior.take_damage(amount)
+		enemy_behavior.take_damage(amount, damage_type)
 
 func set_combat_target(target: Node):
 	if enemy_behavior:

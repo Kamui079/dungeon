@@ -98,6 +98,49 @@ const CUNNING_SCALING = {
 	"hard_cap": 110              # Hard cap for maximum effectiveness
 }
 
+# Elemental System Constants
+const ELEMENT_TYPES = {
+	"ARCANE": "arcane",
+	"DARK": "dark", 
+	"EARTH": "earth",
+	"FIRE": "fire",
+	"HOLY": "holy",
+	"ICE": "ice",
+	"LIGHTNING": "lightning",
+	"PHYSICAL": "physical"  # Non-elemental damage
+}
+
+const ELEMENT_COLORS = {
+	"arcane": Color(0.8, 0.3, 1.0),    # Purple
+	"dark": Color(0.3, 0.1, 0.3),      # Dark purple
+	"earth": Color(0.6, 0.4, 0.2),     # Brown
+	"fire": Color(1.0, 0.3, 0.1),      # Red-orange
+	"holy": Color(1.0, 1.0, 0.8),      # Light yellow
+	"ice": Color(0.6, 0.8, 1.0),       # Light blue
+	"lightning": Color(1.0, 1.0, 0.3), # Yellow
+	"physical": Color(0.8, 0.8, 0.8)   # Gray
+}
+
+const ELEMENT_NAMES = {
+	"arcane": "Arcane",
+	"dark": "Dark",
+	"earth": "Earth", 
+	"fire": "Fire",
+	"holy": "Holy",
+	"ice": "Ice",
+	"lightning": "Lightning",
+	"physical": "Physical"
+}
+
+# Elemental damage bonus stats (can be increased by equipment)
+var fire_damage_bonus: float = 0.0      # +X% fire damage
+var ice_damage_bonus: float = 0.0       # +X% ice damage
+var lightning_damage_bonus: float = 0.0  # +X% lightning damage
+var arcane_damage_bonus: float = 0.0    # +X% arcane damage
+var dark_damage_bonus: float = 0.0      # +X% dark damage
+var earth_damage_bonus: float = 0.0     # +X% earth damage
+var holy_damage_bonus: float = 0.0      # +X% holy damage
+
 func _ready():
 	# Calculate base combat chances from stats
 	_update_combat_chances()
@@ -214,13 +257,7 @@ func _recalculate_max_stats():
 		health = min(health, max_health)
 		mana = min(mana, max_mana)
 	
-	# Set health and mana to 90% for testing potions (after max stats are calculated)
-	if level == 1 and not _initialized:  # Only set on first load
-		_setting_initial_values = true
-		health = int(max_health * 0.9)
-		mana = int(max_mana * 0.9)
-		_setting_initial_values = false
-		# Don't set _initialized here as it's used for the _ready() function
+	# Player now spawns with full HP and mana
 	
 
 	
@@ -316,7 +353,7 @@ func set_level(new_level: int):
 	
 	print("Level set to ", level, " with ", total_stat_points, " stat points to distribute")
 
-func take_damage(amount: int) -> void:
+func take_damage(amount: int, damage_type: String = "physical") -> void:
 	health = max(0, health - amount)
 	emit_signal("health_changed", health, max_health)
 	if health <= 0:
@@ -701,3 +738,86 @@ func remove_damage(amount: int):
 func get_armor_value() -> int:
 	"""Get the current armor value (base + equipment bonuses)"""
 	return armor
+
+func get_total_armor_value() -> int:
+	"""Get the current armor value (base + equipment bonuses)"""
+	return armor
+
+# Elemental System Helper Functions
+func is_elemental_damage(damage_type: String) -> bool:
+	"""Check if a damage type is elemental (not physical)"""
+	return damage_type != "physical" and ELEMENT_TYPES.values().has(damage_type)
+
+func get_elemental_damage_bonus(damage_type: String) -> float:
+	"""Get the damage bonus for a specific element"""
+	if not is_elemental_damage(damage_type):
+		return 0.0
+	
+	match damage_type:
+		"fire": return fire_damage_bonus
+		"ice": return ice_damage_bonus
+		"lightning": return lightning_damage_bonus
+		"arcane": return arcane_damage_bonus
+		"dark": return dark_damage_bonus
+		"earth": return earth_damage_bonus
+		"holy": return holy_damage_bonus
+		_: return 0.0
+
+func apply_elemental_damage_bonus(base_damage: int, damage_type: String) -> int:
+	"""Apply elemental damage bonus to base damage"""
+	if not is_elemental_damage(damage_type):
+		return base_damage
+	
+	var bonus_multiplier = 1.0 + (get_elemental_damage_bonus(damage_type) / 100.0)
+	var final_damage = int(base_damage * bonus_multiplier)
+	
+	print("Elemental damage: ", base_damage, " ", damage_type, " -> ", final_damage, " (", get_elemental_damage_bonus(damage_type), "% bonus)")
+	return final_damage
+
+func add_elemental_damage_bonus(element: String, bonus: float) -> void:
+	"""Add elemental damage bonus (called by equipment)"""
+	if not ELEMENT_TYPES.values().has(element):
+		print("ERROR: Invalid element: ", element)
+		return
+	
+	match element:
+		"fire": fire_damage_bonus += bonus
+		"ice": ice_damage_bonus += bonus
+		"lightning": lightning_damage_bonus += bonus
+		"arcane": arcane_damage_bonus += bonus
+		"dark": dark_damage_bonus += bonus
+		"earth": earth_damage_bonus += bonus
+		"holy": holy_damage_bonus += bonus
+	
+	print("Added ", bonus, "% bonus to ", element, " damage. Total: ", get_elemental_damage_bonus(element), "%")
+	stats_changed.emit()
+
+func remove_elemental_damage_bonus(element: String, bonus: float) -> void:
+	"""Remove elemental damage bonus (called when equipment is unequipped)"""
+	if not ELEMENT_TYPES.values().has(element):
+		print("ERROR: Invalid element: ", element)
+		return
+	
+	match element:
+		"fire": fire_damage_bonus -= bonus
+		"ice": ice_damage_bonus -= bonus
+		"lightning": lightning_damage_bonus -= bonus
+		"arcane": arcane_damage_bonus -= bonus
+		"dark": dark_damage_bonus -= bonus
+		"earth": earth_damage_bonus -= bonus
+		"holy": holy_damage_bonus -= bonus
+	
+	print("Removed ", bonus, "% bonus from ", element, " damage. Total: ", get_elemental_damage_bonus(element), "%")
+	stats_changed.emit()
+
+func get_all_elemental_bonuses() -> Dictionary:
+	"""Get all current elemental damage bonuses for UI display"""
+	return {
+		"fire": fire_damage_bonus,
+		"ice": ice_damage_bonus,
+		"lightning": lightning_damage_bonus,
+		"arcane": arcane_damage_bonus,
+		"dark": dark_damage_bonus,
+		"earth": earth_damage_bonus,
+		"holy": holy_damage_bonus
+	}

@@ -93,6 +93,9 @@ func _ready():
 	
 	add_child(stats)
 	
+	# Add to Enemy group for easy finding by combat systems
+	add_to_group("Enemy")
+	
 	# Set the enemy's level first
 	stats.set_level(enemy_level)
 	
@@ -300,14 +303,31 @@ func end_combat():
 		else:
 			print(enemy_name, " ERROR: Cannot end combat - parent is not a CharacterBody3D!")
 
-func take_damage(amount: int):
-	stats.take_damage(amount)
-	print(enemy_name, " took ", amount, " damage! Health: ", stats.health, "/", stats.max_health)
+func take_damage(amount: int, damage_type: String = "physical"):
+	"""Take damage and spawn damage numbers"""
+	if is_dead or is_processing_death:
+		return
+	
+	# Apply damage to stats
+	if stats:
+		stats.take_damage(amount)
+		print(enemy_name, " took ", amount, " ", damage_type, " damage! Health: ", stats.health, "/", stats.max_health)
+	
+	# Spawn damage number
+	_spawn_damage_number(amount, damage_type)
 	
 	# Update floating status bars
 	update_status_bars()
 	
-	# Spirit gain from taking damage removed - only actions give spirit now
+	# Check if enemy is dead
+	if stats and stats.health <= 0:
+		print("💀 ", enemy_name, " DEFEATED! Calling die() function...")
+		# Use the existing die() function
+		die()
+		return
+	else:
+		# Gain spirit from taking damage (like players do)
+		gain_spirit(1)
 	
 	# Update combat UI with new status
 	if combat_manager and combat_manager.has_method("_update_combat_ui_status"):
@@ -317,12 +337,29 @@ func take_damage(amount: int):
 			combat_manager._update_combat_ui_status()
 		else:
 			print(enemy_name, " ERROR: Cannot update combat UI - parent is not a CharacterBody3D!")
+
+func _spawn_damage_number(amount: int, damage_type: String):
+	"""Spawn a damage number above the enemy"""
+	# Find the damage numbers system
+	var damage_numbers = get_tree().get_first_node_in_group("DamageNumbers")
+	if not damage_numbers:
+		# Create a new damage numbers system if none exists
+		damage_numbers = DamageNumbers.new()
+		damage_numbers.name = "DamageNumbers"
+		damage_numbers.add_to_group("DamageNumbers")
+		get_tree().current_scene.add_child(damage_numbers)
 	
-	if stats.health <= 0:
-		print("💀 ", enemy_name, " DEFEATED! Calling die() function...")
-		# Use the new death system
-		die()
+	# Get the parent CharacterBody3D node for proper 3D positioning
+	var parent_body = get_parent()
+	if not parent_body or not parent_body is CharacterBody3D:
+		print(enemy_name, " ERROR: Cannot spawn damage number - parent is not a CharacterBody3D!")
 		return
+	
+	# Spawn the damage number
+	if damage_numbers.has_method("spawn_damage_number"):
+		damage_numbers.spawn_damage_number(amount, damage_type, parent_body)
+	else:
+		print("Warning: DamageNumbers system missing spawn_damage_number method")
 
 func _check_for_nearby_combat() -> bool:
 	"""Check if there's combat happening nearby that this enemy should join"""
@@ -447,27 +484,25 @@ func melee_attack():
 	else:
 		# Fallback: direct damage if no combat manager
 		if current_target.has_method("take_damage"):
-			current_target.take_damage(damage)
+			current_target.take_damage(damage, "physical")  # Enemy attacks are physical damage
 	
 	# Gain spirit from attacking (like players do)
 	gain_spirit(1)
 	
-	# End turn - use ATB system
-	if combat_manager:
-		print(enemy_name, " ending turn via combat manager")
-		# Reset movement attempts for next turn
-		movement_attempts = 0
-		# In ATB system, we need to call the enemy turn end function
-		if parent_body and parent_body is CharacterBody3D:
+	# Wait for animation to complete before ending turn
+	if combat_manager and combat_manager.has_method("wait_for_animation_then_end_turn"):
+		print(enemy_name, " waiting for animation to complete before ending turn")
+		combat_manager.wait_for_animation_then_end_turn(self)
+	else:
+		# Fallback: end turn immediately if animation system not available
+		print(enemy_name, " ending turn immediately (no animation system)")
+		if combat_manager:
 			if combat_manager.has_method("end_enemy_turn"):
-				combat_manager.end_current_turn()
+				combat_manager.end_enemy_turn()
 			else:
-				# Fallback to old method if ATB method doesn't exist
 				combat_manager.end_current_turn()
 		else:
-			print(enemy_name, " ERROR: Cannot end turn - parent is not a CharacterBody3D!")
-	else:
-		print(enemy_name, " WARNING: No combat manager to end turn!")
+			print(enemy_name, " WARNING: No combat manager to end turn!")
 
 func move_to_target(target: Node):
 	print(enemy_name, " DEBUG: BASE ENEMY move_to_target() called!")
@@ -963,7 +998,7 @@ func apply_ignite(initial_damage: int, duration: int = 3):
 func _on_ignite_tick():
 	if ignite_duration > 0:
 		# Take ignite damage
-		take_damage(ignite_damage)
+		take_damage(ignite_damage, "ignite")
 		ignite_duration -= 1
 		print(enemy_name, " takes ", ignite_damage, " ignite damage! Duration remaining: ", ignite_duration, " turns")
 		

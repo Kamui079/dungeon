@@ -28,28 +28,34 @@ var experience_bar_created: bool = false
 
 
 func _ready():
-	# Find and connect to PlayerInventory
-	var inventory_node = get_node_or_null("../../PlayerInventory")
+	# Find and connect to PlayerInventory using group lookup
+	var inventory_node = get_tree().get_first_node_in_group("PlayerInventory")
 	if inventory_node:
+		player_inventory = inventory_node
 		inventory_node.inventory_changed.connect(_on_inventory_changed)
+		print("EquipmentUI: Found PlayerInventory via group lookup and connected signal")
 	else:
 		printerr("EquipmentUI: Could not find PlayerInventory!")
 	
-	# Find and connect to PlayerStats
-	var player = get_node_or_null("../../Player")
+	# Find and connect to PlayerStats using group lookup
+	var player = get_tree().get_first_node_in_group("Player")
 	if player and player.has_method("get_stats"):
 		player_stats = player.get_stats()
+		print("EquipmentUI: Found PlayerStats via player.get_stats()")
 	else:
-		# Try alternative path
-		player_stats = get_node_or_null("../../Player/PlayerStats")
-		if not player_stats:
+		# Try alternative path - look for PlayerStats in PlayerInventory group
+		var alt_inventory = get_tree().get_first_node_in_group("PlayerInventory")
+		if alt_inventory and alt_inventory.has_method("get_stats"):
+			player_stats = alt_inventory.get_stats()
+			print("EquipmentUI: Found PlayerStats via inventory.get_stats()")
+		else:
 			printerr("EquipmentUI: Could not find PlayerStats!")
 	
 	# Initialize equipment slots
 	_initialize_equipment_slots()
 	
-	# Update display
-	_update_display()
+	# Defer display update to ensure nodes are properly initialized
+	call_deferred("_deferred_initialization")
 	
 	# Connect player stats signals and create experience bar
 	if player_stats:
@@ -61,7 +67,14 @@ func _ready():
 		timer.one_shot = true
 		timer.timeout.connect(_create_experience_bar)
 		timer.start()
-	
+
+func _deferred_initialization():
+	"""Initialize display after all nodes are properly set up"""
+	if player_inventory:
+		_update_display()
+		print("EquipmentUI: Deferred initialization completed successfully")
+	else:
+		printerr("EquipmentUI: Deferred initialization failed - no player_inventory")
 
 
 
@@ -96,6 +109,10 @@ func _initialize_equipment_slots():
 			slot_node.set_script(load("res://equipment_slot.gd"))
 			slot_node.slot_name = slot_name
 			slot_node.player_inventory = player_inventory
+			
+			# Manually call the setup that would normally happen in _ready()
+			if slot_node.has_method("set_player_inventory"):
+				slot_node.set_player_inventory(player_inventory)
 			
 			# Manually add to group since _ready() won't be called when setting script dynamically
 			slot_node.add_to_group("EquipmentSlot")
@@ -162,16 +179,19 @@ func _update_cursor_mode():
 	if inventory_ui and inventory_ui.visible:
 		any_ui_visible = true
 	
-	# Only change cursor mode if we're actually showing/hiding the panel
-	# Don't force cursor mode changes that might conflict with other systems
+	# Change cursor mode based on UI visibility
 	if any_ui_visible:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		print("EquipmentUI: Set mouse mode to VISIBLE (UI open)")
 	else:
-		# Don't force cursor capture - let other systems handle it
-		pass
+		# Restore camera mode when no UI is visible
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		print("EquipmentUI: Set mouse mode to CAPTURED (UI closed, camera mode)")
 
 func _on_inventory_changed():
 	"""Called when the player's inventory changes"""
+	print("EquipmentUI: Inventory changed signal received!")
+	
 	# Force cleanup tooltips when inventory changes to prevent stuck tooltips
 	var tooltip_manager = get_node_or_null("/root/Dungeon/TooltipManager")
 	if tooltip_manager:
@@ -183,9 +203,11 @@ func _on_inventory_changed():
 func _update_display():
 	"""Update the visual display of equipment slots"""
 	if not player_inventory: 
+		print("EquipmentUI: _update_display called but player_inventory is null")
 		return
 	
 	var equipment = player_inventory.get_equipment()
+	print("EquipmentUI: Updating display with equipment: ", equipment)
 	
 	# Process each slot
 	for slot_name in slot_nodes:
@@ -195,8 +217,10 @@ func _update_display():
 		
 		# Call the slot's own _update_display method if it exists
 		if slot_node.has_method("_update_display"):
+			print("EquipmentUI: Calling _update_display on slot: ", slot_name)
 			slot_node._update_display()
 		else:
+			print("EquipmentUI: Slot ", slot_name, " doesn't have _update_display, using fallback")
 			# Fallback to the old method if the slot doesn't have _update_display
 			# Get or create the icon TextureRect
 			var icon_rect = _get_or_create_icon_rect(slot_node)
@@ -208,12 +232,15 @@ func _update_display():
 				if equipment_item is Equipment and equipment_item.icon != null:
 					icon_rect.texture = equipment_item.icon
 					icon_rect.visible = true
+					print("EquipmentUI: Set icon for ", slot_name, " to ", equipment_item.icon)
 				else:
 					icon_rect.texture = null
 					icon_rect.visible = false
+					print("EquipmentUI: No icon for ", slot_name, " - item: ", equipment_item, " icon: ", equipment_item.icon if equipment_item else "null")
 			else:
 				icon_rect.texture = null
 				icon_rect.visible = false
+				print("EquipmentUI: No item in slot ", slot_name)
 			
 			# Hide/show the slot label based on whether there's a visible icon
 			var should_hide = icon_rect.visible and icon_rect.texture != null

@@ -14,6 +14,7 @@ var _gravity := 20.0
 var _y_velocity := 0.0
 var _can_interact := false
 var is_frozen: bool = false
+var _disable_auto_facing: bool = false  # Flag to prevent automatic facing during combat
 @onready var camera: Camera3D = $SpringArm3D/Camera3D
 @onready var stats: PlayerStats = PlayerStats.new()
 
@@ -28,7 +29,12 @@ func _ready():
 	stats.set_health(3); stats.set_mana(1); stats.set_strength(1); stats.set_intelligence(1)
 	stats.set_spell_power(0); stats.set_dexterity(2); stats.set_cunning(0); stats.set_speed(1)
 	stats._update_combat_chances(); stats._recalculate_max_stats()
-	stats.health = int(stats.max_health * 0.9); stats.mana = int(stats.max_mana * 0.9)
+	
+	# Set player to full HP and mana on spawn
+	stats.health = stats.max_health
+	stats.mana = stats.max_mana
+	
+	# Emit signals to update UI
 	stats.emit_signal("health_changed", stats.health, stats.max_health)
 	stats.emit_signal("mana_changed", stats.mana, stats.max_mana)
 	
@@ -37,16 +43,10 @@ func _ready():
 	
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	
-	# HUD Setup
-	var hud_scene: PackedScene = preload("res://UI/HUD.tscn")
-	var hud: HUD = hud_scene.instantiate()
-	add_child(hud)
-	stats.health_changed.connect(hud.set_health)
-	stats.mana_changed.connect(hud.set_mana)
-	stats.spirit_changed.connect(hud.set_spirit)
-	hud.set_health(stats.health, stats.max_health)
-	hud.set_mana(stats.mana, stats.max_mana)
-	hud.set_spirit(stats.spirit, 10)
+	# HUD Setup - Connect to existing HUD in scene instead of creating new one
+	# Use a timer to ensure HUD is fully loaded
+	var hud_timer = get_tree().create_timer(0.1)
+	hud_timer.timeout.connect(_connect_to_hud)
 	stats.spirit_changed.connect(_on_spirit_changed)
 	
 	# --- THIS IS THE CORRECTED UI SETUP ---
@@ -85,12 +85,43 @@ func get_stats() -> PlayerStats:
 		stats.set_health(1); stats.set_mana(1); stats.set_strength(1); stats.set_intelligence(1)
 		stats.set_spell_power(0); stats.set_dexterity(0); stats.set_cunning(0); stats.set_speed(1)
 		stats._update_combat_chances(); stats._recalculate_max_stats()
-		stats.health = stats.max_health; stats.mana = stats.max_mana
+		
+		# Ensure full HP and mana
+		stats.health = stats.max_health
+		stats.mana = stats.max_mana
+		
+		# Emit signals to update UI
+		stats.emit_signal("health_changed", stats.health, stats.max_health)
+		stats.emit_signal("mana_changed", stats.mana, stats.max_mana)
 	return stats
 
 func get_spirit() -> int:
 	if has_method("get_stats") and get_stats(): return get_stats().spirit
 	return 0
+
+func set_auto_facing_enabled(enabled: bool):
+	"""Enable or disable automatic enemy facing"""
+	_disable_auto_facing = not enabled
+
+func _connect_to_hud():
+	"""Connect player stats to the existing HUD in the scene"""
+	var hud = get_tree().get_first_node_in_group("HUD")
+	if hud:
+		# Connect signals
+		stats.health_changed.connect(hud.set_health)
+		stats.mana_changed.connect(hud.set_mana)
+		stats.spirit_changed.connect(hud.set_spirit)
+		
+		# Set initial values
+		hud.set_health(stats.health, stats.max_health)
+		hud.set_mana(stats.mana, stats.max_mana)
+		hud.set_spirit(stats.spirit, 10)
+		
+		print("Player: Connected to HUD successfully")
+	else:
+		print("Player: No HUD found in scene")
+
+# HUD force update function removed - signals should work now
 
 
 
@@ -110,10 +141,12 @@ func _input(event):
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * mouse_sensitivity)
 		if is_instance_valid(camera):
-			camera.rotate_x(-event.relative.y * mouse_sensitivity)
-			camera.rotation.x = clamp(camera.rotation.x, -PI/4, PI/4)
-			# Only keep camera Y rotation at 0 when NOT in combat to allow combat orientation
+			# Only allow camera tilt when NOT in combat to maintain level height
 			var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+			if not combat_manager or not combat_manager.in_combat:
+				camera.rotate_x(-event.relative.y * mouse_sensitivity)
+				camera.rotation.x = clamp(camera.rotation.x, -PI/4, PI/4)
+			# Only keep camera Y rotation at 0 when NOT in combat to allow combat orientation
 			if not combat_manager or not combat_manager.in_combat:
 				camera.rotation.y = 0.0
 			camera.rotation.z = 0.0
@@ -171,9 +204,10 @@ func restore_mana(amount: int):
 	if stats: stats.restore_mana(amount)
 
 # --- Combat Methods ---
-func take_damage(amount: int):
+func take_damage(amount: int, damage_type: String = "physical"):
 	if not stats: return
 	stats.take_damage(amount)
+	
 	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
 	if combat_manager and combat_manager.has_method("_update_combat_ui_status"):
 		combat_manager._update_combat_ui_status()
@@ -202,6 +236,12 @@ func is_fire_attack(attack_type: String) -> bool:
 	match attack_type:
 		"fireball", "fire_weapon_basic", "fire_weapon_special": return true
 		_: return false
+
+func get_ice_freeze_chance() -> float: return 25.0
+func is_ice_attack(attack_type: String) -> bool:
+	match attack_type:
+		"ice_spell", "ice_weapon_basic", "ice_weapon_special": return true
+		_: return false
 func is_defending() -> bool: return false
 func set_physics_process_enabled(enabled: bool):
 	set_physics_process_internal(enabled)
@@ -212,7 +252,11 @@ func set_physics_process_enabled(enabled: bool):
 		# Don't auto-face enemy when unfrozen during combat - let combat manager handle it
 		var combat_manager = get_tree().get_first_node_in_group("CombatManager")
 		if not combat_manager or not combat_manager.in_combat:
-			face_nearest_enemy()
+			# Only auto-face if we're not in combat, not disabled, and there are enemies nearby
+			if not _disable_auto_facing:
+				var enemies = get_tree().get_nodes_in_group("Enemy")
+				if not enemies.is_empty():
+					face_nearest_enemy()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -271,8 +315,23 @@ func face_target(target: Node):
 		var target_rotation = atan2(direction.x, direction.z)
 		print("🎯 Direction vector: ", direction, " Target rotation: ", target_rotation, " Current rotation: ", rotation.y)
 		
-		# Try flipping the rotation 180 degrees to fix the orientation issue
+		# Fix the orientation issue (this was needed because the system was facing away from enemies)
 		target_rotation += PI
+		
+		# Calculate the shortest rotation path
+		var current_rotation = rotation.y
+		var rotation_diff = target_rotation - current_rotation
+		
+		# Normalize rotation difference to [-PI, PI] range to find shortest path
+		while rotation_diff > PI:
+			rotation_diff -= 2 * PI
+		while rotation_diff < -PI:
+			rotation_diff += 2 * PI
+		
+		# Use the normalized difference for smooth rotation
+		var final_rotation = current_rotation + rotation_diff
+		
+		print("🎯 Current rotation: ", current_rotation, " Target: ", target_rotation, " Difference: ", rotation_diff, " Final: ", final_rotation)
 		
 		# First, reset camera to neutral position to avoid conflicts with scene rotation
 		if camera:
@@ -283,7 +342,7 @@ func face_target(target: Node):
 				# After camera reset, rotate player and set final camera position
 				print("🎯 Camera reset complete, now rotating player...")
 				var player_tween = create_tween()
-				player_tween.tween_property(self, "rotation:y", target_rotation, 0.8)
+				player_tween.tween_property(self, "rotation:y", final_rotation, 0.8)
 				print("✅ Player rotation tween started")
 				
 				# Ensure camera stays at neutral rotation
@@ -295,7 +354,7 @@ func face_target(target: Node):
 			print("⚠️ face_target: No camera reference")
 			# Just rotate player if no camera
 			var tween = create_tween()
-			tween.tween_property(self, "rotation:y", target_rotation, 0.8)
+			tween.tween_property(self, "rotation:y", final_rotation, 0.8)
 			print("✅ Player rotation tween started (no camera)")
 	else:
 		print("⚠️ face_target: Direction not normalized")
@@ -307,6 +366,11 @@ func orient_camera_toward(target: Node):
 		return
 	
 	print("🎯 orient_camera_toward called with target: ", target.name)
+	
+	# Quick smooth reset of camera height to level for combat
+	var height_tween = create_tween()
+	height_tween.tween_property(camera, "rotation:x", 0.0, 0.2)
+	print("🎥 DEBUG: Camera height tween started from ", camera.rotation.x, " to 0.0")
 	
 	# Get the direction from player to target
 	var target_pos = Vector3.ZERO
@@ -320,10 +384,11 @@ func orient_camera_toward(target: Node):
 	
 	print("🎯 Target position: ", target_pos, " Player position: ", global_position)
 	
-	var direction = (target_pos - global_position).normalized()
+	var direction = (target_pos - global_position)
 	direction.y = 0  # Keep camera level
+	direction = direction.normalized()  # Normalize after setting Y to 0
 	
-	if direction.is_normalized():
+	if direction.length() > 0.001:  # Check if direction is valid
 		# Calculate target rotation for the player (not the camera)
 		var target_rotation = atan2(direction.x, direction.z)
 		print("🎯 Direction vector: ", direction, " Target rotation: ", target_rotation, " Current rotation: ", rotation.y)
@@ -335,17 +400,42 @@ func orient_camera_toward(target: Node):
 		print("🎯 Resetting camera to neutral position first...")
 		var reset_tween = create_tween()
 		reset_tween.tween_property(camera, "rotation:y", 0.0, 0.4)
+		reset_tween.tween_property(camera, "rotation:x", 0.0, 0.4)  # Reset height to level
 		reset_tween.tween_callback(func():
 			# After camera reset, rotate player and set final camera position
 			print("🎯 Camera reset complete, now rotating player...")
 			var player_tween = create_tween()
 			player_tween.tween_property(self, "rotation:y", target_rotation, 0.8)
-			print("✅ Player rotation tween started in orient_camera_toward")
-			
-			# Ensure camera stays at neutral rotation
-			var camera_tween = create_tween()
-			camera_tween.tween_property(camera, "rotation:y", 0.0, 0.8)
-			print("✅ Camera rotation tween started in orient_camera_toward")
+			player_tween.tween_callback(func():
+				# Ensure camera stays at neutral rotation and level height
+				# But first check if rotating would cause the camera to clip into walls
+				var camera_tween = create_tween()
+				
+				# Check for wall collisions before rotating camera
+				var camera_pos = camera.global_position
+				var camera_forward = -camera.global_transform.basis.z  # Camera's forward direction
+				var collision_check_distance = 0.5  # Distance to check for walls
+				
+				# Cast a ray from camera position in camera's forward direction
+				var space_state = get_world_3d().direct_space_state
+				var ray_query = PhysicsRayQueryParameters3D.new()
+				ray_query.from = camera_pos
+				ray_query.to = camera_pos + (camera_forward * collision_check_distance)
+				ray_query.collision_mask = 1  # Check against world geometry
+				
+				var ray_result = space_state.intersect_ray(ray_query)
+				
+				if ray_result:
+					print("⚠️ Camera rotation blocked by wall, keeping current camera position")
+					# If there's a wall in front, don't rotate the camera
+					camera_tween.parallel().tween_property(camera, "rotation:x", 0.0, 0.8)  # Only reset height
+				else:
+					# No wall collision, safe to rotate camera
+					camera_tween.parallel().tween_property(camera, "rotation:y", 0.0, 0.8)
+					camera_tween.parallel().tween_property(camera, "rotation:x", 0.0, 0.8)  # Reset height to level
+				
+				print("✅ Camera rotation tween started in orient_camera_toward")
+			)
 		)
 		
 		print("🎥 Camera system oriented toward target (player rotation: ", target_rotation, ")")
@@ -362,11 +452,22 @@ func reset_camera_control():
 	var camera_tween = create_tween()
 	camera_tween.tween_property(camera, "rotation:y", 0.0, 0.3)
 	
-	# Also reset the camera's X rotation to a comfortable viewing angle
+	# Keep camera at level height for combat (no downward angle)
 	var camera_x_tween = create_tween()
-	camera_x_tween.tween_property(camera, "rotation:x", -0.3, 0.3)  # Slight downward angle
+	camera_x_tween.tween_property(camera, "rotation:x", 0.0, 0.3)  # Level height
 	
 	print("🎥 Camera control reset to player")
+
+func reset_camera_to_combat_height():
+	"""Reset camera to level height when combat starts, regardless of current position"""
+	if not camera:
+		return
+	
+	# Immediately reset camera to level height for combat
+	var camera_tween = create_tween()
+	camera_tween.tween_property(camera, "rotation:x", 0.0, 0.2)  # Quick reset to level height
+	
+	print("🎥 Camera reset to combat height (level)")
 
 
 func get_camera() -> Camera3D:

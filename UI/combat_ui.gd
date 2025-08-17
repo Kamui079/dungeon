@@ -22,7 +22,7 @@ class_name CombatUI
 
 # ATB System elements
 @onready var player_atb_bar: ProgressBar = $CombatPanel/VBoxContainer/ATBSection/PlayerATBBar
-@onready var enemy_atb_bar: ProgressBar = $CombatPanel/VBoxContainer/ATBSection/EnemyATBBar
+
 @onready var atb_status_label: Label = $CombatPanel/VBoxContainer/ATBSection/ATBStatusLabel
 
 # Queued action indicator
@@ -405,13 +405,7 @@ func _on_atb_bar_updated(player_progress: float, enemy_progress: float):
 			player_atb_bar.modulate = Color.WHITE
 			atb_status_label.text = "⏳ ATB bar filling... (" + str(int(player_progress * 100)) + "%)"
 	
-	if enemy_atb_bar:
-		enemy_atb_bar.value = enemy_progress * 100  # Convert to percentage
-		# Change color when ready
-		if enemy_progress >= 1.0:
-			enemy_atb_bar.modulate = Color.RED
-		else:
-			enemy_atb_bar.modulate = Color.WHITE
+
 
 func _on_turn_changed(current_actor: Node, turn_type: String):
 	"""Update turn system display when turn changes"""
@@ -482,6 +476,9 @@ func add_combat_log_entry(message: String):
 	# Auto-scroll to top to show newest entry
 	combat_log_text.scroll_vertical = 0
 	
+	# Force UI update to ensure the text is displayed immediately
+	combat_log_text.queue_redraw()
+	
 	# Limit log size to prevent memory issues (keep last 100 entries)
 	var lines = combat_log_text.text.split("\n")
 	if lines.size() > 100:
@@ -512,7 +509,7 @@ func debug_atb_status():
 	
 	var status_text = "🔍 ATB Debug Info:\n"
 	status_text += "Player Progress: " + str(int(atb_status.player_atb_progress * 100)) + "%\n"
-	status_text += "Enemy Progress: " + str(int(atb_status.enemy_atb_progress * 100)) + "%\n"
+
 	status_text += "Player Ready: " + str(atb_status.player_turn_ready) + "\n"
 	status_text += "Enemy Ready: " + str(atb_status.enemy_turn_ready) + "\n"
 	status_text += "Action in Progress: " + str(atb_status.action_in_progress) + "\n"

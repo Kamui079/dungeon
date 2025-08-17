@@ -25,6 +25,9 @@ enum EQUIP_SLOT {
 # Stats that this equipment provides when equipped
 @export var stat_bonuses: Dictionary = {}
 
+# Elemental damage bonuses (e.g., {"fire": 5.0} for +5% fire damage)
+@export var elemental_bonuses: Dictionary = {}
+
 func on_equip(user: Node) -> void:
 	"""Apply equipment stats to the user when equipped"""
 	if user.has_method("modify_stats"):
@@ -42,6 +45,17 @@ func on_equip(user: Node) -> void:
 		user.add_armor(armor_value)
 	if damage_value > 0 and user.has_method("add_damage"):
 		user.add_damage(damage_value)
+	
+	# Apply elemental damage bonuses
+	if user.has_method("add_elemental_damage_bonus"):
+		for element in elemental_bonuses:
+			var bonus_value = elemental_bonuses[element]
+			user.add_elemental_damage_bonus(element, bonus_value)
+	elif user.get("stats") != null and user.stats.has_method("add_elemental_damage_bonus"):
+		# Try to access stats through a stats property
+		for element in elemental_bonuses:
+			var bonus_value = elemental_bonuses[element]
+			user.stats.add_elemental_damage_bonus(element, bonus_value)
 
 func on_unequip(user: Node) -> void:
 	"""Remove equipment stats from the user when unequipped"""
@@ -60,6 +74,17 @@ func on_unequip(user: Node) -> void:
 		user.remove_armor(armor_value)
 	if damage_value > 0 and user.has_method("remove_damage"):
 		user.remove_damage(damage_value)
+	
+	# Remove elemental damage bonuses
+	if user.has_method("remove_elemental_damage_bonus"):
+		for element in elemental_bonuses:
+			var bonus_value = elemental_bonuses[element]
+			user.remove_elemental_damage_bonus(element, bonus_value)
+	elif user.get("stats") != null and user.stats.has_method("remove_elemental_damage_bonus"):
+		# Try to access stats through a stats property
+		for element in elemental_bonuses:
+			var bonus_value = elemental_bonuses[element]
+			user.stats.remove_elemental_damage_bonus(element, bonus_value)
 
 func get_slot_name() -> String:
 	"""Get the human-readable slot name for this equipment"""
@@ -99,6 +124,11 @@ func get_stats() -> Dictionary:
 	# Add stat bonuses
 	for stat_name in stat_bonuses:
 		equipment_stats[stat_name] = stat_bonuses[stat_name]
+	
+	# Add elemental bonuses
+	for element in elemental_bonuses:
+		var bonus_value = elemental_bonuses[element]
+		equipment_stats[element + "_damage_bonus"] = bonus_value
 	
 	return equipment_stats
 

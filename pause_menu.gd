@@ -58,19 +58,28 @@ func _handle_escape_press():
 	"""Handle ESC key press - close open windows or show pause menu"""
 	print("PauseMenu: _handle_escape_press() called")
 	
+	# Check if we're in combat - if so, allow pause menu to show
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	var in_combat = false
+	if combat_manager and combat_manager.has_method("is_combat_active"):
+		in_combat = combat_manager.is_combat_active()
+	
+	print("PauseMenu: In combat: ", in_combat)
+	
 	# Check if any UI windows are open
 	var any_ui_open = _check_for_open_ui()
 	print("PauseMenu: Any UI open: ", any_ui_open)
 	
-	if any_ui_open:
+	if any_ui_open and not in_combat:
 		# Close the open UI window and STOP HERE - don't show pause menu
+		# But if we're in combat, allow pause menu to show even with UI open
 		print("PauseMenu: Closing open UI...")
 		_close_open_ui()
 		# Don't proceed to pause menu - just close the UI and return
 		return
 	else:
-		# No UI open, toggle pause menu
-		print("PauseMenu: No UI open, toggling pause menu...")
+		# No UI open OR we're in combat - toggle pause menu
+		print("PauseMenu: No UI open or in combat, toggling pause menu...")
 		_toggle_pause_menu()
 
 func _check_for_open_ui() -> bool:
@@ -200,8 +209,37 @@ func _hide_pause_menu():
 	# Resume the game
 	get_tree().paused = false
 	
-	# Hide cursor (let other systems handle this)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# Restore appropriate cursor mode based on game state
+	var should_show_cursor = false
+	
+	# Check if we're in combat - if so, keep cursor visible for UI interaction
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager and combat_manager.has_method("is_combat_active"):
+		if combat_manager.is_combat_active():
+			should_show_cursor = true
+			print("PauseMenu: Combat active - keeping cursor visible")
+	
+	# Check if any UI windows are open that need cursor
+	if not should_show_cursor:
+		var equipment_uis = get_tree().get_nodes_in_group("EquipmentUI")
+		for ui in equipment_uis:
+			if ui.visible:
+				should_show_cursor = true
+				print("PauseMenu: Equipment UI open - keeping cursor visible")
+				break
+		
+		var inventory_ui = get_tree().get_first_node_in_group("InventoryUI")
+		if inventory_ui and inventory_ui.visible:
+			should_show_cursor = true
+			print("PauseMenu: Inventory UI open - keeping cursor visible")
+	
+	# Set cursor mode
+	if should_show_cursor:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		print("PauseMenu: Restored cursor to VISIBLE mode")
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		print("PauseMenu: Restored cursor to CAPTURED mode")
 
 func _on_restart_pressed():
 	"""Restart the game"""

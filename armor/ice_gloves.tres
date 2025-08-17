@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="Equipment" load_steps=2 format=3 uid="uid://fire_gloves_example"]
+
+[ext_resource type="Script" path="res://equipment.gd" id="1_equipment"]
+
+[resource]
+script = ExtResource("1_equipment")
+name = "Fire-Enchanted Gloves"
+description = "Gloves imbued with fire magic. Attacks with fire damage deal 5% more damage."
+item_type = 1
+max_stack = 1
+drop_chance = 50.0
+rarity = 2
+equipment_slot = "gloves"
+slot = 0
+armor_value = 2
+damage_value = 0
+stat_bonuses = {}
+required_level = 5
+
+# Elemental bonuses
+elemental_bonuses = {
+"fire": 5.0  # +5% fire damage
+}
+
+# Tooltip Section Controls
+show_name = true
+show_type = true
+show_rarity = true
+show_level_requirement = true
+show_stats = true
+show_description = true
+show_elemental_bonuses = true
+
+# Tooltip Content
+custom_name = ""
+custom_type = ""
+custom_description = ""
+level_requirement = 5
+custom_stats = {"armor": 2}

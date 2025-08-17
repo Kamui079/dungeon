@@ -1,33 +1,17 @@
-[gd_resource type="Resource" script_class="Equipment" load_steps=2 format=3 uid="uid://rusty_sword"]
+[gd_resource type="Resource" script_class="Weapon" load_steps=2 format=3 uid="uid://bqxvxqxqxqxqx"]
 
-[ext_resource type="Script" path="res://equipment.gd" id="1_equipment"]
+[ext_resource type="Script" path="res://weapons/rusty_sword.gd" id="1_rusty_sword"]
 
-[resource]
-script = ExtResource("1_equipment")
-name = "Rusty Sword"
-description = "An old, rusty sword that still has some fight left in it."
-item_type = 1
-max_stack = 1
-drop_chance = 100.0
-rarity = 0
-equipment_slot = "weapon"
-slot = 0
-armor_value = 0
-damage_value = 8
-stat_bonuses = {}
-required_level = 1
+[sub_resource type="Script" id="1_rusty_sword"]
+script = ExtResource("1_rusty_sword")
 
-# Tooltip Section Controls
-show_name = true
-show_type = true
-show_rarity = true
-show_level_requirement = false
-show_stats = true
-show_description = true
-
-# Tooltip Content
-custom_name = ""
-custom_type = ""
-custom_description = ""
-level_requirement = 1
-custom_stats = {"damage": 8}
+custom_stats = {
+"name": "Rusty Sword",
+"description": "A basic sword with some rust. Still sharp enough to cut.",
+"damage": 15,
+"damage_type": "physical",
+"durability": 80,
+"max_durability": 100,
+"level_requirement": 1,
+"rarity": "common"
+}

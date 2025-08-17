@@ -32,15 +32,17 @@ class StatusEffect:
 	var duration: int
 	var remaining_duration: int
 	var source: Node  # Who applied the effect
+	var entity: Node  # Who the effect is applied to
 	var is_active: bool = true
 	var visual_effect: Node = null  # Reference to the visual effect node
 	
-	func _init(effect_type: EFFECT_TYPE, damage: int, effect_duration: int, effect_source: Node):
+	func _init(effect_type: EFFECT_TYPE, damage: int, effect_duration: int, effect_source: Node, effect_entity: Node):
 		type = effect_type
 		damage_per_tick = damage
 		duration = effect_duration
 		remaining_duration = effect_duration
 		source = effect_source
+		entity = effect_entity
 	
 	func tick() -> int:
 		"""Process one tick of the effect, return damage dealt"""
@@ -50,10 +52,54 @@ class StatusEffect:
 		remaining_duration -= 1
 		var damage_dealt = damage_per_tick
 		
+		# Apply damage directly with proper damage type for damage numbers
+		if damage_dealt > 0:
+			var damage_type = _get_damage_type_for_effect()
+			# Try to find the correct node to call take_damage on
+			var target_node = _find_take_damage_target()
+			if target_node and target_node.has_method("take_damage"):
+				target_node.take_damage(damage_dealt, damage_type)
+		
 		if remaining_duration <= 0:
 			is_active = false
 		
 		return damage_dealt
+	
+	func _find_take_damage_target() -> Node:
+		"""Find the correct node to call take_damage on"""
+		# First try the entity itself
+		if entity and entity.has_method("take_damage"):
+			return entity
+		
+		# If entity doesn't have take_damage, look for enemy_behavior child
+		if entity:
+			for child in entity.get_children():
+				if child.has_method("take_damage"):
+					return child
+		
+		return null
+	
+	func _get_damage_type_for_effect() -> String:
+		"""Get the damage type string for this status effect"""
+		match type:
+			EFFECT_TYPE.POISON:
+				return "poison"
+			EFFECT_TYPE.IGNITE:
+				return "ignite"
+			EFFECT_TYPE.BLEED:
+				return "bleed"
+			EFFECT_TYPE.FREEZE:
+				return "freeze"
+			EFFECT_TYPE.SHOCK:
+				return "shock"
+			EFFECT_TYPE.BONE_BREAK:
+				return "physical"  # Bone break is physical damage
+			EFFECT_TYPE.STUN:
+				return "physical"  # Stun is physical damage
+			EFFECT_TYPE.SLOW:
+				return "physical"  # Slow is physical damage
+			_:
+				return "physical"  # Default fallback
 	
 	func get_remaining_duration() -> int:
 		return remaining_duration
@@ -107,7 +153,7 @@ class EntityStatusEffects:
 				return
 		
 		# Create new effect
-		var new_effect = StatusEffect.new(effect_type, damage, duration, source)
+		var new_effect = StatusEffect.new(effect_type, damage, duration, source, entity)
 		effects.append(new_effect)
 		
 		# Create and display visual effect
@@ -309,7 +355,7 @@ class EntityStatusEffects:
 			effect_height = _get_default_entity_height(entity_root)
 		
 		# Position the effect above the enemy with some padding
-		var padding = 0.2  # Small gap between enemy and effect
+		var padding = -0.1  # Reduced padding to make effect spawn lower (was 0.2)
 		sprite.position.y = effect_height + padding
 		
 		print("Auto-positioned status effect at height: ", effect_height + padding, " (entity height: ", effect_height, ")")
@@ -475,7 +521,6 @@ class EntityStatusEffects:
 	
 	func _on_effect_tick():
 		"""Process all active effects"""
-		var total_damage = 0
 		var effects_to_remove: Array[int] = []
 		
 		for i in range(effects.size()):
@@ -488,18 +533,14 @@ class EntityStatusEffects:
 				effects_to_remove.append(i)
 				continue
 			
+			# Process the effect (damage is now handled directly by each effect)
 			var damage = effect.tick()
 			if damage > 0:
-				total_damage += damage
 				_log_effect_damage(effect.type, damage)
 		
 		# Remove expired effects
 		for i in range(effects_to_remove.size() - 1, -1, -1):
 			effects.remove_at(effects_to_remove[i])
-		
-		# Apply total damage
-		if total_damage > 0 and entity.has_method("take_damage"):
-			entity.take_damage(total_damage)
 	
 	
 	func _log_effect_applied(effect_type: EFFECT_TYPE, duration: int):
@@ -549,6 +590,28 @@ class EntityStatusEffects:
 				return "Shock"
 			_:
 				return "Unknown Effect"
+	
+	func _get_damage_type_for_effect(effect_type: EFFECT_TYPE) -> String:
+		"""Get the damage type string for a status effect"""
+		match effect_type:
+			EFFECT_TYPE.POISON:
+				return "poison"
+			EFFECT_TYPE.IGNITE:
+				return "ignite"
+			EFFECT_TYPE.BLEED:
+				return "bleed"
+			EFFECT_TYPE.FREEZE:
+				return "freeze"
+			EFFECT_TYPE.SHOCK:
+				return "shock"
+			EFFECT_TYPE.BONE_BREAK:
+				return "physical"  # Bone break is physical damage
+			EFFECT_TYPE.STUN:
+				return "physical"  # Stun is physical damage
+			EFFECT_TYPE.SLOW:
+				return "physical"  # Slow is physical damage
+			_:
+				return "physical"  # Default fallback
 
 # End of EntityStatusEffects class
 
@@ -575,6 +638,35 @@ func apply_effect(entity: Node, effect_type: EFFECT_TYPE, damage: int, duration:
 	var effects = get_entity_effects(entity)
 	effects.add_effect(effect_type, damage, duration, source)
 	
+	# Log status effect to combat log
+	var entity_name = "Unknown"
+	if entity.has_method("enemy_name"):
+		entity_name = entity.enemy_name
+	elif entity.has_method("get_name"):
+		entity_name = entity.get_name()
+	elif entity.name:
+		entity_name = entity.name
+	
+	var effect_name = ""
+	match effect_type:
+		EFFECT_TYPE.POISON:
+			effect_name = "poisoned"
+		EFFECT_TYPE.IGNITE:
+			effect_name = "ignited"
+		EFFECT_TYPE.BONE_BREAK:
+			effect_name = "bone broken"
+		EFFECT_TYPE.STUN:
+			effect_name = "stunned"
+		EFFECT_TYPE.SLOW:
+			effect_name = "slowed"
+		_:
+			effect_name = "affected by status effect"
+	
+	# Try to log to combat manager if available
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager and combat_manager.has_method("_log_combat_event"):
+		combat_manager._log_combat_event("☠️ " + entity_name + " is " + effect_name + "! (" + str(duration) + " turns)")
+	
 	# Emit signal for UI updates
 	effects_changed.emit(entity)
 
@@ -582,6 +674,35 @@ func remove_effect(entity: Node, effect_type: EFFECT_TYPE):
 	"""Remove a specific effect from an entity"""
 	if entity_effects.has(entity):
 		entity_effects[entity].remove_effect(effect_type)
+		
+		# Log status effect removal to combat log
+		var entity_name = "Unknown"
+		if entity.has_method("enemy_name"):
+			entity_name = entity.enemy_name
+		elif entity.has_method("get_name"):
+			entity_name = entity.get_name()
+		elif entity.name:
+			entity_name = entity.name
+		
+		var effect_name = ""
+		match effect_type:
+			EFFECT_TYPE.POISON:
+				effect_name = "poison"
+			EFFECT_TYPE.IGNITE:
+				effect_name = "ignite"
+			EFFECT_TYPE.BONE_BREAK:
+				effect_name = "bone break"
+			EFFECT_TYPE.STUN:
+				effect_name = "stun"
+			EFFECT_TYPE.SLOW:
+				effect_name = "slow"
+			_:
+				effect_name = "status effect"
+		
+		# Try to log to combat manager if available
+		var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+		if combat_manager and combat_manager.has_method("_log_combat_event"):
+			combat_manager._log_combat_event("✨ " + entity_name + " is no longer " + effect_name + "ed!")
 
 func clear_entity_effects(entity: Node):
 	"""Clear all effects from an entity"""

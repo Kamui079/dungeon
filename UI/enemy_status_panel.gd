@@ -34,7 +34,7 @@ func set_enemy(enemy: Node):
 	current_enemy = enemy
 	
 	# Update enemy name
-	enemy_name_label.text = enemy.name
+	update_enemy_info(enemy)
 	
 	# Connect to enemy signals for updates
 	if enemy.has_signal("health_changed"):
@@ -202,3 +202,17 @@ func refresh_display():
 		update_health_display()
 		update_mana_display()
 		update_status_effects()
+
+func update_enemy_info(enemy: Node) -> void:
+	"""Update the panel with current enemy information"""
+	if not enemy:
+		return
+	
+	# Get proper enemy display name
+	var enemy_display_name = "Unknown Enemy"
+	if enemy.has_method("enemy_name"):
+		enemy_display_name = enemy.enemy_name()
+	elif enemy.name:
+		enemy_display_name = enemy.name
+	
+	enemy_name_label.text = enemy_display_name

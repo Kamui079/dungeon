@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://3bjx3edc46mw"]
+[gd_scene load_steps=18 format=3 uid="uid://3bjx3edc46mw"]
 
 [ext_resource type="Script" uid="uid://xerxi770axkc" path="res://dungeon.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://character_body_3d.tscn" id="2_player"]
@@ -10,8 +10,10 @@
 [ext_resource type="PackedScene" uid="uid://bqxvxqxqxqxqx" path="res://UI/CombatUI.tscn" id="23_combat_ui_scene"]
 [ext_resource type="PackedScene" uid="uid://dfxhvjmv27gqh" path="res://UI/EquipmentUI.tscn" id="24_equipment_ui_scene"]
 [ext_resource type="PackedScene" uid="uid://bqxxvmmv4pv12" path="res://UI/tooltip_manager.tscn" id="25_tooltip_manager"]
-[ext_resource type="Script" uid="uid://gry25qrjhawh" path="res://database_manager.gd" id="26_database_manager"]
-[ext_resource type="PackedScene" uid="uid://bqxvn8yqxqxqx" path="res://pause_menu.tscn" id="27_pause_menu"]
+[ext_resource type="PackedScene" uid="uid://dw2y071evqab3" path="res://UI/HUD.tscn" id="26_hud_scene"]
+[ext_resource type="Script" uid="uid://gry25qrjhawh" path="res://database_manager.gd" id="27_database_manager"]
+[ext_resource type="PackedScene" uid="uid://bqxvn8yqxqxqx" path="res://pause_menu.tscn" id="28_pause_menu"]
+[ext_resource type="Script" uid="uid://d11ddoxscx35q" path="res://damage_numbers.gd" id="29_damage_numbers"]
 
 [sub_resource type="StandardMaterial3D" id="3_wall_material"]
 albedo_color = Color(0.6, 0.6, 0.6, 1)
@@ -26,6 +28,7 @@ data = PackedVector3Array(-1.4998, -1.4997, -12.5552, -1.4998, -1.4997, -1.3458,
 
 [node name="Dungeon" type="Node3D"]
 script = ExtResource("1_script")
+big_rat_scene = ExtResource("21_big_rat_scene")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, -5)
@@ -69,11 +72,7 @@ light_energy = 0.8
 [node name="Chest" parent="." instance=ExtResource("20_chest_scene")]
 transform = Transform3D(0.549844, 0, 0, 0, 0.549844, 0, 0, 0, 0.549844, 11.0844, -1.52831, 0.177985)
 
-[node name="BigRat" parent="." instance=ExtResource("21_big_rat_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1.2, 0)
-
-[node name="BigRat2" parent="." instance=ExtResource("21_big_rat_scene")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, -1.2, 0)
+[node name="EnemySpawner" type="Node3D" parent="."]
 
 [node name="CombatManager" type="Node" parent="."]
 script = ExtResource("22_combat_manager")
@@ -83,11 +82,18 @@ script = ExtResource("22_status_effects")
 
 [node name="CombatUI" parent="." instance=ExtResource("23_combat_ui_scene")]
 
+[node name="HUD" parent="." instance=ExtResource("26_hud_scene")]
+grow_horizontal = 2
+grow_vertical = 2
+
 [node name="EquipmentUI" parent="." instance=ExtResource("24_equipment_ui_scene")]
 
 [node name="TooltipManager" parent="." instance=ExtResource("25_tooltip_manager")]
 
 [node name="DatabaseManager" type="Node" parent="."]
-script = ExtResource("26_database_manager")
+script = ExtResource("27_database_manager")
 
-[node name="PauseMenu" parent="." instance=ExtResource("27_pause_menu")]
+[node name="DamageNumbers" type="Node" parent="."]
+script = ExtResource("29_damage_numbers")
+
+[node name="PauseMenu" parent="." instance=ExtResource("28_pause_menu")]
