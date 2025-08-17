@@ -959,7 +959,7 @@ func _position_enemy_at_combat_distance():
 	
 	# Cone formation parameters
 	var base_distance = 3.0  # Base distance from player
-	var cone_angle = deg_to_rad(140.0)  # 140-degree cone (70 degrees each side)
+	var cone_angle = deg_to_rad(75.0)  # 75-degree cone
 	var max_enemies_per_row = 4  # Maximum enemies in a single row (increased for wider cone)
 	
 	# Calculate positions for each enemy
@@ -993,6 +993,9 @@ func _position_enemy_at_combat_distance():
 			var target_pos = player_pos + (direction * row_distance)
 			target_pos.y = enemy.global_position.y  # Keep current height
 			
+			# Store the initial combat position on the enemy itself
+			enemy.initial_combat_position = target_pos
+
 			enemy_positions.append({
 				"enemy": enemy,
 				"target_pos": target_pos,

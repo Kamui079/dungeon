@@ -85,6 +85,9 @@ var is_moving_to_target: bool = false
 var target_position: Vector3 = Vector3.ZERO
 var is_frozen: bool = false  # Flag to prevent movement during combat
 var movement_attempts: int = 0  # Track movement attempts to prevent infinite loops
+var initial_combat_position: Vector3 = Vector3.ZERO  # The enemy's starting position in the combat cone
+var original_position: Vector3 = Vector3.ZERO  # The enemy's position before moving to attack
+var is_returning: bool = false  # Flag to track if the enemy is returning to its position
 
 # Death system
 var is_dead: bool = false
@@ -607,6 +610,8 @@ func melee_attack():
 	if not current_target is Node3D:
 		print(enemy_name, " ERROR: Current target is not a Node3D - cannot access global_position!")
 		return
+
+	original_position = parent_body.global_position
 	var distance_to_target = parent_body.global_position.distance_to(current_target.global_position)
 	if distance_to_target > 2.0:  # Need to get closer (increased from 1.5 to 2.0)
 		# Safety check: prevent infinite movement loops
@@ -639,20 +644,8 @@ func melee_attack():
 	# Gain spirit from attacking (like players do)
 	gain_spirit(1)
 	
-	# Wait for animation to complete before ending turn
-	if combat_manager and combat_manager.has_method("wait_for_animation_then_end_turn"):
-		print(enemy_name, " waiting for animation to complete before ending turn")
-		combat_manager.wait_for_animation_then_end_turn(self)
-	else:
-		# Fallback: end turn immediately if animation system not available
-		print(enemy_name, " ending turn immediately (no animation system)")
-		if combat_manager:
-			if combat_manager.has_method("end_enemy_turn"):
-				combat_manager.end_enemy_turn()
-			else:
-				combat_manager.end_current_turn()
-		else:
-			print(enemy_name, " WARNING: No combat manager to end turn!")
+	# Return to initial position after attacking
+	return_to_initial_position()
 
 # Lightning paralysis methods for enemies
 func get_lightning_paralysis_chance() -> float: return 25.0
@@ -1164,6 +1157,23 @@ func get_attack_damage() -> int:
 	var final_damage = int(attack_damage * multiplier)
 	
 	return final_damage
+
+func return_to_initial_position():
+	is_returning = true
+	var parent_body = get_parent()
+	if not parent_body or not parent_body is CharacterBody3D:
+		is_returning = false
+		if combat_manager and combat_manager.has_method("_end_enemy_turn_for"):
+			combat_manager._end_enemy_turn_for(self)
+		return
+
+	var tween = create_tween()
+	tween.tween_property(parent_body, "global_position", initial_combat_position, 1.0)
+	tween.tween_callback(func():
+		is_returning = false
+		if combat_manager and combat_manager.has_method("_end_enemy_turn_for"):
+			combat_manager._end_enemy_turn_for(self)
+	)
 
 func apply_ignite(initial_damage: int, duration: int = 3):
 	# Apply or refresh ignite effect
