@@ -25,6 +25,10 @@ script = ExtResource("2_spring_arm_script")
 [node name="Camera3D" type="Camera3D" parent="SpringArm3D" groups=["player"]]
 transform = Transform3D(0.999616, 0, -0.0276949, 0, 1, 0, 0.0276949, 0, 0.999616, -0.0089369, 0, 1.0415)
 
+[node name="WallRaycast" type="RayCast3D" parent="SpringArm3D/Camera3D"]
+target_position = Vector3(0, 0, -10)
+collision_mask = 1
+
 [node name="InteractionArea" type="Area3D" parent="."]
 collision_layer = 0
 collision_mask = 2

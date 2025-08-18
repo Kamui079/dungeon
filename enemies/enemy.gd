@@ -85,9 +85,6 @@ var is_moving_to_target: bool = false
 var target_position: Vector3 = Vector3.ZERO
 var is_frozen: bool = false  # Flag to prevent movement during combat
 var movement_attempts: int = 0  # Track movement attempts to prevent infinite loops
-var initial_combat_position: Vector3 = Vector3.ZERO  # The enemy's starting position in the combat cone
-var original_position: Vector3 = Vector3.ZERO  # The enemy's position before moving to attack
-var is_returning: bool = false  # Flag to track if the enemy is returning to its position
 
 # Death system
 var is_dead: bool = false
@@ -297,7 +294,7 @@ func _physics_process(delta):
 	parent_body.move_and_slide()
 
 # Virtual functions that can be overridden by specific enemy types
-func start_combat():
+async func start_combat():
 	if in_combat or not combat_manager:
 		return
 	
@@ -327,7 +324,7 @@ func start_combat():
 	# Pass the parent node (CharacterBody3D) to the combat manager, not this behavior node
 	var parent_body = get_parent()
 	if parent_body and parent_body is CharacterBody3D:
-		combat_manager.start_combat(parent_body, player)
+		await combat_manager.start_combat(parent_body, player)
 	else:
 		print(enemy_name, " ERROR: Cannot start combat - parent is not a CharacterBody3D!")
 		return
@@ -610,8 +607,6 @@ func melee_attack():
 	if not current_target is Node3D:
 		print(enemy_name, " ERROR: Current target is not a Node3D - cannot access global_position!")
 		return
-
-	original_position = parent_body.global_position
 	var distance_to_target = parent_body.global_position.distance_to(current_target.global_position)
 	if distance_to_target > 2.0:  # Need to get closer (increased from 1.5 to 2.0)
 		# Safety check: prevent infinite movement loops
@@ -644,8 +639,13 @@ func melee_attack():
 	# Gain spirit from attacking (like players do)
 	gain_spirit(1)
 	
-	# Return to initial position after attacking
-	return_to_initial_position()
+	# Wait for attack animation to finish, then return to initial position
+	var anim_wait_timer = Timer.new()
+	anim_wait_timer.wait_time = 1.0 # Approximate animation time
+	anim_wait_timer.one_shot = true
+	anim_wait_timer.timeout.connect(return_to_initial_position)
+	add_child(anim_wait_timer)
+	anim_wait_timer.start()
 
 # Lightning paralysis methods for enemies
 func get_lightning_paralysis_chance() -> float: return 25.0
@@ -653,6 +653,26 @@ func is_lightning_attack(attack_type: String) -> bool:
 	match attack_type:
 		"lightning_bolt", "lightning_weapon_basic", "lightning_weapon_special": return true
 		_: return false
+
+func return_to_initial_position():
+	var parent_body = get_parent()
+	if not parent_body:
+		if combat_manager: combat_manager.end_current_turn()
+		return
+
+	var initial_pos = parent_body.get("initial_combat_position")
+
+	if initial_pos and initial_pos != Vector3.ZERO:
+		var tween = create_tween()
+		tween.tween_property(parent_body, "global_position", initial_pos, 0.8)
+		tween.tween_callback(func():
+			if combat_manager:
+				combat_manager.end_current_turn()
+		)
+	else:
+		# No initial position, just end turn
+		if combat_manager:
+			combat_manager.end_current_turn()
 
 func move_to_target(target: Node):
 	print(enemy_name, " DEBUG: BASE ENEMY move_to_target() called!")
@@ -1157,23 +1177,6 @@ func get_attack_damage() -> int:
 	var final_damage = int(attack_damage * multiplier)
 	
 	return final_damage
-
-func return_to_initial_position():
-	is_returning = true
-	var parent_body = get_parent()
-	if not parent_body or not parent_body is CharacterBody3D:
-		is_returning = false
-		if combat_manager and combat_manager.has_method("_end_enemy_turn_for"):
-			combat_manager._end_enemy_turn_for(self)
-		return
-
-	var tween = create_tween()
-	tween.tween_property(parent_body, "global_position", initial_combat_position, 1.0)
-	tween.tween_callback(func():
-		is_returning = false
-		if combat_manager and combat_manager.has_method("_end_enemy_turn_for"):
-			combat_manager._end_enemy_turn_for(self)
-	)
 
 func apply_ignite(initial_damage: int, duration: int = 3):
 	# Apply or refresh ignite effect

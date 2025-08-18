@@ -716,7 +716,7 @@ func _end_enemy_turn_for(enemy: Node) -> void:
 	# Restore camera to player's target after enemy turn ends
 	_restore_camera_to_player_target()
 
-func start_combat(enemy: Node, player: Node):
+async func start_combat(enemy: Node, player: Node):
 	"""Start a new combat encounter"""
 	if in_combat or not enemy or not player:
 		return
@@ -819,14 +819,18 @@ func start_combat(enemy: Node, player: Node):
 	# Call enemy's custom combat start behavior
 	if current_enemy and current_enemy.has_method("on_combat_start"):
 		current_enemy.on_combat_start()
-	
+
+	# Reorient camera before positioning enemies
+	if player.has_method("check_and_reorient_camera"):
+		await player.check_and_reorient_camera(enemy)
+
 	# Orient player and camera toward the enemy
 	_orient_player_toward_enemy()
 	
-	# Start ATB system
-	_start_atb_timers()
+	# Position enemies and start combat
+	_position_enemy_at_combat_distance()
 
-func add_enemy_to_combat(enemy: Node):
+async func add_enemy_to_combat(enemy: Node):
 	"""Add an additional enemy to an existing combat encounter"""
 	if not in_combat or not enemy:
 		return
@@ -881,7 +885,11 @@ func add_enemy_to_combat(enemy: Node):
 	if current_player and current_player.has_method("set_auto_facing_enabled"):
 		current_player.set_auto_facing_enabled(false)
 		print("🎯 Disabled automatic enemy facing for combat")
-	
+
+	# Reorient camera before positioning enemies
+	if current_player.has_method("check_and_reorient_camera"):
+		await current_player.check_and_reorient_camera(enemy)
+
 	# Check if player is grounded before starting combat
 	if current_player and current_player is Node3D:
 		if current_player.has_method("is_on_floor") and not current_player.is_on_floor():
@@ -993,6 +1001,18 @@ func _position_enemy_at_combat_distance():
 			var target_pos = player_pos + (direction * row_distance)
 			target_pos.y = enemy.global_position.y  # Keep current height
 			
+			# NEW: Wall collision check
+			var space_state = get_world_3d().direct_space_state
+			var query = PhysicsRayQueryParameters3D.new()
+			query.from = player_pos
+			query.to = target_pos
+			query.collision_mask = 1 # World geometry
+
+			var result = space_state.intersect_ray(query)
+			if result:
+				# Wall detected, adjust target_pos
+				target_pos = result.position - (direction * 0.5) # Place enemy 0.5 units in front of the wall
+
 			# Store the initial combat position on the enemy itself
 			enemy.initial_combat_position = target_pos
 

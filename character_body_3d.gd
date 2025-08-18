@@ -605,3 +605,40 @@ func _add_starter_equipment():
 	_inventory.add_item_to_bag(boots, 1)
 	_inventory.add_item_to_bag(acid_flask, 3)  # Give 3 acid flasks
 	_inventory.add_item_to_bag(venom_dart, 5)  # Give 5 venom darts
+
+func check_and_reorient_camera(target: Node) -> Signal:
+	var reorient_finished = Signal()
+	reorient_finished.name = "reorient_finished" # for debugging
+	_reorient_camera_async(target, reorient_finished)
+	return reorient_finished
+
+async func _reorient_camera_async(target: Node, finished_signal: Signal):
+	var wall_raycast = $SpringArm3D/Camera3D/WallRaycast
+	if not wall_raycast:
+		printerr("WallRaycast node not found!")
+		finished_signal.emit()
+		return
+
+	var clear_view_found = false
+	var attempts = 0
+
+	while not clear_view_found and attempts < 8: # Max 8 attempts (360 degrees)
+		wall_raycast.force_raycast_update()
+		if not wall_raycast.is_colliding():
+			clear_view_found = true
+		else:
+			var tween = create_tween()
+			var target_rotation_y = rotation.y + deg_to_rad(45)
+			tween.tween_property(self, "rotation:y", target_rotation_y, 0.5).set_ease(Tween.EASE_OUT)
+			await tween.finished
+			attempts += 1
+
+	if not clear_view_found:
+		print("Could not find a clear view after 8 attempts.")
+
+	# Final orientation towards the enemy
+	face_target(target)
+	# wait for face_target to finish
+	await get_tree().create_timer(0.9).timeout # face_target takes 0.8s
+
+	finished_signal.emit()
