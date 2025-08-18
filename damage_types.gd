@@ -12,6 +12,7 @@ enum DAMAGE_TYPE {
 	DARK,
 	HOLY,
 	EARTH,
+	WATER,
 	BLEED,
 	IGNITE,
 	FREEZE,
@@ -33,6 +34,7 @@ const DAMAGE_COLORS = {
 	DAMAGE_TYPE.DARK: Color.PURPLE,
 	DAMAGE_TYPE.HOLY: Color.GOLD,
 	DAMAGE_TYPE.EARTH: Color.BROWN,
+	DAMAGE_TYPE.WATER: Color.BLUE,
 	DAMAGE_TYPE.BLEED: Color.RED,
 	DAMAGE_TYPE.IGNITE: Color.DARK_ORANGE,
 	DAMAGE_TYPE.FREEZE: Color.LIGHT_BLUE,
@@ -54,6 +56,7 @@ const DAMAGE_NAMES = {
 	DAMAGE_TYPE.DARK: "Dark",
 	DAMAGE_TYPE.HOLY: "Holy",
 	DAMAGE_TYPE.EARTH: "Earth",
+	DAMAGE_TYPE.WATER: "Water",
 	DAMAGE_TYPE.BLEED: "Bleed",
 	DAMAGE_TYPE.IGNITE: "Ignite",
 	DAMAGE_TYPE.FREEZE: "Freeze",
@@ -88,6 +91,8 @@ static func get_damage_type_enum(damage_type_string: String) -> DAMAGE_TYPE:
 			return DAMAGE_TYPE.HOLY
 		"earth", "stone", "nature":
 			return DAMAGE_TYPE.EARTH
+		"water", "aqua", "wet":
+			return DAMAGE_TYPE.WATER
 		"bleed", "blood":
 			return DAMAGE_TYPE.BLEED
 		"ignite", "burning":

@@ -165,6 +165,17 @@ func _apply_spell_status_effects(spell_data: Dictionary, damage: int):
 			"freeze":
 				if randf() * 100.0 <= chance:
 					status_manager.apply_freeze(target_enemy, duration, current_player)
+			"magic_vulnerability":
+				if randf() < 0.5: # 50% chance
+					status_manager.apply_magic_vulnerability(target_enemy, 2, current_player)
+			"corruption":
+				# DoT damage is 20% of initial spell damage, for 3 turns
+				var dot_damage = int(damage * 0.2)
+				status_manager.apply_corruption(target_enemy, dot_damage, 3, current_player)
+			"slow":
+				status_manager.apply_slow(target_enemy, spell_data.get("duration", 3), current_player)
+			"stun":
+				status_manager.apply_stun(target_enemy, spell_data.get("duration", 1), current_player)
 
 # Camera target management for enemy turns
 var player_current_target: Node = null  # The enemy the player has targeted
@@ -229,6 +240,66 @@ var available_spells: Dictionary = {
 		"tags": ["aoe", "multi-cast"],
 		"aoe_radius": 4.0,
 		"description": "Shake the earth, dealing damage to all enemies in an area for 2 turns."
+	},
+	"arcane_bolt": {
+		"name": "Arcane Bolt",
+		"damage_type": "arcane",
+		"base_damage": 30,
+		"mana_cost": 22,
+		"level_scaling": 3.8,
+		"animation": "fire_magic", # Placeholder animation
+		"status_effects": ["magic_vulnerability"],
+		"tags": ["single target"],
+		"description": "A bolt of pure magic that can make targets more susceptible to further spells."
+	},
+	"dark_intention": {
+		"name": "Dark Intention",
+		"damage_type": "dark",
+		"base_damage": 15, # Lower base damage due to powerful DoT
+		"mana_cost": 35,
+		"level_scaling": 2.5,
+		"animation": "fire_magic", # Placeholder animation
+		"status_effects": ["corruption"],
+		"tags": ["aoe", "self"], # Self-centered AOE
+		"aoe_radius": 5.0,
+		"description": "Unleash a wave of dark energy, corrupting nearby enemies."
+	},
+	"whirlpool": {
+		"name": "Whirlpool",
+		"damage_type": "water",
+		"base_damage": 10,
+		"mana_cost": 30,
+		"level_scaling": 2.0,
+		"animation": "fire_magic", # Placeholder
+		"status_effects": ["slow"],
+		"duration": 3, # For the slow effect
+		"tags": ["aoe"],
+		"aoe_radius": 3.5,
+		"description": "Summons a whirlpool that slows and damages enemies for 3 turns."
+	},
+	"bubble_burst": {
+		"name": "Bubble Burst",
+		"damage_type": "water",
+		"base_damage": 0, # Initial cast does no damage, only stuns
+		"mana_cost": 25,
+		"level_scaling": 0,
+		"animation": "fire_magic", # Placeholder
+		"status_effects": ["stun"],
+		"duration": 1, # For the stun effect
+		"tags": ["single target", "multi-cast"],
+		"description": "Traps an enemy in a bubble for 1 turn, which then bursts, dealing splash damage."
+	},
+	"bubble_burst_damage": {
+		"name": "Bubble Burst (Explosion)",
+		"damage_type": "water",
+		"base_damage": 20,
+		"mana_cost": 0, # No cost for the explosion part
+		"level_scaling": 3.0,
+		"animation": "fire_magic", # Placeholder
+		"status_effects": [],
+		"tags": ["aoe"],
+		"aoe_radius": 2.5,
+		"description": "The damaging explosion from Bubble Burst."
 	}
 }
 
@@ -2621,6 +2692,16 @@ func _process_attack_damage(base_damage: int, _damage_type: String, _attack_type
 		var damage_bonus = current_player.get_meta("blessing_damage_bonus")
 		final_damage += damage_bonus
 		print("✨ Blessing damage bonus applied: +", damage_bonus, " damage!")
+
+	# Check for magic vulnerability on the target
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	var target = get_focused_enemy() # This function is called in the context of a player's spell
+	if status_manager and target and status_manager.has_effect(target, status_manager.EFFECT_TYPE.MAGIC_VULNERABILITY):
+		var vulnerability_effect = status_manager.get_effect(target, status_manager.EFFECT_TYPE.MAGIC_VULNERABILITY)
+		if vulnerability_effect:
+			var vulnerability_percent = float(vulnerability_effect.damage_per_tick) / 100.0
+			final_damage = int(final_damage * (1.0 + vulnerability_percent))
+			_log_combat_event("🎯 Target is vulnerable to magic! Damage increased by " + str(vulnerability_effect.damage_per_tick) + "%.")
 	
 	# Apply other damage modifiers here (critical hits, etc.)
 	# For now, just return the elemental-modified damage
@@ -2906,19 +2987,29 @@ func _execute_spell_directly(data: Dictionary):
 	# Execute the core spell logic
 	_execute_spell_logic(spell_id, current_player, get_focused_enemy())
 
-	# Handle special multi-cast logic for spells like Earthquake
+	# Handle special multi-cast logic for spells like Earthquake and Bubble Burst
 	if "multi-cast" in spell_data.get("tags", []):
 		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
 		if status_manager:
-			var recast_data = {
-				"spell_id": spell_id,
-				"caster": current_player,
-				"target": get_focused_enemy(),
-				"damage_multiplier": 0.5
-			}
-			# Duration of 1 means it will trigger on the player's next turn start
-			status_manager.apply_recast_spell(current_player, current_player, 1, recast_data)
-			_log_combat_event("The ground continues to tremble...")
+			var recast_data = {}
+			if spell_id == "earthquake":
+				recast_data = {
+					"spell_id": "earthquake",
+					"caster": current_player,
+					"target": get_focused_enemy(),
+					"damage_multiplier": 0.5
+				}
+				status_manager.apply_recast_spell(current_player, current_player, 1, recast_data)
+				_log_combat_event("The ground continues to tremble...")
+			elif spell_id == "bubble_burst":
+				recast_data = {
+					"spell_id": "bubble_burst_damage", # Queue the explosion part
+					"caster": current_player,
+					"target": get_focused_enemy(),
+					"damage_multiplier": 1.0 # No multiplier for the explosion
+				}
+				status_manager.apply_recast_spell(current_player, current_player, 1, recast_data)
+				_log_combat_event("A bubble forms around " + get_focused_enemy().name + "!")
 
 	# End the player's turn (animations are handled by the logic/damage system)
 	_end_player_turn()
@@ -4242,6 +4333,25 @@ func _on_animation_damage_ready(_animation_type: AnimationManager.ANIMATION_TYPE
 				# Apply a stack of petrify
 				status_manager.apply_petrify(target, actor)
 
+	# Handle Water damage buff removal
+	if damage_type == "water":
+		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+		if status_manager and randf() < 0.3: # 30% chance
+			var effects_manager = status_manager.get_entity_effects(target)
+			var buffs_removed = 0
+			var effects_to_remove = []
+			for effect in effects_manager.effects:
+				if effect.effect_category == "buff":
+					effects_to_remove.append(effect.type)
+					buffs_removed += 1
+
+			if buffs_removed > 0:
+				for effect_type in effects_to_remove:
+					effects_manager.remove_effect(effect_type)
+
+				_log_combat_event("💧 " + _get_entity_name(target) + "'s buffs were washed away!")
+				status_manager.apply_waterlogged(target, actor, buffs_removed)
+
 	# End the actor's turn after damage is applied
 	if actor.has_method("enemy_name"):  # This is an enemy
 		print("🎯 Enemy ", actor_name, " animation completed, ending turn")
@@ -4292,13 +4402,21 @@ func _execute_spell_logic(spell_id: String, caster: Node, target: Node, damage_m
 	final_damage = int(final_damage * damage_multiplier)
 
 	# Handle AOE
-	var targets = [primary_target]
-	if "aoe" in spell_data.get("tags", []):
-		var all_enemies = get_combat_enemies()
+	var spell_tags = spell_data.get("tags", [])
+	var targets = []
+	if "aoe" in spell_tags:
 		var aoe_radius = spell_data.get("aoe_radius", 3.0)
+		var center_node = primary_target
+		if "self" in spell_tags:
+			center_node = caster
+
+		var all_enemies = get_combat_enemies()
 		for enemy in all_enemies:
-			if enemy != primary_target and enemy.global_position.distance_to(primary_target.global_position) <= aoe_radius:
+			if enemy.global_position.distance_to(center_node.global_position) <= aoe_radius:
 				targets.append(enemy)
+	else:
+		# Single target
+		targets = [primary_target]
 
 	# Apply damage and effects to all targets
 	for t in targets:

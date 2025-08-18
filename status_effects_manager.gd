@@ -29,12 +29,16 @@ enum EFFECT_TYPE {
 	FROSTBITE,
 	BLESSING,
 	PETRIFY,
-	RECAST_SPELL
+	RECAST_SPELL,
+	CORRUPTION,
+	MAGIC_VULNERABILITY,
+	WATERLOGGED
 }
 
 # Base status effect class
 class StatusEffect:
 	var type: EFFECT_TYPE
+	var effect_category: String = "status" # "buff", "debuff", or "status"
 	var damage_per_tick: int
 	var duration: int
 	var remaining_duration: int
@@ -42,7 +46,7 @@ class StatusEffect:
 	var entity: Node  # Who the effect is applied to
 	var is_active: bool = true
 	var visual_effect: Node = null  # Reference to the visual effect node
-	var slow_percentage: float = 0.0 # For Petrify effect
+	var effect_value: float = 0.0 # Generic value for effects like Petrify's slow % or Waterlogged stacks
 	var is_petrified: bool = false # For Petrify effect
 	var recast_data: Dictionary = {} # For RECAST_SPELL effect
 	
@@ -185,7 +189,7 @@ class EntityStatusEffects:
 		visual_effects_container.position = Vector3(0, 0, 0)
 
 	
-	func add_effect(effect_type: EFFECT_TYPE, damage: int, duration: int, source: Node):
+	func add_effect(effect_type: EFFECT_TYPE, category: String, damage: int, duration: int, source: Node):
 		"""Add a new status effect"""
 		# Check if effect already exists and refresh it
 		for effect in effects:
@@ -193,17 +197,16 @@ class EntityStatusEffects:
 				# Refresh existing effect
 				effect.remaining_duration = duration
 				effect.damage_per_tick = damage
-		
+				effect.effect_category = category
 				return
 		
 		# Create new effect
 		var new_effect = StatusEffect.new(effect_type, damage, duration, source, entity)
+		new_effect.effect_category = category
 		effects.append(new_effect)
 		
 		# Create and display visual effect
 		_create_visual_effect(new_effect)
-		
-
 		
 		# Log to combat log if in combat
 		_log_effect_applied(effect_type, duration)
@@ -614,11 +617,43 @@ class EntityStatusEffects:
 			var damage = effect.tick()
 			if damage > 0:
 				_log_effect_damage(effect.type, damage)
+
+			# Handle special tick effects
+			if effect.type == EFFECT_TYPE.CORRUPTION:
+				if randf() < 0.25: # 25% chance
+					_apply_random_debuff_from_corruption(effect)
 		
 		# Remove expired effects
 		for i in range(effects_to_remove.size() - 1, -1, -1):
 			effects.remove_at(effects_to_remove[i])
 	
+	func _apply_random_debuff_from_corruption(corruption_effect: StatusEffect):
+		"""Apply a random debuff, called from the Corruption effect's tick."""
+		var status_manager = entity.get_tree().get_first_node_in_group("StatusEffectsManager")
+		if not status_manager: return
+
+		var debuffs = [
+			EFFECT_TYPE.POISON, EFFECT_TYPE.IGNITE, EFFECT_TYPE.BONE_BREAK,
+			EFFECT_TYPE.STUN, EFFECT_TYPE.SLOW, EFFECT_TYPE.BLEED,
+			EFFECT_TYPE.FREEZE, EFFECT_TYPE.SHOCK, EFFECT_TYPE.PARALYSIS,
+			EFFECT_TYPE.FROSTBITE, EFFECT_TYPE.PETRIFY
+		]
+		var random_debuff = debuffs[randi() % debuffs.size()]
+
+		# The source of the new debuff is the original source of the corruption
+		var source = corruption_effect.source
+
+		# Petrify has a unique application function
+		if random_debuff == EFFECT_TYPE.PETRIFY:
+			status_manager.apply_petrify(entity, source)
+		else:
+			# Apply other debuffs with a standard damage/duration
+			var random_damage = 5
+			var random_duration = 2
+			status_manager.apply_effect(entity, random_debuff, "debuff", random_damage, random_duration, source)
+
+		_log_to_combat("⚫ Corruption spreads! " + entity.name + " is now " + _get_effect_display_name(random_debuff) + "ed!")
+
 	
 	func _log_effect_applied(effect_type: EFFECT_TYPE, duration: int):
 		"""Log when an effect is applied"""
@@ -710,10 +745,33 @@ func get_entity_effects(entity: Node) -> EntityStatusEffects:
 		entity_effects[entity] = EntityStatusEffects.new(entity)
 	return entity_effects[entity]
 
-func apply_effect(entity: Node, effect_type: EFFECT_TYPE, damage: int, duration: int, source: Node):
+func apply_effect(entity: Node, effect_type: EFFECT_TYPE, category: String, damage: int, duration: int, source: Node):
 	"""Apply a status effect to an entity"""
+	# Check for Waterlogged backfire before applying any buffs
+	if category == "buff":
+		var waterlogged_effect = get_effect(entity, EFFECT_TYPE.WATERLOGGED)
+		if waterlogged_effect:
+			var stacks = waterlogged_effect.effect_value
+			# Exponential damage: 10 * (1.5 ^ (stacks - 1))
+			var backfire_damage = int(10 * pow(1.5, stacks - 1))
+
+			# The entity takes damage instead of getting the buff
+			if entity.has_method("take_damage"):
+				entity.take_damage(backfire_damage, "water")
+
+			# Log the backfire
+			var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+			if combat_manager:
+				combat_manager._log_combat_event("💧 " + entity.name + "'s buff backfired due to being Waterlogged, causing " + str(backfire_damage) + " damage!")
+
+			# Remove the waterlogged effect
+			remove_effect(entity, EFFECT_TYPE.WATERLOGGED)
+
+			# Stop the buff from being applied
+			return
+
 	var effects = get_entity_effects(entity)
-	effects.add_effect(effect_type, damage, duration, source)
+	effects.add_effect(effect_type, category, damage, duration, source)
 	
 	# Log status effect to combat log
 	var entity_name = "Unknown"
@@ -849,23 +907,23 @@ func get_effects_debug_info(entity: Node) -> Dictionary:
 # Convenience methods for common effects
 func apply_poison(entity: Node, damage: int, duration: int, source: Node):
 	"""Apply poison effect"""
-	apply_effect(entity, EFFECT_TYPE.POISON, damage, duration, source)
+	apply_effect(entity, EFFECT_TYPE.POISON, "debuff", damage, duration, source)
 
 func apply_ignite(entity: Node, damage: int, duration: int, source: Node):
 	"""Apply ignite effect"""
-	apply_effect(entity, EFFECT_TYPE.IGNITE, damage, duration, source)
+	apply_effect(entity, EFFECT_TYPE.IGNITE, "debuff", damage, duration, source)
 
 func apply_bone_break(entity: Node, damage: int, duration: int, source: Node):
 	"""Apply bone break effect"""
-	apply_effect(entity, EFFECT_TYPE.BONE_BREAK, damage, duration, source)
+	apply_effect(entity, EFFECT_TYPE.BONE_BREAK, "debuff", damage, duration, source)
 
 func apply_stun(entity: Node, duration: int, source: Node):
 	"""Apply stun effect (no damage, just duration)"""
-	apply_effect(entity, EFFECT_TYPE.STUN, 0, duration, source)
+	apply_effect(entity, EFFECT_TYPE.STUN, "debuff", 0, duration, source)
 
 func apply_slow(entity: Node, duration: int, source: Node):
 	"""Apply slow effect (no damage, just duration)"""
-	apply_effect(entity, EFFECT_TYPE.SLOW, 0, duration, source)
+	apply_effect(entity, EFFECT_TYPE.SLOW, "debuff", 0, duration, source)
 
 func apply_paralysis(entity: Node, duration: int, source: Node):
 	"""Apply paralysis effect with overload mechanic"""
@@ -878,19 +936,19 @@ func apply_paralysis(entity: Node, duration: int, source: Node):
 		return
 	
 	# Apply normal paralysis effect
-	apply_effect(entity, EFFECT_TYPE.PARALYSIS, 0, duration, source)
+	apply_effect(entity, EFFECT_TYPE.PARALYSIS, "debuff", 0, duration, source)
 
 func apply_freeze(entity: Node, duration: int, source: Node):
 	"""Apply freeze effect (no damage, just duration)"""
-	apply_effect(entity, EFFECT_TYPE.FREEZE, 0, duration, source)
+	apply_effect(entity, EFFECT_TYPE.FREEZE, "debuff", 0, duration, source)
 
 func apply_frostbite(entity: Node, damage_per_action: int, duration: int, source: Node):
 	"""Apply frostbite effect - deals damage when entity takes actions"""
-	apply_effect(entity, EFFECT_TYPE.FROSTBITE, damage_per_action, duration, source)
+	apply_effect(entity, EFFECT_TYPE.FROSTBITE, "debuff", damage_per_action, duration, source)
 
 func apply_blessing(entity: Node, duration: int, source: Node):
 	"""Apply blessing effect - provides random buffs"""
-	apply_effect(entity, EFFECT_TYPE.BLESSING, 0, duration, source)
+	apply_effect(entity, EFFECT_TYPE.BLESSING, "buff", 0, duration, source)
 
 func apply_petrify(entity: Node, source: Node):
 	"""Apply or stack the petrify effect."""
@@ -907,21 +965,21 @@ func apply_petrify(entity: Node, source: Node):
 			return
 
 		# Effect exists, increment it
-		petrify_effect.slow_percentage = min(100.0, petrify_effect.slow_percentage + 25.0)
+		petrify_effect.effect_value = min(100.0, petrify_effect.effect_value + 25.0)
 		petrify_effect.remaining_duration = 99 # Refresh duration so it doesn't expire while stacking
 
-		if petrify_effect.slow_percentage >= 100.0:
+		if petrify_effect.effect_value >= 100.0:
 			petrify_effect.is_petrified = true
 			petrify_effect.remaining_duration = 3 # Petrified for 2 turns (3 ticks: turn start, end of turn 1, end of turn 2)
 			_log_to_combat("🗿 " + entity.name + " has been turned to stone!")
 	else:
 		# Effect does not exist, create it
 		petrify_effect = StatusEffect.new(EFFECT_TYPE.PETRIFY, 0, 99, source, entity)
-		petrify_effect.slow_percentage = 25.0
+		petrify_effect.effect_value = 25.0
 		effects_manager.effects.append(petrify_effect)
 
 	# Log and emit signal
-	print(entity.name + " petrify at " + str(petrify_effect.slow_percentage) + "%")
+	print(entity.name + " petrify at " + str(petrify_effect.effect_value) + "%")
 	effects_changed.emit(entity)
 
 func is_petrified(entity: Node) -> bool:
@@ -932,12 +990,51 @@ func is_petrified(entity: Node) -> bool:
 				return true
 	return false
 
+func get_effect(entity: Node, effect_type: EFFECT_TYPE) -> StatusEffect:
+	"""Get a specific status effect instance from an entity, if it exists."""
+	if entity_effects.has(entity):
+		for effect in entity_effects[entity].effects:
+			if effect.type == effect_type and effect.is_active:
+				return effect
+	return null
+
 func apply_recast_spell(entity: Node, source: Node, duration: int, data: Dictionary):
 	"""Apply an effect that will re-cast a spell later."""
 	var effects_manager = get_entity_effects(entity)
 	var recast_effect = StatusEffect.new(EFFECT_TYPE.RECAST_SPELL, 0, duration, source, entity)
+	recast_effect.effect_category = "status"
 	recast_effect.recast_data = data
 	effects_manager.effects.append(recast_effect)
+	effects_changed.emit(entity)
+
+func apply_magic_vulnerability(entity: Node, duration: int, source: Node):
+	"""Apply magic vulnerability effect. The magnitude (10%) is stored in the damage field."""
+	apply_effect(entity, EFFECT_TYPE.MAGIC_VULNERABILITY, "debuff", 10, duration, source)
+
+func apply_corruption(entity: Node, damage: int, duration: int, source: Node):
+	"""Apply corruption effect, a DoT that can apply other debuffs."""
+	apply_effect(entity, EFFECT_TYPE.CORRUPTION, "debuff", damage, duration, source)
+
+func apply_waterlogged(entity: Node, source: Node, stacks: int):
+	"""Apply or stack the waterlogged effect."""
+	var effects_manager = get_entity_effects(entity)
+	var waterlogged_effect = null
+	for effect in effects_manager.effects:
+		if effect.type == EFFECT_TYPE.WATERLOGGED:
+			waterlogged_effect = effect
+			break
+
+	if waterlogged_effect:
+		waterlogged_effect.effect_value += stacks
+	else:
+		waterlogged_effect = StatusEffect.new(EFFECT_TYPE.WATERLOGGED, 0, 99, source, entity)
+		waterlogged_effect.effect_category = "debuff"
+		waterlogged_effect.effect_value = stacks
+		effects_manager.effects.append(waterlogged_effect)
+
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager:
+		combat_manager._log_combat_event("💧 " + entity.name + " is Waterlogged! (Stacks: " + str(waterlogged_effect.effect_value) + ")")
 	effects_changed.emit(entity)
 
 func _trigger_lightning_overload(entity: Node, source: Node):
