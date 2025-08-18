@@ -1611,36 +1611,35 @@ func create_focus_indicator():
 	focus_indicator = Node3D.new()
 	focus_indicator.name = "FocusIndicator"
 	
-	# Create a mesh instance for the glowing edge
+	# Create a mesh instance for the ring
 	var mesh_instance = MeshInstance3D.new()
-	var edge_mesh = CylinderMesh.new()
-	edge_mesh.radius = 1.5  # Larger radius for visibility
-	edge_mesh.height = 0.1  # Thicker for visibility
-	mesh_instance.mesh = edge_mesh
+	var ring_mesh = TorusMesh.new()
+	ring_mesh.inner_radius = 1.3
+	ring_mesh.outer_radius = 1.5
+	ring_mesh.ring_sides = 16 # Lower poly for performance
+	ring_mesh.sides = 24 # Lower poly for performance
+	mesh_instance.mesh = ring_mesh
 	
 	# Position it at ground level
 	mesh_instance.position.y = 0.05
 	
-	# Create material for the glowing edge - make it very bright and visible
+	# Create material for the blue ring
 	var material = StandardMaterial3D.new()
-	material.albedo_color = Color(0.0, 1.0, 1.0, 1.0)  # Bright cyan
+	material.albedo_color = Color(0.1, 0.2, 1.0)  # Blue
 	material.emission_enabled = true
-	material.emission = Color(0.0, 1.0, 1.0, 1.0)  # Bright cyan glow
-	material.emission_energy = 3.0  # Very strong glow
+	material.emission = Color(0.1, 0.2, 1.0)  # Blue glow
+	material.emission_energy = 2.0
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mesh_instance.material_override = material
 	
 	focus_indicator.add_child(mesh_instance)
-	add_child(focus_indicator)
+	# This should be added to the parent (the CharacterBody3D) not the behavior script node
+	get_parent().add_child(focus_indicator)
 	
 	print("🎯 Focus indicator created and added to scene for: ", enemy_name)
-	print("🎯 Focus indicator node: ", focus_indicator)
-	print("🎯 Focus indicator parent: ", focus_indicator.get_parent())
-	print("🎯 Focus indicator visible: ", focus_indicator.visible)
 	
-	# Test: make it visible immediately
-	focus_indicator.show()
-	print("🎯 Focus indicator forced to show for testing")
+	# Hide it by default, it will be shown by show_focus_indicator()
+	focus_indicator.hide()
 
 func show_focus_indicator():
 	"""Show the focus indicator"""
