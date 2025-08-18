@@ -2,7 +2,9 @@ extends Panel
 class_name EnemyStatusPanel
 
 # UI References
-@onready var enemy_name_label: Label = $VBoxContainer/EnemyNameLabel
+@onready var enemy_name_label: Label = $VBoxContainer/InfoContainer/EnemyNameLabel
+@onready var level_label: Label = $VBoxContainer/InfoContainer/LevelLabel
+@onready var type_label: Label = $VBoxContainer/InfoContainer/TypeLabel
 @onready var health_bar: ProgressBar = $VBoxContainer/BarsContainer/HealthSection/HealthBar
 @onready var health_value: Label = $VBoxContainer/BarsContainer/HealthSection/HealthValue
 @onready var mana_bar: ProgressBar = $VBoxContainer/BarsContainer/ManaSection/ManaBar
@@ -210,9 +212,22 @@ func update_enemy_info(enemy: Node) -> void:
 	
 	# Get proper enemy display name
 	var enemy_display_name = "Unknown Enemy"
-	if enemy.has_method("enemy_name"):
+	if enemy.has_method("get_enemy_name"):
+		enemy_display_name = enemy.get_enemy_name()
+	elif enemy.has_method("enemy_name"):
 		enemy_display_name = enemy.enemy_name()
 	elif enemy.name:
 		enemy_display_name = enemy.name
 	
 	enemy_name_label.text = enemy_display_name
+
+	# Update level and type
+	var level = "Lvl. ?"
+	if enemy.has_method("get_level"):
+		level = "Lvl. " + str(enemy.get_level())
+	level_label.text = level
+
+	var type = "(Unknown)"
+	if enemy.has_method("get_effective_enemy_type"):
+		type = "(" + enemy.get_effective_enemy_type().capitalize() + ")"
+	type_label.text = type
