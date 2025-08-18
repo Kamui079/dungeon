@@ -1020,6 +1020,11 @@ async func add_enemy_to_combat(enemy: Node):
 			print("🎯 Player is on ground - proceeding with combat freeze")
 	
 	# If we get here, player is grounded, so position at combat distance then freeze
+	# Wait for camera reorientation to complete before positioning enemies
+	print("🎯 Waiting for camera reorientation to complete...")
+	await get_tree().process_frame
+	await get_tree().process_frame  # Wait 2 frames for camera system to complete
+	
 	_position_enemy_at_combat_distance()
 
 func _check_player_landing_and_freeze():
@@ -1033,6 +1038,12 @@ func _check_player_landing_and_freeze():
 	if current_player.has_method("is_on_floor") and current_player.is_on_floor():
 		print("🎯 Player has landed - now positioning at proper combat distance")
 		_cleanup_landing_timer()
+		
+		# Wait for camera reorientation to complete before positioning enemies
+		print("🎯 Waiting for camera reorientation to complete...")
+		await get_tree().process_frame
+		await get_tree().process_frame  # Wait 2 frames for camera system to complete
+		
 		_position_enemy_at_combat_distance()
 	else:
 		# Player still in air, keep checking
@@ -1063,39 +1074,73 @@ func _cleanup_positioning_timer():
 		print("🎯 Cleaned up cone positioning safety timer")
 
 func _position_enemy_at_combat_distance():
-	"""Position all enemies in a cone formation in front of the player"""
-	if not current_player or not current_enemies.size() > 0:
-		# Fallback to immediate freeze if positioning fails
-		_freeze_entities()
+	"""Position enemies in a cone formation in front of the player"""
+	if not current_player or current_enemies.size() == 0:
 		return
 	
 	print("🎯 Positioning enemies in cone formation...")
 	
-	# Get player position and forward direction
+	# Step 1: Check if player is facing a close wall, rotate if needed
+	_check_and_fix_player_facing()
+	
+	# Step 2: Get final player position and direction
 	var player_pos = current_player.global_position
-	var player_forward = -current_player.transform.basis.z  # Player's forward direction
-	player_forward.y = 0  # Keep it level
+	var player_forward = -current_player.transform.basis.z
+	player_forward.y = 0
 	player_forward = player_forward.normalized()
 	
-	# Cone formation parameters
-	var base_distance = 3.0  # Base distance from player
-	var cone_angle = deg_to_rad(75.0)  # 75-degree cone
-	var max_enemies_per_row = 4  # Maximum enemies in a single row (increased for wider cone)
+	print("🎯 Final player position: ", player_pos)
+	print("🎯 Final player direction: ", player_forward)
 	
-	# Calculate positions for each enemy
-	var enemy_positions = []
+	# Step 3: Position enemies in cone
 	var enemies_to_position = current_enemies.duplicate()
+	var total_enemies = enemies_to_position.size()
+	var cone_angle = 75.0  # 75 degree cone
+	var base_distance = 3.0  # Base distance from player
 	
-	# Sort enemies by distance to player (closest first)
-	enemies_to_position.sort_custom(func(a, b): 
-		return current_player.global_position.distance_to(a.global_position) < current_player.global_position.distance_to(b.global_position)
+	print("🎯 Positioning ", total_enemies, " enemies in cone")
+	
+	# Simple cone positioning - all enemies in one row
+	var angle_spacing = cone_angle / (total_enemies + 1)
+	var all_movements_complete = 0
+	var total_movements = total_enemies
+	
+	# Create a single tween for all enemies
+	var group_tween = create_tween()
+	
+	for i in range(total_enemies):
+		var enemy = enemies_to_position.pop_front()
+		if not enemy:
+			continue
+		
+		# Calculate position in cone
+		var angle_offset = (i + 1) * angle_spacing - (cone_angle / 2.0)
+		var direction = player_forward.rotated(Vector3.UP, deg_to_rad(angle_offset))
+		var target_pos = player_pos + (direction * base_distance)
+		target_pos.y = enemy.global_position.y
+		
+		# Store combat position
+		if enemy.has_method("set_initial_combat_position"):
+			enemy.set_initial_combat_position(target_pos)
+		elif enemy.has_method("enemy_behavior") and enemy.enemy_behavior.has_method("set_initial_combat_position"):
+			enemy.enemy_behavior.set_initial_combat_position(target_pos)
+		else:
+			enemy.initial_combat_position = target_pos
+		
+		print("🎯 Enemy ", i, " -> ", target_pos)
+		
+		# Add enemy movement to the group tween
+		group_tween.parallel().tween_property(enemy, "global_position", target_pos, 1.0)
+	
+	# Add callback after all movements complete
+	group_tween.tween_callback(func():
+		print("🎯 All enemies positioned - freezing entities")
+		_freeze_entities()
 	)
 	
-	# Position enemies in rows, starting from the front
-	# This creates a natural formation where enemies spread out in a cone
-	var current_row = 0
-	var row_distance = base_distance
+	print("🎯 All enemies moving to cone positions")
 	
+<<<<<<< Updated upstream
 	while enemies_to_position.size() > 0:
 		var enemies_in_row = min(max_enemies_per_row, enemies_to_position.size())
 		var angle_spacing = cone_angle / (enemies_in_row + 1)  # +1 for spacing
@@ -1175,13 +1220,13 @@ func _position_enemy_at_combat_distance():
 				_freeze_entities()
 		)
 	
-	# Safety timer in case some movements fail
+	# Safety timer in case callbacks fail
 	var safety_timer = Timer.new()
-	safety_timer.name = "cone_positioning_safety_timer"
-	safety_timer.wait_time = 2.0  # 2 second timeout
+	safety_timer.name = "positioning_safety_timer"
+	safety_timer.wait_time = 3.0  # 3 second timeout
 	safety_timer.one_shot = true
 	safety_timer.timeout.connect(func():
-		print("⚠️ Cone positioning safety timeout - forcing freeze")
+		print("⚠️ Positioning safety timeout - forcing freeze")
 		_freeze_entities()
 		safety_timer.queue_free()
 	)
@@ -1230,6 +1275,45 @@ func _freeze_entities():
 	
 	# Start first turn based on speed
 	_start_first_turn()
+
+func _check_and_fix_player_facing():
+	"""Check if player is facing a close wall and rotate until cone is clear"""
+	if not current_player or not current_player is Node3D:
+		return
+	
+	print("🎯 Checking if player is facing a close wall...")
+	
+	var player_forward = -current_player.transform.basis.z
+	player_forward.y = 0
+	player_forward = player_forward.normalized()
+	
+	# Check if there's a wall very close in front (within 2 units)
+	var space_state = current_player.get_world_3d().direct_space_state
+	var wall_query = PhysicsRayQueryParameters3D.new()
+	wall_query.from = current_player.global_position
+	wall_query.to = current_player.global_position + (player_forward * 2.0)
+	wall_query.collision_mask = 0xFFFFFFFF
+	
+	var wall_result = space_state.intersect_ray(wall_query)
+	
+	if wall_result:
+		print("🎯 Wall detected close to player - rotating until cone is clear")
+		
+		# Try rotating in small increments until we find a clear direction
+		for i in range(8):  # Try 8 different angles
+			var test_rotation = current_player.rotation.y + (deg_to_rad(45.0) * i)
+			var test_forward = Vector3.FORWARD.rotated(Vector3.UP, test_rotation)
+			
+			wall_query.to = current_player.global_position + (test_forward * 2.0)
+			var test_result = space_state.intersect_ray(wall_query)
+			
+			if not test_result:
+				print("🎯 Found clear direction at rotation ", rad_to_deg(test_rotation), "°")
+				current_player.rotation.y = test_rotation
+				current_player.force_update_transform()
+				break
+	else:
+		print("🎯 No close wall detected - keeping current direction")
 
 func _initialize_atb_system():
 	"""Initialize the Active Time Battle system"""
@@ -3632,30 +3716,8 @@ func _on_safety_timer_timeout():
 	# This prevents the function from causing crashes
 
 func _orient_player_toward_enemy(target_enemy: Node = null):
-	"""Orient the player toward the enemy when combat starts"""
-	var enemy_to_face = target_enemy if target_enemy else current_enemy
-	
-	if not current_player or not enemy_to_face:
-		print("⚠️ Cannot orient: missing player or enemy")
-		return
-	
-	print("🎯 Orienting player toward enemy: ", enemy_to_face.enemy_name if enemy_to_face.has_method("enemy_name") else enemy_to_face.name)
-	
-	# Make player face the enemy
-	if current_player.has_method("face_target"):
-		print("🎯 Calling player.face_target()...")
-		current_player.face_target(enemy_to_face)
-		print("✅ Player oriented toward enemy")
-	else:
-		print("⚠️ Player has no face_target method")
-		
-	# Also orient camera toward enemy for better combat visibility
-	if current_player.has_method("orient_camera_toward"):
-		print("🎯 Calling player.orient_camera_toward()...")
-		current_player.orient_camera_toward(enemy_to_face)
-		print("✅ Camera oriented toward enemy")
-	else:
-		print("⚠️ Player has no orient_camera_toward method")
+	"""Simple function - no camera rotation needed"""
+	print("🎯 No camera rotation needed - keeping current direction")
 
 func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
 	"""Helper function to orient a camera toward the enemy"""
@@ -3682,11 +3744,33 @@ func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
 	direction = direction.normalized()  # Normalize after setting Y to 0
 	
 	# Calculate the target rotation for the player (not the camera)
-	# Calculate the target rotation for the player (not the camera)
 	var target_rotation = atan2(direction.x, direction.z)
 	
-	# Try flipping the rotation 180 degrees to fix the orientation issue
-	target_rotation += PI
+	# Get current player rotation
+	var current_rotation = current_player.rotation.y
+	
+	# Calculate the difference in rotation
+	var rotation_diff = target_rotation - current_rotation
+	
+	# Normalize rotation difference to -PI to PI range
+	while rotation_diff > PI:
+		rotation_diff -= 2 * PI
+	while rotation_diff < -PI:
+		rotation_diff += 2 * PI
+	
+	# Only rotate if the difference is significant (more than 15 degrees)
+	if abs(rotation_diff) > deg_to_rad(15.0):
+		# Limit rotation to maximum 45 degrees to prevent over-rotation
+		var max_rotation = deg_to_rad(45.0)
+		if abs(rotation_diff) > max_rotation:
+			rotation_diff = sign(rotation_diff) * max_rotation
+		
+		target_rotation = current_rotation + rotation_diff
+		print("🎥 Limited rotation to ", rad_to_deg(rotation_diff), "° to prevent over-rotation")
+	else:
+		# Keep current rotation if difference is small
+		target_rotation = current_rotation
+		print("🎥 Rotation difference too small (", rad_to_deg(rotation_diff), "°), keeping current rotation")
 	
 	print("🎥 DEBUG: Starting camera height reset from ", camera.rotation.x, " to 0.0")
 	var camera_tween = create_tween()
@@ -3702,7 +3786,76 @@ func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
 	
 	print("🎥 Camera system oriented toward enemy (player rotation: ", target_rotation, ")")
 
+func _apply_rotation_limits():
+	"""Apply rotation limits to prevent over-rotation after camera orientation"""
+	if not current_player or not current_player is Node3D:
+		return
+	
+	# Get the direction from player to the first enemy
+	if current_enemies.size() == 0:
+		return
+		
+	var enemy = current_enemies[0]
+	if not enemy is Node3D:
+		return
+	
+	var player_pos = current_player.global_position
+	var enemy_pos = enemy.global_position
+	var direction = (enemy_pos - player_pos)
+	direction.y = 0
+	direction = direction.normalized()
+	
+	# Calculate ideal rotation toward enemy
+	var ideal_rotation = atan2(direction.x, direction.z)
+	var current_rotation = current_player.rotation.y
+	
+	# Calculate rotation difference
+	var rotation_diff = ideal_rotation - current_rotation
+	
+	# Normalize to -PI to PI range
+	while rotation_diff > PI:
+		rotation_diff -= 2 * PI
+	while rotation_diff < -PI:
+		rotation_diff += 2 * PI
+	
+	# Only apply correction if rotation is too large
+	if abs(rotation_diff) > deg_to_rad(45.0):
+		print("🎥 Applying rotation correction: ", rad_to_deg(rotation_diff), "° -> limited to 45°")
+		
+		# Limit to maximum 45 degrees
+		var max_rotation = deg_to_rad(45.0)
+		var limited_diff = sign(rotation_diff) * max_rotation
+		var corrected_rotation = current_rotation + limited_diff
+		
+		# Apply the corrected rotation
+		current_player.rotation.y = corrected_rotation
+		current_player.force_update_transform()
+		
+		print("🎥 Player rotation corrected from ", rad_to_deg(current_rotation), "° to ", rad_to_deg(corrected_rotation), "°")
+	else:
+		print("🎥 Rotation difference acceptable: ", rad_to_deg(rotation_diff), "° (no correction needed)")
 
+func _find_safe_position_for_enemy(enemy: Node, target_pos: Vector3, player_pos: Vector3, direction: Vector3) -> Vector3:
+	"""Simple wall check - if wall detected, move closer to player"""
+	if not enemy is Node3D:
+		return target_pos
+	
+	var space_state = enemy.get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.new()
+	query.from = player_pos
+	query.to = target_pos
+	query.collision_mask = 0xFFFFFFFF
+	
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		print("🎯 Wall detected - moving enemy closer to player")
+		# Move enemy closer to player (2 units away)
+		var safe_pos = player_pos + (direction * 2.0)
+		safe_pos.y = enemy.global_position.y
+		return safe_pos
+	
+	return target_pos
 
 func _ensure_camera_faces_enemy():
 	"""Double-check that the camera is properly facing the enemy"""
@@ -4369,7 +4522,7 @@ func _on_animation_damage_ready(_animation_type: AnimationManager.ANIMATION_TYPE
 		
 		# Reset action_in_progress to allow next entity to act
 		action_in_progress = false
-		print("🎯 Action in progress reset to false")
+		print("�� Action in progress reset to false")
 		
 		_end_player_turn()
 

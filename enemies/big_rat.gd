@@ -100,6 +100,37 @@ func enemy_name() -> String:
 		return enemy_behavior.enemy_name
 	return "Big Rat"  # Fallback name
 
+# Setter method for initial combat position (used by combat system)
+func set_initial_combat_position(position: Vector3):
+	if enemy_behavior:
+		enemy_behavior.initial_combat_position = position
+
+# Getter method for initial combat position (used by combat system)
+func get_initial_combat_position() -> Vector3:
+	if enemy_behavior:
+		return enemy_behavior.initial_combat_position
+	return Vector3.ZERO
+
+# Override return_to_initial_position to work with BigRat's structure
+func return_to_initial_position():
+	if enemy_behavior:
+		enemy_behavior.return_to_initial_position()
+
+# Note: Most methods are already defined earlier in the file
+# Only adding the missing ones that combat system needs
+
+# Note: Physics process methods are already defined earlier in the file
+
+# Properties that combat system checks
+func get_movement_attempts() -> int:
+	if enemy_behavior:
+		return enemy_behavior.movement_attempts
+	return 0
+
+func set_movement_attempts(attempts: int):
+	if enemy_behavior:
+		enemy_behavior.movement_attempts = attempts
+
 # Note: get_enemy_name() is now inherited from the base enemy class
 
 # Attack functions
@@ -413,6 +444,7 @@ func take_turn():
 	
 	# Safety check: if no attack was performed, end turn manually
 	print("🎯 Big Rat take_turn() completed")
+	return
 
 # Proxy functions to maintain compatibility with combat system
 func get_stats():
@@ -422,23 +454,28 @@ func get_stats():
 
 func take_damage(amount: int, damage_type: String = "physical"):
 	if enemy_behavior:
-		enemy_behavior.take_damage(amount, damage_type)
+		return enemy_behavior.take_damage(amount, damage_type)
+	return
 
 func set_combat_target(target: Node):
 	if enemy_behavior:
-		enemy_behavior.set_combat_target(target)
+		return enemy_behavior.set_combat_target(target)
+	return
 
 func on_combat_start():
 	if enemy_behavior:
-		enemy_behavior.on_combat_start()
+		return enemy_behavior.on_combat_start()
+	return
 
 func on_combat_end():
 	if enemy_behavior:
-		enemy_behavior.on_combat_end()
+		return enemy_behavior.on_combat_end()
+	return
 
 func set_physics_process_enabled(enabled: bool):
 	if enemy_behavior:
-		enemy_behavior.set_physics_process_enabled(enabled)
+		return enemy_behavior.set_physics_process_enabled(enabled)
+	return
 
 # Status bar management functions - REMOVED (now handled by top panel)
 func _create_bar_textures():
