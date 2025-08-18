@@ -27,7 +27,9 @@ enum EFFECT_TYPE {
 	SHOCK,
 	PARALYSIS,
 	FROSTBITE,
-	BLESSING
+	BLESSING,
+	PETRIFY,
+	RECAST_SPELL
 }
 
 # Base status effect class
@@ -40,6 +42,9 @@ class StatusEffect:
 	var entity: Node  # Who the effect is applied to
 	var is_active: bool = true
 	var visual_effect: Node = null  # Reference to the visual effect node
+	var slow_percentage: float = 0.0 # For Petrify effect
+	var is_petrified: bool = false # For Petrify effect
+	var recast_data: Dictionary = {} # For RECAST_SPELL effect
 	
 	func _init(effect_type: EFFECT_TYPE, damage: int, effect_duration: int, effect_source: Node, effect_entity: Node):
 		type = effect_type
@@ -886,6 +891,54 @@ func apply_frostbite(entity: Node, damage_per_action: int, duration: int, source
 func apply_blessing(entity: Node, duration: int, source: Node):
 	"""Apply blessing effect - provides random buffs"""
 	apply_effect(entity, EFFECT_TYPE.BLESSING, 0, duration, source)
+
+func apply_petrify(entity: Node, source: Node):
+	"""Apply or stack the petrify effect."""
+	var effects_manager = get_entity_effects(entity)
+	var petrify_effect = null
+	for effect in effects_manager.effects:
+		if effect.type == EFFECT_TYPE.PETRIFY:
+			petrify_effect = effect
+			break
+
+	if petrify_effect:
+		# If already petrified, do nothing here. Shatter logic is handled in combat manager.
+		if petrify_effect.is_petrified:
+			return
+
+		# Effect exists, increment it
+		petrify_effect.slow_percentage = min(100.0, petrify_effect.slow_percentage + 25.0)
+		petrify_effect.remaining_duration = 99 # Refresh duration so it doesn't expire while stacking
+
+		if petrify_effect.slow_percentage >= 100.0:
+			petrify_effect.is_petrified = true
+			petrify_effect.remaining_duration = 3 # Petrified for 2 turns (3 ticks: turn start, end of turn 1, end of turn 2)
+			_log_to_combat("🗿 " + entity.name + " has been turned to stone!")
+	else:
+		# Effect does not exist, create it
+		petrify_effect = StatusEffect.new(EFFECT_TYPE.PETRIFY, 0, 99, source, entity)
+		petrify_effect.slow_percentage = 25.0
+		effects_manager.effects.append(petrify_effect)
+
+	# Log and emit signal
+	print(entity.name + " petrify at " + str(petrify_effect.slow_percentage) + "%")
+	effects_changed.emit(entity)
+
+func is_petrified(entity: Node) -> bool:
+	"""Check if an entity is currently petrified."""
+	if entity_effects.has(entity):
+		for effect in entity_effects[entity].effects:
+			if effect.type == EFFECT_TYPE.PETRIFY and effect.is_petrified:
+				return true
+	return false
+
+func apply_recast_spell(entity: Node, source: Node, duration: int, data: Dictionary):
+	"""Apply an effect that will re-cast a spell later."""
+	var effects_manager = get_entity_effects(entity)
+	var recast_effect = StatusEffect.new(EFFECT_TYPE.RECAST_SPELL, 0, duration, source, entity)
+	recast_effect.recast_data = data
+	effects_manager.effects.append(recast_effect)
+	effects_changed.emit(entity)
 
 func _trigger_lightning_overload(entity: Node, source: Node):
 	"""Trigger lightning overload explosion when paralysis is applied again"""

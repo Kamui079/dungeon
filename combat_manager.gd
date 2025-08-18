@@ -126,6 +126,9 @@ func _get_animation_type_for_spell(animation_name: String) -> int:
 		"holy_magic":
 			print("🎬 DEBUG: Returning HOLY_MAGIC")
 			return AnimationManager.ANIMATION_TYPE.HOLY_MAGIC
+		"earth_magic":
+			print("🎬 DEBUG: Returning EARTH_MAGIC")
+			return AnimationManager.ANIMATION_TYPE.EARTH_MAGIC
 		_:
 			print("🎬 DEBUG: No match found, defaulting to FIRE_MAGIC")
 			return AnimationManager.ANIMATION_TYPE.FIRE_MAGIC  # Default fallback
@@ -179,6 +182,7 @@ var available_spells: Dictionary = {
 		"level_scaling": 3.0,  # +3 damage per level
 		"animation": "fire_magic",
 		"status_effects": ["ignite"],
+		"tags": ["single target"],
 		"description": "A ball of fire that burns enemies"
 	},
 	"lightning_bolt": {
@@ -189,6 +193,7 @@ var available_spells: Dictionary = {
 		"level_scaling": 3.5,  # +3.5 damage per level
 		"animation": "lightning_magic",
 		"status_effects": ["paralysis"],
+		"tags": ["single target"],
 		"description": "A bolt of lightning that can paralyze enemies"
 	},
 	"icicle": {
@@ -199,6 +204,7 @@ var available_spells: Dictionary = {
 		"level_scaling": 3.2,  # +3.2 damage per level
 		"animation": "ice_magic",
 		"status_effects": ["frostbite", "freeze"],
+		"tags": ["single target"],
 		"description": "A sharp icicle that can freeze and frostbite enemies"
 	},
 	"smite": {
@@ -209,13 +215,28 @@ var available_spells: Dictionary = {
 		"level_scaling": 3.5,  # +3.5 damage per level
 		"animation": "holy_magic",
 		"status_effects": ["blessing"],
+		"tags": ["single target"],
 		"description": "Divine smite that can bless the caster and deal bonus damage to undead"
+	},
+	"earthquake": {
+		"name": "Earthquake",
+		"damage_type": "earth",
+		"base_damage": 45,
+		"mana_cost": 40,
+		"level_scaling": 4.0,
+		"animation": "earth_magic",
+		"status_effects": [],
+		"tags": ["aoe", "multi-cast"],
+		"aoe_radius": 4.0,
+		"description": "Shake the earth, dealing damage to all enemies in an area for 2 turns."
 	}
 }
 
 # Visual targeting indicator
 var focus_indicators: Dictionary = {}  # Store focus circles for each enemy
 var focus_circle_scene: PackedScene = null
+var aoe_indicator_scene: PackedScene = preload("res://UI/AOEIndicator.tscn")
+var aoe_indicator_instance: Node3D = null
 
 func _ready():
 	# Add this node to the CombatManager group
@@ -250,6 +271,20 @@ func _ready():
 	safety_timer.wait_time = 1.0  # Check every second
 	safety_timer.timeout.connect(_on_safety_timer_timeout)
 	safety_timer.start()
+
+func show_aoe_indicator(position: Vector3, radius: float):
+	if not aoe_indicator_instance:
+		aoe_indicator_instance = aoe_indicator_scene.instantiate()
+		get_tree().current_scene.add_child(aoe_indicator_instance)
+
+	aoe_indicator_instance.global_position = position
+	# Scale the mesh to match the radius. The cylinder's radius is 1, so scale x and z.
+	aoe_indicator_instance.scale = Vector3(radius, 1, radius)
+	aoe_indicator_instance.show()
+
+func hide_aoe_indicator():
+	if aoe_indicator_instance:
+		aoe_indicator_instance.hide()
 
 # Safety check function
 func is_valid_3d_node(node: Node) -> bool:
@@ -400,13 +435,18 @@ func _start_enemy_turn_dynamic(enemy: Node) -> void:
 		_end_enemy_turn_for(enemy)
 		return
 	
-	# Check if enemy is stunned
+	# Check if enemy is stunned or petrified
 	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
-	if status_manager and status_manager.has_method("has_effect"):
+	if status_manager:
 		if status_manager.has_effect(enemy, status_manager.EFFECT_TYPE.STUN):
 			var stunned_enemy_name = _get_entity_name(enemy)
 			_log_combat_event("😵 " + stunned_enemy_name + " is stunned and cannot act!")
 			_end_enemy_turn_for(enemy)
+			return
+		if status_manager.is_petrified(enemy):
+			var petrified_enemy_name = _get_entity_name(enemy)
+			_log_combat_event("🗿 " + petrified_enemy_name + " is petrified and cannot act!")
+			_end_enemy_turn_for(enemy) # Duration will tick down automatically
 			return
 	
 	# Mark action as in progress
@@ -450,7 +490,8 @@ func _start_enemy_turn_dynamic(enemy: Node) -> void:
 	add_child(enemy_safety_timer)
 	enemy_safety_timer.start()
 	
-	# Check for frostbite effects before enemy takes action
+	# Check for start-of-turn effects
+	_process_recast_effects(enemy)
 	_check_frostbite_damage(enemy)
 	
 	# Use enemy's AI logic if available, otherwise fall back to basic attack
@@ -1170,8 +1211,9 @@ func _start_player_turn() -> void:
 	
 	# Emit turn changed signal
 	turn_changed.emit(current_player, "player")
-	
-	# Process blessing effects at turn start
+
+	# Process start-of-turn effects
+	_process_recast_effects(current_player)
 	_process_blessing_effects()
 	
 	# Update combat UI to show it's the player's turn
@@ -1771,20 +1813,10 @@ func player_special_attack():
 	_end_player_turn()
 
 func player_cast_spell(spell_id: String = "fireball"):
-	"""Player casts a specific spell"""
-	print("=== player_cast_spell called for: ", spell_id, " ===")
-	print("🎬 DEBUG: spell_id parameter = '", spell_id, "' (type: ", typeof(spell_id), ")")
-	print("🎬 DEBUG: spell_id length = ", spell_id.length())
+	"""Player casts a specific spell. This function now only handles queuing."""
 	if not in_combat or not current_player:
-		print("Cannot cast spell: in_combat=", in_combat, " current_player=", current_player)
 		return
-	
-	# Always use the currently focused enemy for spell targeting
-	var target_enemy = get_focused_enemy()
-	if not target_enemy:
-		print("ERROR: No focused enemy found for spell!")
-		return
-	
+
 	# Check if player's turn is ready (ATB system)
 	if not player_turn_ready:
 		print("Player turn not ready yet! Queuing spell...")
@@ -1804,78 +1836,10 @@ func player_cast_spell(spell_id: String = "fireball"):
 		_execute_queued_player_action()
 		return
 	
-	# Mark action as in progress
+	# Mark action as in progress and execute
 	action_in_progress = true
 	player_turn_ready = false
-	
-	print("=== PLAYER CAST SPELL: ", spell_id, " ===")
-	_log_player_action("cast_spell", {"spell_id": spell_id})
-	
-	# Get spell data
-	var spell_data = get_spell_data(spell_id)
-	if not spell_data:
-		print("ERROR: Unknown spell: ", spell_id)
-		_end_player_turn()
-		return
-	
-	# Check if player has enough mana
-	var mana_cost = get_spell_mana_cost(spell_id)
-	if not current_player or not current_player.has_method("get_stats") or not current_player.get_stats():
-		print("ERROR: Player has no stats!")
-		_end_player_turn()
-		return
-	
-	var player_stats = current_player.get_stats()
-	if player_stats.mana < mana_cost:
-		print("Not enough mana! Need ", mana_cost, " MP, have ", player_stats.mana, " MP")
-		_end_player_turn()
-		return
-	
-	# Calculate spell damage with level scaling
-	var base_damage = get_spell_damage(spell_id)
-	var damage_type = spell_data.get("damage_type", "physical")
-	var final_damage = _process_attack_damage(base_damage, damage_type, spell_id)
-	
-	# Consume mana
-	player_stats.mana -= mana_cost
-	player_stats.mana_changed.emit(player_stats.mana, player_stats.max_mana)
-	
-	# Play appropriate animation
-	if animation_manager:
-		print("🎬 DEBUG: Spell data animation field: '", spell_data.get("animation", "fire_magic"), "'")
-		var animation_type = _get_animation_type_for_spell(spell_data.get("animation", "fire_magic"))
-		print("🎬 Playing player ", spell_data.get("animation", "fire_magic"), " animation")
-		animation_manager.play_attack_animation(current_player, animation_type)
-	else:
-		print("⚠️ No animation manager available for player spell")
-	
-	# Apply dual damage: elemental damage + spell damage
-	# This allows equipment to boost both specific elements AND all spells generically
-	var elemental_damage = int(final_damage * 0.7)  # 70% elemental damage
-	var spell_damage = int(final_damage * 0.3)      # 30% spell damage
-	
-	# Apply elemental damage first
-	target_enemy.take_damage(elemental_damage, damage_type)
-	_log_attack(current_player, target_enemy, elemental_damage, spell_id + " (elemental)")
-	
-	# Apply spell damage second
-	target_enemy.take_damage(spell_damage, "spell_damage")
-	_log_attack(current_player, target_enemy, spell_damage, spell_id + " (spell)")
-	
-	print("Player casts ", spell_data.get("name", spell_id), "! Deals ", final_damage, " total damage (", elemental_damage, " ", damage_type, " + ", spell_damage, " spell)! Costs ", mana_cost, " MP!")
-	
-	# Apply status effects based on spell
-	_apply_spell_status_effects(spell_data, final_damage)
-	
-	# Check if enemy is defeated
-	if target_enemy.get_stats().health <= 0:
-		print("Enemy defeated!")
-		# Remove the defeated enemy and continue combat if there are others
-		remove_enemy_from_combat(target_enemy)
-		return
-	
-	# End turn after spell
-	_end_player_turn()
+	_execute_spell_directly({"spell_id": spell_id})
 
 func player_defend():
 	"""Player defends, reducing damage taken"""
@@ -2918,103 +2882,46 @@ func _execute_special_attack_directly():
 
 func _execute_spell_directly(data: Dictionary):
 	"""Execute spell directly without queuing checks"""
-	print("=== EXECUTING QUEUED SPELL ===")
-	print("🎯 DEBUG: queued_action_data = ", data)
-	
-	# Get the spell ID from queued data, default to fireball
 	var spell_id = data.get("spell_id", "fireball")
-	print("🎯 DEBUG: Retrieved spell_id from queued data: '", spell_id, "'")
-	_log_player_action("cast_spell", {"spell_id": spell_id})
-	
-	# Get spell data
 	var spell_data = get_spell_data(spell_id)
 	if not spell_data:
 		print("ERROR: Unknown spell: ", spell_id)
 		_end_player_turn()
 		return
-	
-	# Check if player has enough mana
+
+	# Check mana cost
 	var mana_cost = get_spell_mana_cost(spell_id)
-	if not current_player or not current_player.has_method("get_stats") or not current_player.get_stats():
-		print("ERROR: Player has no stats!")
-		_end_player_turn()
-		return
-	
 	var player_stats = current_player.get_stats()
 	if player_stats.mana < mana_cost:
 		print("Not enough mana! Need ", mana_cost, " MP, have ", player_stats.mana, " MP")
 		_end_player_turn()
 		return
 	
-	# Calculate spell damage with level scaling
-	var base_damage = get_spell_damage(spell_id)
-	var damage_type = spell_data.get("damage_type", "physical")
-	var final_damage = _process_attack_damage(base_damage, damage_type, spell_id)
-	
 	# Consume mana
 	player_stats.mana -= mana_cost
 	player_stats.mana_changed.emit(player_stats.mana, player_stats.max_mana)
 	
-	print("Player casts ", spell_data.get("name", spell_id), "! Deals ", final_damage, " damage! Costs ", mana_cost, " MP!")
-	
-	# Apply status effects based on spell
-	_apply_spell_status_effects(spell_data, final_damage)
-	
-	# Always use the currently focused enemy for spell targeting
-	var target_enemy = get_focused_enemy()
-	if not target_enemy:
-		print("ERROR: No focused enemy found for spell!")
-		_end_player_turn()
-		return
-	
-	# Check if enemy is defeated
-	if target_enemy.get_stats().health <= 0:
-		print("Enemy defeated!")
-		# Remove the defeated enemy and continue combat if there are others
-		remove_enemy_from_combat(target_enemy)
-		return
-	
-	# Play animation with damage - damage will be applied when animation completes
-	if animation_manager and animation_manager.has_method("play_attack_animation_with_damage"):
-		print("🎬 DEBUG: Queued spell data animation field: '", spell_data.get("animation", "fire_magic"), "'")
-		var animation_type = _get_animation_type_for_spell(spell_data.get("animation", "fire_magic"))
-		print("🎬 Playing queued player ", spell_data.get("animation", "fire_magic"), " animation with damage")
-		
-		# For animation-based damage, we need to store both damage types
-		# The animation will trigger damage when it completes
-		current_player.set_meta("pending_spell_damage", {
-			"elemental_damage": int(final_damage * 0.7),
-			"spell_damage": int(final_damage * 0.3),
-			"elemental_type": damage_type,
-			"spell_id": spell_id,
-			"animation_type": animation_type
-		})
-		
-		animation_manager.play_attack_animation_with_damage(
-			current_player, 
-			animation_type, 
-			target_enemy, 
-			final_damage, 
-			damage_type
-		)
-	else:
-		# Fallback to old system
-		print("⚠️ No animation manager available for queued player spell")
-		# Apply dual damage immediately
-		var elemental_damage = int(final_damage * 0.7)
-		var spell_damage = int(final_damage * 0.3)
-		
-		target_enemy.take_damage(elemental_damage, damage_type)
-		_log_attack(current_player, target_enemy, elemental_damage, spell_id + " (elemental)")
-		
-		target_enemy.take_damage(spell_damage, "spell_damage")
-		_log_attack(current_player, target_enemy, spell_damage, spell_id + " (spell)")
-		
-		# End turn immediately
-		_end_player_turn()
-		return
-	
-	# Note: Turn will end automatically when animation completes and damage is applied
+	_log_player_action("cast_spell", {"spell_id": spell_id})
+
+	# Execute the core spell logic
+	_execute_spell_logic(spell_id, current_player, get_focused_enemy())
+
+	# Handle special multi-cast logic for spells like Earthquake
+	if "multi-cast" in spell_data.get("tags", []):
+		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+		if status_manager:
+			var recast_data = {
+				"spell_id": spell_id,
+				"caster": current_player,
+				"target": get_focused_enemy(),
+				"damage_multiplier": 0.5
+			}
+			# Duration of 1 means it will trigger on the player's next turn start
+			status_manager.apply_recast_spell(current_player, current_player, 1, recast_data)
+			_log_combat_event("The ground continues to tremble...")
+
+	# End the player's turn (animations are handled by the logic/damage system)
+	_end_player_turn()
 
 func _execute_defend_directly():
 	"""Execute defend directly without queuing checks"""
@@ -4322,6 +4229,19 @@ func _on_animation_damage_ready(_animation_type: AnimationManager.ANIMATION_TYPE
 		else:  # This is the player
 			_log_combat_event("💥 " + actor_name + " deals " + str(damage) + " damage to " + target_name + "!")
 	
+	# Handle Petrify and Shatter mechanics for Earth damage
+	if damage_type == "earth":
+		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+		if status_manager:
+			if status_manager.is_petrified(target):
+				# Shatter the target
+				damage *= 3
+				_log_combat_event("💥 SHATTER! " + _get_entity_name(target) + " takes massive damage!")
+				status_manager.remove_effect(target, status_manager.EFFECT_TYPE.PETRIFY)
+			else:
+				# Apply a stack of petrify
+				status_manager.apply_petrify(target, actor)
+
 	# End the actor's turn after damage is applied
 	if actor.has_method("enemy_name"):  # This is an enemy
 		print("🎯 Enemy ", actor_name, " animation completed, ending turn")
@@ -4348,6 +4268,81 @@ func _on_animation_damage_ready(_animation_type: AnimationManager.ANIMATION_TYPE
 func is_combat_active() -> bool:
 	"""Check if combat is currently active"""
 	return in_combat
+
+func _execute_spell_logic(spell_id: String, caster: Node, target: Node, damage_multiplier: float = 1.0):
+	"""
+	Core logic for executing a spell's effects.
+	Can be called directly for recasts or special spell effects.
+	"""
+	var spell_data = get_spell_data(spell_id)
+	if not spell_data:
+		print("ERROR: Unknown spell to execute: ", spell_id)
+		return
+
+	# Use the provided target, not necessarily the currently focused one
+	var primary_target = target
+	if not primary_target:
+		print("ERROR: No valid target for spell logic execution!")
+		return
+
+	# Calculate damage
+	var base_damage = get_spell_damage(spell_id)
+	var damage_type = spell_data.get("damage_type", "physical")
+	var final_damage = _process_attack_damage(base_damage, damage_type, spell_id)
+	final_damage = int(final_damage * damage_multiplier)
+
+	# Handle AOE
+	var targets = [primary_target]
+	if "aoe" in spell_data.get("tags", []):
+		var all_enemies = get_combat_enemies()
+		var aoe_radius = spell_data.get("aoe_radius", 3.0)
+		for enemy in all_enemies:
+			if enemy != primary_target and enemy.global_position.distance_to(primary_target.global_position) <= aoe_radius:
+				targets.append(enemy)
+
+	# Apply damage and effects to all targets
+	for t in targets:
+		# The animation damage system will handle the actual damage application
+		if animation_manager and animation_manager.has_method("play_attack_animation_with_damage"):
+			var animation_type = _get_animation_type_for_spell(spell_data.get("animation", "fire_magic"))
+			animation_manager.play_attack_animation_with_damage(caster, animation_type, t, final_damage, damage_type)
+		else:
+			# Fallback for no animation manager
+			if t.has_method("take_damage"):
+				t.take_damage(final_damage, damage_type)
+
+		_log_attack(caster, t, final_damage, spell_data.get("name", spell_id))
+		_apply_spell_status_effects(spell_data, final_damage)
+
+
+func _process_recast_effects(actor: Node):
+	"""Process any RECAST_SPELL effects on the current actor."""
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager: return
+
+	var effects_manager = status_manager.get_entity_effects(actor)
+	if not effects_manager: return
+
+	var effects_to_process = []
+	for effect in effects_manager.effects:
+		if effect.type == status_manager.EFFECT_TYPE.RECAST_SPELL:
+			effects_to_process.append(effect)
+
+	for effect in effects_to_process:
+		effect.remaining_duration -= 1
+		if effect.remaining_duration <= 0:
+			var data = effect.recast_data
+			var spell_id = data.get("spell_id")
+			var caster = data.get("caster")
+			var target = data.get("target")
+			var damage_multiplier = data.get("damage_multiplier", 1.0)
+
+			if spell_id and caster and target:
+				print("Recasting spell: " + spell_id)
+				_execute_spell_logic(spell_id, caster, target, damage_multiplier)
+
+			# This is a one-time recast, so remove the effect
+			effects_manager.remove_effect(effect.type)
 
 func _check_and_skip_player_if_no_action():
 	"""Check if player should be skipped due to no queued action, and implement skip and re-queue logic"""

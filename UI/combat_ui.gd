@@ -17,6 +17,7 @@ class_name CombatUI
 @onready var lightning_bolt_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/LightningBoltButton
 @onready var icicle_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/IcicleButton
 @onready var smite_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/SmiteButton
+@onready var earthquake_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/EarthquakeButton
 @onready var special_attacks_close_button: Button = $SpecialAttacksPopup/VBoxContainer/CloseButton
 @onready var spells_close_button: Button = $SpellsPopup/VBoxContainer/CloseButton
 
@@ -179,6 +180,14 @@ func _ready():
 		print("Smite button connected!")
 	else:
 		print("ERROR: Smite button not found!")
+
+	if earthquake_button:
+		earthquake_button.mouse_entered.connect(_on_earthquake_button_mouse_entered)
+		earthquake_button.mouse_exited.connect(_on_earthquake_button_mouse_exited)
+		earthquake_button.pressed.connect(_on_earthquake_button_pressed)
+		print("Earthquake button connected!")
+	else:
+		print("WARNING: Earthquake button not found, AOE indicator will not be shown.")
 		
 	# Connect close buttons
 	if special_attacks_close_button:
@@ -372,6 +381,25 @@ func _on_fireball_pressed():
 		spells_popup.hide()  # Close popup after selection
 	else:
 		print("ERROR: No combat manager found!")
+
+func _on_earthquake_button_mouse_entered():
+    if combat_manager:
+        var spell_data = combat_manager.get_spell_data("earthquake")
+        if "aoe" in spell_data.get("tags", []):
+            var radius = spell_data.get("aoe_radius", 3.0)
+            var target = combat_manager.get_focused_enemy()
+            if target:
+                combat_manager.show_aoe_indicator(target.global_position, radius)
+
+func _on_earthquake_button_mouse_exited():
+    if combat_manager:
+        combat_manager.hide_aoe_indicator()
+
+func _on_earthquake_button_pressed():
+    if combat_manager:
+        combat_manager.player_cast_spell("earthquake")
+        spells_popup.hide()
+        combat_manager.hide_aoe_indicator() # Hide after casting
 
 func _on_lightning_bolt_pressed():
 	print("⚡ Lightning Bolt button pressed!")

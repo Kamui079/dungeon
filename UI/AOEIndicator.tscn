@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://aoe_indicator"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aoe"]
+albedo_color = Color(1, 1, 1, 0.4)
+transparency = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_aoe"]
+material = SubResource("StandardMaterial3D_aoe")
+height = 0.01
+
+[node name="AOEIndicator" type="MeshInstance3D"]
+mesh = SubResource("CylinderMesh_aoe")
