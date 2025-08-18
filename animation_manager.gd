@@ -8,8 +8,13 @@ enum ANIMATION_TYPE {
 	LIGHTNING_MAGIC,
 	ICE_MAGIC,
 	HOLY_MAGIC,
+	EARTH_MAGIC,
+	WATER_MAGIC,
+	ARCANE_MAGIC,
+	DARK_MAGIC,
 	PHYSICAL_ATTACK,
-	THROW_ATTACK
+	THROW_ATTACK,
+	LEVEL_UP
 }
 
 # Animation durations (in seconds)
@@ -19,8 +24,13 @@ var animation_durations = {
 	ANIMATION_TYPE.LIGHTNING_MAGIC: 2.5,
 	ANIMATION_TYPE.ICE_MAGIC: 3.5,
 	ANIMATION_TYPE.HOLY_MAGIC: 3.5,
+	ANIMATION_TYPE.EARTH_MAGIC: 4.0,
+	ANIMATION_TYPE.WATER_MAGIC: 3.5,
+	ANIMATION_TYPE.ARCANE_MAGIC: 3.0,
+	ANIMATION_TYPE.DARK_MAGIC: 3.5,
 	ANIMATION_TYPE.PHYSICAL_ATTACK: 2.0,
-	ANIMATION_TYPE.THROW_ATTACK: 2.5
+	ANIMATION_TYPE.THROW_ATTACK: 2.5,
+	ANIMATION_TYPE.LEVEL_UP: 2.0
 }
 
 # Animation signals
@@ -234,10 +244,20 @@ func _play_animation_effect(actor: Node, animation_type: ANIMATION_TYPE) -> void
 			_play_ice_magic_effect(actor, "❄️ ICE MAGIC", "ice")
 		ANIMATION_TYPE.HOLY_MAGIC:
 			_play_holy_magic_effect(actor, "✨ HOLY MAGIC", "holy")
+		ANIMATION_TYPE.EARTH_MAGIC:
+			_play_earth_magic_effect(actor, "🪨 EARTH MAGIC", "earth")
+		ANIMATION_TYPE.WATER_MAGIC:
+			_play_water_magic_effect(actor, "💧 WATER MAGIC", "water")
+		ANIMATION_TYPE.ARCANE_MAGIC:
+			_play_arcane_magic_effect(actor, "🔮 ARCANE MAGIC", "arcane")
+		ANIMATION_TYPE.DARK_MAGIC:
+			_play_dark_magic_effect(actor, "🖤 DARK MAGIC", "dark")
 		ANIMATION_TYPE.PHYSICAL_ATTACK:
 			_play_physical_attack_effect(actor, "⚔️ PHYSICAL ATTACK", "physical")
 		ANIMATION_TYPE.THROW_ATTACK:
 			_play_throw_attack_effect(actor, "🎯 THROW ATTACK", "magic")
+		ANIMATION_TYPE.LEVEL_UP:
+			_play_level_up_effect(actor, "🎉 LEVEL UP!", "divine")
 
 func _play_physical_attack_effect(actor: Node, attack_name: String, attack_type: String):
 	"""Play physical attack visual effect"""
@@ -365,6 +385,90 @@ func _play_holy_magic_effect(actor: Node, attack_name: String, attack_type: Stri
 		# Fallback to static effect if no target found
 		_create_attack_effect(actor, attack_name, attack_type)
 
+func _play_earth_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play earth magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("🪨 Playing earth magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
+func _play_water_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play water magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("💧 Playing water magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
+func _play_arcane_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play arcane magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("🔮 Playing arcane magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
+func _play_dark_magic_effect(actor: Node, attack_name: String, attack_type: String):
+	"""Play dark magic visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("🖤 Playing dark magic effect for ", actor_name)
+	
+	# Get the target for this attack
+	var target = _get_target_for_actor(actor)
+	if target:
+		# Create moving attack effect that flies to target
+		_create_moving_attack_effect(actor, attack_name, attack_type, target)
+	else:
+		# Fallback to static effect if no target found
+		_create_attack_effect(actor, attack_name, attack_type)
+
 func _play_throw_attack_effect(actor: Node, attack_name: String, attack_type: String):
 	"""Play throw attack visual effect"""
 	var actor_name = "Unknown"
@@ -392,8 +496,10 @@ func _create_attack_effect(actor: Node, text: String, attack_type: String = "") 
 		return
 	
 	print("🎬 DEBUG: _create_attack_effect called with:")
+	@warning_ignore("incompatible_ternary")
 	print("🎬 DEBUG: - actor: ", actor.name if actor.name else "unnamed")
 	print("🎬 DEBUG: - actor class: ", actor.get_class())
+	@warning_ignore("incompatible_ternary")
 	print("🎬 DEBUG: - actor parent: ", actor.get_parent().name if actor.get_parent() else "no parent")
 	print("🎬 DEBUG: - text: ", text)
 	print("🎬 DEBUG: - attack_type: ", attack_type)
@@ -469,11 +575,15 @@ func _attach_effect_to_actor(actor: Node, effect: Node3D) -> void:
 		return
 	
 	print("🎬 DEBUG: _attach_effect_to_actor called with:")
+	@warning_ignore("incompatible_ternary")
 	print("🎬 DEBUG: - actor: ", actor.name if actor.name else "unnamed")
 	print("🎬 DEBUG: - actor class: ", actor.get_class())
+	@warning_ignore("incompatible_ternary")
 	print("🎬 DEBUG: - actor parent: ", actor.get_parent().name if actor.get_parent() else "no parent")
+	@warning_ignore("incompatible_ternary")
 	print("🎬 DEBUG: - effect: ", effect.name if effect.name else "unnamed")
 	print("🎬 DEBUG: - effect class: ", effect.get_class())
+	@warning_ignore("incompatible_ternary")
 	print("🎬 DEBUG: - effect parent: ", effect.get_parent().name if effect.get_parent() else "no parent")
 	
 	var actor_id = actor.get_instance_id()
@@ -588,10 +698,20 @@ func _get_animation_name(animation_type: ANIMATION_TYPE) -> String:
 			return "Ice Magic"
 		ANIMATION_TYPE.HOLY_MAGIC:
 			return "Holy Magic"
+		ANIMATION_TYPE.EARTH_MAGIC:
+			return "Earth Magic"
+		ANIMATION_TYPE.WATER_MAGIC:
+			return "Water Magic"
+		ANIMATION_TYPE.ARCANE_MAGIC:
+			return "Arcane Magic"
+		ANIMATION_TYPE.DARK_MAGIC:
+			return "Dark Magic"
 		ANIMATION_TYPE.PHYSICAL_ATTACK:
 			return "Physical Attack"
 		ANIMATION_TYPE.THROW_ATTACK:
 			return "Throw Attack"
+		ANIMATION_TYPE.LEVEL_UP:
+			return "Level Up"
 		_:
 			return "Unknown Animation"
 
@@ -783,3 +903,94 @@ func _find_combat_manager() -> Node:
 	
 	print("🎬 Could not find combat manager")
 	return null
+
+func _play_level_up_effect(actor: Node, effect_name: String, effect_type: String):
+	"""Play level up visual effect"""
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	print("🎉 Playing level up effect for ", actor_name)
+	
+	# Create a special level up effect that appears above the player
+	_create_level_up_effect(actor, effect_name, effect_type)
+
+func _create_level_up_effect(actor: Node, effect_name: String, _effect_type: String):
+	"""Create a special level up visual effect"""
+	# Get actor name for logging
+	var actor_name = "Unknown"
+	if actor.has_method("enemy_name"):
+		actor_name = actor.enemy_name()
+	elif actor.name:
+		actor_name = actor.name
+	else:
+		actor_name = str(actor)
+	
+	# Create a 3D label for the level up effect
+	var effect = Label3D.new()
+	effect.text = effect_name
+	effect.font_size = 20  # Even smaller font size for full text visibility
+	effect.billboard = true  # Always face the camera
+	effect.pixel_size = 0.02  # Smaller pixel size for better fit
+	effect.modulate = Color(1, 1, 0, 1)  # Bright yellow color
+	
+	# Try to find the camera to position the effect better
+	var camera = null
+	var scene = get_tree().current_scene
+	if scene:
+		# Look for camera in the scene - try multiple methods
+		# Method 1: Look for Camera3D nodes
+		var cameras = scene.get_tree().get_nodes_in_group("")
+		for node in cameras:
+			if node is Camera3D:
+				camera = node
+				break
+		
+		# Method 2: Look for camera in player group if Method 1 failed
+		if not camera:
+			var player_nodes = scene.get_tree().get_nodes_in_group("player")
+			for node in player_nodes:
+				if node is Camera3D:
+					camera = node
+					break
+				elif node.has_method("get_camera"):
+					var player_camera = node.get_camera()
+					if player_camera and player_camera is Camera3D:
+						camera = player_camera
+						break
+	
+	# Position the effect relative to camera view if possible
+	if camera and camera is Camera3D:
+		# Position the effect in front of the camera, above the player
+		var camera_forward = -camera.global_transform.basis.z  # Camera's forward direction
+		var effect_offset = Vector3(0, 0.8, 0) + (camera_forward * 1.8)  # Lower height, closer for full text visibility
+		effect.global_position = actor.global_position + effect_offset
+		print("🎉 Level up effect positioned relative to camera")
+	else:
+		# Fallback to simple positioning above the actor
+		effect.global_position = actor.global_position + Vector3(0, 0.8, 0)
+		print("🎉 Level up effect positioned above actor (camera not found)")
+	
+	# Add the effect to the scene
+	get_tree().current_scene.add_child(effect)
+	
+	# Create a tween for the level up animation
+	var tween = effect.create_tween()
+	
+	# Animate the effect: fade in, move up, fade out
+	tween.tween_property(effect, "modulate:a", 0.0, 0.0)  # Start transparent
+	tween.tween_property(effect, "modulate:a", 1.0, 0.3)  # Fade in
+	tween.tween_property(effect, "global_position", effect.global_position + Vector3(0, 1.5, 0), 1.0)  # Move up moderately
+	tween.tween_property(effect, "modulate:a", 0.0, 0.7)  # Fade out
+	
+	# Remove the effect when animation is complete
+	tween.tween_callback(func():
+		effect.queue_free()
+		print("🎉 Level up effect animation completed for ", actor_name)
+	)
+	
+	print("🎉 Started level up effect animation")

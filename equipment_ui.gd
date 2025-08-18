@@ -19,6 +19,10 @@ var player_stats: Node
 var slot_nodes: Dictionary = {}
 var stat_labels: Dictionary = {}
 
+# Stat allocation system
+var stat_points_label: Label
+var stat_buttons: Dictionary = {}
+
 # Experience bar elements (created programmatically)
 var experience_section: VBoxContainer
 var experience_bar: ProgressBar
@@ -156,6 +160,7 @@ func toggle_panel():
 	else:
 		# Update display when showing the panel
 		_update_display()
+		_update_stats_display()  # Update stats display when showing equipment UI
 		
 		# Ensure experience bar is visible and update data
 		if experience_section:
@@ -298,51 +303,54 @@ func get_total_stat_bonuses() -> Dictionary:
 	return total_bonuses
 
 func _update_stats_display():
-	"""Update the stats display with current equipment bonuses"""
-	if not stats_list or not player_inventory:
+	"""Update the stats display with current values"""
+	if not player_stats:
 		return
 	
-	# Calculate total bonuses from all equipped items
-	var total_bonuses = {
-		"strength": 0,
-		"dexterity": 0,
-		"intelligence": 0,
-		"speed": 0,
-		"cunning": 0,
-		"spell_power": 0,
-		"armor": 0
-	}
+	# Update stat points display
+	if stat_points_label:
+		stat_points_label.text = "Stat Points: " + str(player_stats.stat_points_available)
 	
-	var equipment = player_inventory.get_equipment()
+	# Update stat button texts and enable/disable based on available points
+	var has_points = player_stats.stat_points_available > 0
 	
-	for slot_name in equipment:
-		var item = equipment[slot_name]
-		if item != null and item is Equipment:
-			# Add stat bonuses
-			for stat_name in item.stat_bonuses:
-				if total_bonuses.has(stat_name):
-					total_bonuses[stat_name] += item.stat_bonuses[stat_name]
+	for stat_name in stat_buttons.keys():
+		var button = stat_buttons[stat_name]
+		if button:
+			# Update button text with current stat value
+			var current_value = 0
+			match stat_name:
+				"strength":
+					current_value = player_stats.strength
+				"intelligence":
+					current_value = player_stats.intelligence
+				"spell_power":
+					current_value = player_stats.spell_power
+				"dexterity":
+					current_value = player_stats.dexterity
+				"cunning":
+					current_value = player_stats.cunning
+				"speed":
+					current_value = player_stats.speed
+				"health":
+					current_value = player_stats.health
+				"mana":
+					current_value = player_stats.mana
+				"armor":
+					# Skip armor - it's gear-based, not investable
+					continue
 			
-			# Add armor value
-			total_bonuses["armor"] += item.armor_value
-	
-	# Update the stat labels
-	for stat_name in total_bonuses:
-		if stat_labels.has(stat_name):
-			var label = stat_labels[stat_name]
-			var bonus = total_bonuses[stat_name]
+			# Update button text
+			var stat_display_name = stat_name.capitalize()
+			if stat_name == "spell_power":
+				stat_display_name = "Spell Power"
+			button.text = stat_display_name + ": " + str(current_value)
 			
-			if stat_name == "armor":
-				label.text = "Armor: " + str(bonus)
-			else:
-				# Capitalize first letter for display
-				var display_name = stat_name.capitalize()
-				if bonus > 0:
-					label.text = display_name + ": +" + str(bonus)
-				elif bonus < 0:
-					label.text = display_name + ": " + str(bonus)
-				else:
-					label.text = display_name + ": +0"
+			# Enable/disable button based on available points
+			button.disabled = not has_points
+	
+	# Update armor display with gear values
+	_update_armor_display()
 
 func _get_or_create_icon_rect(slot_node: Panel) -> TextureRect:
 	# First try to find an existing icon with the exact name "Icon"
@@ -428,25 +436,58 @@ func _initialize_stats_display():
 			printerr("Could not find stats list automatically!")
 			return
 	
-	# Find all stat labels
+	# Find all stat labels and convert them to clickable buttons
 	for child in stats_list.get_children():
 		if child is Label:
 			var text = child.text
+			var stat_name = ""
+			
+			# Determine which stat this label represents
 			if "Strength" in text:
-				stat_labels["strength"] = child
+				stat_name = "strength"
 			elif "Dexterity" in text:
-				stat_labels["dexterity"] = child
+				stat_name = "dexterity"
 			elif "Intelligence" in text:
-				stat_labels["intelligence"] = child
+				stat_name = "intelligence"
 			elif "Speed" in text:
-				stat_labels["speed"] = child
+				stat_name = "speed"
 			elif "Cunning" in text:
-				stat_labels["cunning"] = child
+				stat_name = "cunning"
 			elif "Spell Power" in text:
-				stat_labels["spell_power"] = child
+				stat_name = "spell_power"
 			elif "Armor" in text:
+				# Armor is gear-based, not investable - keep as label
 				stat_labels["armor"] = child
-		# End of _initialize_stats_display function
+				continue  # Skip button creation for armor
+			
+			if stat_name != "":
+				# Store the original label for reference
+				stat_labels[stat_name] = child
+				
+				# Create a button to replace the label
+				var button = Button.new()
+				button.text = text
+				button.flat = true
+				button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				button.add_theme_constant_override("h_separation", 0)
+				
+				# Connect the button signal
+				button.pressed.connect(_on_stat_button_pressed.bind(stat_name))
+				
+				# Store the button reference
+				stat_buttons[stat_name] = button
+				
+				# Replace the label with the button
+				var parent = child.get_parent()
+				var index = child.get_index()
+				parent.remove_child(child)
+				parent.add_child(button)
+				parent.move_child(button, index)
+				
+				print("Converted ", stat_name, " label to clickable button")
+	
+	# Add stat points display
+	_add_stat_points_display()
 
 func _find_stats_list_recursively(node: Node) -> VBoxContainer:
 	"""Recursively search for a VBoxContainer that contains stat labels"""
@@ -686,3 +727,81 @@ func _connect_player_stats_signals():
 		player_stats.stats_changed.connect(_on_player_stats_changed)
 	else:
 		printerr("EquipmentUI: Could not connect PlayerStats signals, player_stats is null!")
+
+# Stat allocation functions
+func _add_stat_points_display():
+	"""Add stat points display to the stats section"""
+	if not stats_list:
+		return
+	
+	# Create stat points label
+	stat_points_label = Label.new()
+	stat_points_label.text = "Stat Points: 0"
+	stat_points_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stat_points_label.add_theme_color_override("font_color", Color(1, 1, 0, 1))  # Yellow text
+	
+	# Add it to the stats list
+	stats_list.add_child(stat_points_label)
+	
+	print("Added stat points display to equipment UI")
+
+func _on_stat_button_pressed(stat_name: String):
+	"""Handle stat button press for stat allocation"""
+	if not player_stats:
+		print("Player stats not found!")
+		return
+	
+	if player_stats.stat_points_available <= 0:
+		print("No stat points available!")
+		return
+	
+	# Allocate the stat point
+	match stat_name:
+		"strength":
+			player_stats.set_strength(player_stats.strength + 1)
+		"intelligence":
+			player_stats.set_intelligence(player_stats.intelligence + 1)
+		"spell_power":
+			player_stats.set_spell_power(player_stats.spell_power + 1)
+		"dexterity":
+			player_stats.set_dexterity(player_stats.dexterity + 1)
+		"cunning":
+			player_stats.set_cunning(player_stats.cunning + 1)
+		"speed":
+			player_stats.set_speed(player_stats.speed + 1)
+		"health":
+			player_stats.set_health(player_stats.health + 1)
+		"mana":
+			player_stats.set_mana(player_stats.mana + 1)
+		"armor":
+			# Armor is gear-based, not investable
+			print("Cannot invest in armor - it's gear-based!")
+			return
+	
+	# Decrease available stat points
+	player_stats.stat_points_available -= 1
+	
+	# Update the display
+	_update_stats_display()
+	
+	print("Allocated 1 point to ", stat_name, ". Points remaining: ", player_stats.stat_points_available)
+
+func _update_armor_display():
+	"""Update the armor display with current gear values"""
+	if not stat_labels.has("armor"):
+		return
+	
+	var armor_label = stat_labels["armor"]
+	if not armor_label:
+		return
+	
+	# Get total armor from equipped gear
+	var total_armor = get_total_armor_value()
+	
+	# Update the armor label text with gear bonus
+	if total_armor > 0:
+		armor_label.text = "Armor: +" + str(total_armor)
+	else:
+		armor_label.text = "Armor: 0"
+	
+	print("Updated armor display: ", total_armor)

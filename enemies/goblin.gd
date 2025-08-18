@@ -13,7 +13,7 @@ func get_custom_display_name() -> String:
 
 func _ready():
 	# Create enemy behavior component
-	enemy_behavior = preload("enemy.gd").new()
+	enemy_behavior = load("res://enemies/enemy.gd").new()
 	add_child(enemy_behavior)
 	
 	# Set goblin-specific properties

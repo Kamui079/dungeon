@@ -100,7 +100,16 @@ func _consume_item(bag_slot: int):
 		return
 	
 	# Not in combat - use item immediately
-	if item_resource.use(player_node):
+	var item_used = false
+	
+	# Special handling for Level Up Potion
+	if item_resource.name == "Level Up Potion" and item_resource.custom_effect == "level_up":
+		item_used = _handle_level_up_potion(player_node)
+	else:
+		# Use normal item logic
+		item_used = item_resource.use(player_node)
+	
+	if item_used:
 		bag[bag_slot].quantity -= 1
 		if bag[bag_slot].quantity <= 0: bag.erase(bag_slot)
 		inventory_changed.emit()
@@ -218,3 +227,88 @@ func _move_equipment_item(from_slot: String, to_slot: String):
 	
 	# Emit signal
 	inventory_changed.emit()
+
+func _handle_level_up_potion(player_node: Node) -> bool:
+	"""Handle the Level Up Potion effect"""
+	print("🎯 Level Up Potion used!")
+	
+	# Try to find player stats
+	var player_stats = null
+	if player_node.has_method("get_stats"):
+		player_stats = player_node.get_stats()
+	elif player_node.has_method("get_player_stats"):
+		player_stats = player_node.get_player_stats()
+	elif player_node.has("stats"):
+		player_stats = player_node.stats
+	
+	if not player_stats:
+		print("ERROR: Could not find player stats for level up!")
+		return false
+	
+	# Try experience method first, then fall back to force level up
+	var level_up_successful = false
+	if player_stats.has_method("gain_experience"):
+		# Grant enough experience to level up
+		var current_exp = player_stats.experience
+		var exp_needed = player_stats.experience_to_next_level
+		
+		# Give exactly the amount needed to level up
+		var exp_to_give = exp_needed - current_exp
+		if exp_to_give > 0:
+			player_stats.gain_experience(exp_to_give)
+			print("🎉 Level Up Potion granted ", exp_to_give, " experience!")
+			level_up_successful = true
+		else:
+			print("Player already has enough experience to level up!")
+			level_up_successful = true
+	elif player_stats.has_method("force_level_up"):
+		# Fall back to direct level up
+		player_stats.force_level_up()
+		print("🎉 Level Up Potion used force_level_up method!")
+		level_up_successful = true
+	else:
+		print("ERROR: Player stats missing both gain_experience and force_level_up methods!")
+		return false
+	
+	# If level up was successful, play the animation
+	if level_up_successful:
+		_play_level_up_animation(player_node)
+	
+	return level_up_successful
+
+func _play_level_up_animation(player_node: Node):
+	"""Play the level up animation for the player"""
+	print("🎬 Attempting to play level up animation...")
+	
+	# Find the animation manager
+	var animation_manager = null
+	var scene = get_tree().current_scene
+	if scene:
+		print("🎬 Current scene: ", scene.name)
+		animation_manager = scene.get_node_or_null("AnimationManager")
+		if animation_manager:
+			print("🎬 Found AnimationManager by name: ", animation_manager.name)
+		else:
+			print("🎬 AnimationManager not found by name")
+	
+	if not animation_manager:
+		# Try alternative search methods
+		var managers = get_tree().get_nodes_in_group("AnimationManager")
+		print("🎬 AnimationManager group search found ", managers.size(), " managers")
+		if managers.size() > 0:
+			animation_manager = managers[0]
+			print("🎬 Found AnimationManager through group: ", animation_manager.name)
+	
+	if animation_manager:
+		print("🎬 AnimationManager found: ", animation_manager.name)
+		print("🎬 Has play_attack_animation method: ", animation_manager.has_method("play_attack_animation"))
+		print("🎬 ANIMATION_TYPE.LEVEL_UP value: ", animation_manager.ANIMATION_TYPE.LEVEL_UP)
+		
+		if animation_manager.has_method("play_attack_animation"):
+			# Play the level up animation
+			animation_manager.play_attack_animation(player_node, animation_manager.ANIMATION_TYPE.LEVEL_UP)
+			print("🎬 Level up animation triggered!")
+		else:
+			print("⚠️ AnimationManager missing play_attack_animation method")
+	else:
+		print("⚠️ Could not find animation manager for level up effect")

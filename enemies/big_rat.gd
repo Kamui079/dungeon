@@ -25,7 +25,7 @@ func _ready():
 	add_to_group("Enemy")
 	
 	# Create enemy behavior component
-	enemy_behavior = preload("enemy.gd").new()
+	enemy_behavior = load("res://enemies/enemy.gd").new()
 	add_child(enemy_behavior)
 	
 	# Set rat-specific properties
@@ -101,9 +101,9 @@ func enemy_name() -> String:
 	return "Big Rat"  # Fallback name
 
 # Setter method for initial combat position (used by combat system)
-func set_initial_combat_position(position: Vector3):
+func set_initial_combat_position(combat_pos: Vector3):
 	if enemy_behavior:
-		enemy_behavior.initial_combat_position = position
+		enemy_behavior.initial_combat_position = combat_pos
 
 # Getter method for initial combat position (used by combat system)
 func get_initial_combat_position() -> Vector3:

@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="Item" load_steps=3 format=3 uid="uid://bqxv8yqxqxqxq"]
+
+[ext_resource type="Texture2D" path="res://Free - Raven Fantasy Icons/Free - Raven Fantasy Icons/64x64/XPPotion.png" id="1_ktgxa"]
+[ext_resource type="Script" path="res://Inventory/item.gd" id="2_ko7gi"]
+
+[resource]
+resource_name = "Level Up Potion"
+script = ExtResource("2_ko7gi")
+icon = ExtResource("1_ktgxa")
+name = "Level Up Potion"
+description = "A mysterious potion that grants instant experience and level advancement. Perfect for testing!"
+item_type = 0
+max_stack = 99
+drop_chance = 100.0
+rarity = 4
+show_name = true
+show_type = true
+show_rarity = true
+show_level_requirement = false
+show_stats = false
+show_description = true
+custom_name = "Level Up Potion"
+custom_type = "Testing Item"
+custom_description = "🎯 TESTING ITEM: Click to gain a level instantly! Grants 5 stat points to allocate."
+level_requirement = 1
+custom_stats = {}
+consumable_type = 3
+amount = 0
+custom_effect = "level_up"
+equipment_slot = ""
+stats = {}

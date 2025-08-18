@@ -83,6 +83,7 @@ var combat_manager: Node = null
 var current_target: Node3D = null
 var is_moving_to_target: bool = false
 var target_position: Vector3 = Vector3.ZERO
+var initial_combat_position: Vector3 = Vector3.ZERO  # Store initial position when combat starts
 var is_frozen: bool = false  # Flag to prevent movement during combat
 var movement_attempts: int = 0  # Track movement attempts to prevent infinite loops
 
@@ -140,22 +141,53 @@ func _ready():
 	# Set the enemy's level first
 	stats.set_level(enemy_level)
 	
-	# Set base stats (health and mana are now investable stats)
-	# Convert base health to stat points (divide by 3 since each point gives 3 HP)
-	var health_stat_points = int(base_health / 3.0)
-	stats.set_health(health_stat_points)
+	# Automatically allocate available stat points for enemies
+	var available_points = stats.stat_points_available
 	
-	# Convert base mana to stat points (divide by 4 since each point gives 4 MP)
-	var mana_stat_points = int(base_mana / 4.0)
-	stats.set_mana(mana_stat_points)
+	# Allocate stats based on enemy type and available points
+	# Prioritize health and mana for survivability
+	var health_points = min(available_points, 3)  # Spend up to 3 points on health
+	available_points -= health_points
+	stats.set_health(10 + health_points)  # Base 10 + invested points
 	
-	# Set combat stats with modifiers
-	stats.set_strength(1 + strength_modifier)
-	stats.set_intelligence(1 + intelligence_modifier)
-	stats.set_spell_power(1 + spell_power_modifier)
-	stats.set_dexterity(1 + dexterity_modifier)
-	stats.set_cunning(1 + cunning_modifier)
-	stats.set_speed(1 + speed_modifier)
+	var mana_points = min(available_points, 2)  # Spend up to 2 points on mana
+	available_points -= mana_points
+	stats.set_mana(10 + mana_points)  # Base 10 + invested points
+	
+	# Distribute remaining points across combat stats
+	var combat_stats = ["strength", "intelligence", "spell_power", "dexterity", "cunning", "speed"]
+	var base_values = [1, 1, 1, 1, 1, 1]
+	var modifiers = [strength_modifier, intelligence_modifier, spell_power_modifier, dexterity_modifier, cunning_modifier, speed_modifier]
+	
+	# Allocate remaining points evenly across combat stats
+	var points_per_stat = available_points / combat_stats.size()
+	var remainder = available_points % combat_stats.size()
+	
+	for i in range(combat_stats.size()):
+		var points_to_add = points_per_stat
+		if i < remainder:
+			points_to_add += 1
+		
+		var stat_name = combat_stats[i]
+		var base_value = base_values[i]
+		var modifier = modifiers[i]
+		var final_value = base_value + modifier + points_to_add
+		
+		match stat_name:
+			"strength":
+				stats.set_strength(final_value)
+			"intelligence":
+				stats.set_intelligence(final_value)
+			"spell_power":
+				stats.set_spell_power(final_value)
+			"dexterity":
+				stats.set_dexterity(final_value)
+			"cunning":
+				stats.set_cunning(final_value)
+			"speed":
+				stats.set_speed(final_value)
+	
+	print(enemy_name, " allocated ", health_points, " health, ", mana_points, " mana, and ", available_points, " combat stat points")
 	
 	# Update combat chances and recalculate max stats
 	stats._update_combat_chances()
@@ -294,7 +326,7 @@ func _physics_process(delta):
 	parent_body.move_and_slide()
 
 # Virtual functions that can be overridden by specific enemy types
-async func start_combat():
+func start_combat():
 	if in_combat or not combat_manager:
 		return
 	
@@ -320,6 +352,9 @@ async func start_combat():
 		return
 	
 	in_combat = true
+	
+	# Store initial position when combat starts
+	initial_combat_position = get_parent().global_position
 	
 	# Pass the parent node (CharacterBody3D) to the combat manager, not this behavior node
 	var parent_body = get_parent()
@@ -652,6 +687,24 @@ func get_lightning_paralysis_chance() -> float: return 25.0
 func is_lightning_attack(attack_type: String) -> bool:
 	match attack_type:
 		"lightning_bolt", "lightning_weapon_basic", "lightning_weapon_special": return true
+		_: return false
+
+# Fire ignite methods for enemies
+func is_fire_attack(attack_type: String) -> bool:
+	match attack_type:
+		"fire_weapon_basic", "fire_weapon_special": return true
+		_: return false
+
+# Ice freeze methods for enemies
+func is_ice_attack(attack_type: String) -> bool:
+	match attack_type:
+		"ice_weapon_basic", "ice_weapon_special": return true
+		_: return false
+
+# Earth stun methods for enemies
+func is_earth_attack(attack_type: String) -> bool:
+	match attack_type:
+		"earth_weapon_basic", "earth_weapon_special": return true
 		_: return false
 
 func return_to_initial_position():
@@ -1664,3 +1717,12 @@ func remove_focus_indicator():
 		focus_indicator = null
 		is_focused = false
 		print("🎯 Focus indicator removed for: ", enemy_name)
+
+# Combat position methods
+func set_initial_combat_position(combat_pos: Vector3):
+	"""Set the initial combat position for this enemy"""
+	initial_combat_position = combat_pos
+
+func get_initial_combat_position() -> Vector3:
+	"""Get the initial combat position for this enemy"""
+	return initial_combat_position

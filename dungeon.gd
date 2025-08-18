@@ -27,8 +27,8 @@ func _ready():
 	else:
 		print("ERROR: No chest found in dungeon!")
 	
-	# Spawn enemies dynamically
-	_spawn_enemies()
+	# Spawn enemies dynamically - defer until scene tree is ready
+	call_deferred("_spawn_enemies")
 	
 	# Check all nodes
 	print("All dungeon children:")

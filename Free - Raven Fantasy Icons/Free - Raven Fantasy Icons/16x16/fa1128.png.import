@@ -1,0 +1,34 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://t2x3rq7r12ht"
+path="res://.godot/imported/fa1128.png-59db4818a659bf0ad03f570fc090d390.ctex"
+metadata={
+"vram_texture": false
+}
+
+[deps]
+
+source_file="res://Free - Raven Fantasy Icons/Free - Raven Fantasy Icons/16x16/fa1128.png"
+dest_files=["res://.godot/imported/fa1128.png-59db4818a659bf0ad03f570fc090d390.ctex"]
+
+[params]
+
+compress/mode=0
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=false
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=1

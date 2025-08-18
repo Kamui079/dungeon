@@ -248,6 +248,26 @@ func is_ice_attack(attack_type: String) -> bool:
 	match attack_type:
 		"ice_spell", "ice_weapon_basic", "ice_weapon_special": return true
 		_: return false
+
+func is_earth_attack(attack_type: String) -> bool:
+	match attack_type:
+		"earthquake", "earth_weapon_basic", "earth_weapon_special": return true
+		_: return false
+
+func is_water_attack(attack_type: String) -> bool:
+	match attack_type:
+		"whirlpool", "bubble_burst", "water_weapon_basic", "water_weapon_special": return true
+		_: return false
+
+func is_arcane_attack(attack_type: String) -> bool:
+	match attack_type:
+		"arcane_bolt", "arcane_weapon_basic", "arcane_weapon_special": return true
+		_: return false
+
+func is_dark_attack(attack_type: String) -> bool:
+	match attack_type:
+		"dark_intention", "dark_weapon_basic", "dark_weapon_special": return true
+		_: return false
 func is_defending() -> bool: return false
 func set_physics_process_enabled(enabled: bool):
 	set_physics_process_internal(enabled)
@@ -605,18 +625,18 @@ func _add_starter_equipment():
 	_inventory.add_item_to_bag(boots, 1)
 	_inventory.add_item_to_bag(acid_flask, 3)  # Give 3 acid flasks
 	_inventory.add_item_to_bag(venom_dart, 5)  # Give 5 venom darts
+	
+	# Add testing items
+	var level_up_potion = load("res://Consumables/LevelUpPotion.tres")
+	_inventory.add_item_to_bag(level_up_potion, 5)  # Give 5 level up potions for testing
 
-func check_and_reorient_camera(target: Node) -> Signal:
-	var reorient_finished = Signal()
-	reorient_finished.name = "reorient_finished" # for debugging
-	_reorient_camera_async(target, reorient_finished)
-	return reorient_finished
+func check_and_reorient_camera(target: Node) -> void:
+	await _reorient_camera_async(target)
 
-async func _reorient_camera_async(target: Node, finished_signal: Signal):
+func _reorient_camera_async(target: Node):
 	var wall_raycast = $SpringArm3D/Camera3D/WallRaycast
 	if not wall_raycast:
 		printerr("WallRaycast node not found!")
-		finished_signal.emit()
 		return
 
 	var clear_view_found = false
@@ -641,4 +661,4 @@ async func _reorient_camera_async(target: Node, finished_signal: Signal):
 	# wait for face_target to finish
 	await get_tree().create_timer(0.9).timeout # face_target takes 0.8s
 
-	finished_signal.emit()
+	return

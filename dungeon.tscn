@@ -1,6 +1,7 @@
-[gd_scene load_steps=18 format=3 uid="uid://3bjx3edc46mw"]
+[gd_scene load_steps=19 format=3 uid="uid://3bjx3edc46mw"]
 
 [ext_resource type="Script" uid="uid://xerxi770axkc" path="res://dungeon.gd" id="1_script"]
+[ext_resource type="Script" path="res://animation_manager.gd" id="1_animation_manager"]
 [ext_resource type="PackedScene" path="res://character_body_3d.tscn" id="2_player"]
 [ext_resource type="ArrayMesh" uid="uid://8lw25uf4k15s" path="res://Models/wallfloor1.obj" id="3_level_mesh"]
 [ext_resource type="PackedScene" path="res://chest.tscn" id="20_chest_scene"]
@@ -76,6 +77,9 @@ transform = Transform3D(0.549844, 0, 0, 0, 0.549844, 0, 0, 0, 0.549844, 11.0844,
 
 [node name="CombatManager" type="Node" parent="."]
 script = ExtResource("22_combat_manager")
+
+[node name="AnimationManager" type="Node" parent="."]
+script = ExtResource("1_animation_manager")
 
 [node name="StatusEffectsManager" type="Node" parent="."]
 script = ExtResource("22_status_effects")

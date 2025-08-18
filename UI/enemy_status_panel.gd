@@ -2,14 +2,14 @@ extends Panel
 class_name EnemyStatusPanel
 
 # UI References
-@onready var enemy_name_label: Label = $VBoxContainer/InfoContainer/EnemyNameLabel
-@onready var level_label: Label = $VBoxContainer/InfoContainer/LevelLabel
-@onready var type_label: Label = $VBoxContainer/InfoContainer/TypeLabel
-@onready var health_bar: ProgressBar = $VBoxContainer/BarsContainer/HealthSection/HealthBar
-@onready var health_value: Label = $VBoxContainer/BarsContainer/HealthSection/HealthValue
-@onready var mana_bar: ProgressBar = $VBoxContainer/BarsContainer/ManaSection/ManaBar
-@onready var mana_value: Label = $VBoxContainer/BarsContainer/ManaSection/ManaValue
-@onready var status_effects_icons: HBoxContainer = $VBoxContainer/StatusEffectsContainer/StatusEffectsIcons
+var enemy_name_label: Label
+var level_label: Label
+var type_label: Label
+var health_bar: ProgressBar
+var health_value: Label
+var mana_bar: ProgressBar
+var mana_value: Label
+var status_effects_icons: HBoxContainer
 
 # Current enemy reference
 var current_enemy: Node = null
@@ -21,16 +21,84 @@ func _ready():
 	# Hide the panel initially
 	hide()
 	
+	# Wait for the scene tree to be ready before accessing child nodes
+	call_deferred("_initialize_ui_elements")
+	
 	# Connect to status effects manager signals
 	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
 	if status_manager:
 		# We'll connect to signals when we set an enemy
 		pass
 
+func _initialize_ui_elements():
+	"""Initialize UI elements after the scene tree is ready"""
+	print("DEBUG: EnemyStatusPanel _initialize_ui_elements() called")
+	
+	# Debug: Check the scene tree structure
+	print("DEBUG: Scene tree structure:")
+	print("DEBUG: Self node: ", self)
+	print("DEBUG: Self name: ", name)
+	print("DEBUG: Self type: ", get_class())
+	print("DEBUG: Child count: ", get_child_count())
+	print("DEBUG: All children:")
+	for i in range(get_child_count()):
+		var child = get_child(i)
+		print("DEBUG:   Child ", i, ": ", child.name, " (", child.get_class(), ")")
+		if child.get_child_count() > 0:
+			for j in range(child.get_child_count()):
+				var grandchild = child.get_child(j)
+				print("DEBUG:     Grandchild ", j, ": ", grandchild.name, " (", grandchild.get_class(), ")")
+	
+	# Manually find and assign UI elements using direct child access
+	# Based on the debug output, the nodes are at specific indices
+	if get_child_count() >= 18:
+		enemy_name_label = get_child(2)  # EnemyStatusPanel_VBoxContainer_InfoContainer#EnemyNameLabel
+		level_label = get_child(3)       # EnemyStatusPanel_VBoxContainer_InfoContainer#LevelLabel
+		type_label = get_child(4)        # EnemyStatusPanel_VBoxContainer_InfoContainer#TypeLabel
+		health_bar = get_child(9)        # EnemyStatusPanel_VBoxContainer_BarsContainer_HealthSection#HealthBar
+		health_value = get_child(10)     # EnemyStatusPanel_VBoxContainer_BarsContainer_HealthSection#HealthValue
+		mana_bar = get_child(13)         # EnemyStatusPanel_VBoxContainer_BarsContainer_ManaSection#ManaBar
+		mana_value = get_child(14)       # EnemyStatusPanel_VBoxContainer_BarsContainer_ManaSection#ManaValue
+		status_effects_icons = get_child(17) # EnemyStatusPanel_VBoxContainer_StatusEffectsContainer#StatusEffectsIcons
+		
+		# Verify the types are correct
+		if not enemy_name_label is Label or not level_label is Label or not type_label is Label:
+			print("ERROR: Label nodes not found at expected indices!")
+		if not health_bar is ProgressBar or not mana_bar is ProgressBar:
+			print("ERROR: ProgressBar nodes not found at expected indices!")
+	else:
+		print("ERROR: Not enough children found! Expected 18, got ", get_child_count())
+	
+	# Debug: Check if UI elements are properly initialized
+	print("DEBUG: UI elements found:")
+	print("DEBUG: enemy_name_label: ", enemy_name_label)
+	print("DEBUG: level_label: ", level_label)
+	print("DEBUG: type_label: ", type_label)
+	print("DEBUG: health_bar: ", health_bar)
+	print("DEBUG: health_value: ", health_value)
+	print("DEBUG: mana_bar: ", mana_bar)
+	print("DEBUG: mana_value: ", mana_value)
+	print("DEBUG: status_effects_icons: ", status_effects_icons)
+	
+	# Check if any elements are still null
+	if not enemy_name_label or not level_label or not type_label or not health_bar or not health_value or not mana_bar or not mana_value:
+		print("ERROR: Some UI elements are still null after manual initialization!")
+		print("DEBUG: Checking node paths...")
+		print("DEBUG: VBoxContainer exists: ", get_node_or_null("VBoxContainer"))
+		print("DEBUG: InfoContainer exists: ", get_node_or_null("VBoxContainer/InfoContainer"))
+		print("DEBUG: BarsContainer exists: ", get_node_or_null("VBoxContainer/BarsContainer"))
+	else:
+		print("DEBUG: All UI elements initialized successfully!")
+
 func set_enemy(enemy: Node):
 	"""Set the enemy to display information for"""
 	if not enemy or not is_instance_valid(enemy):
 		hide()
+		return
+	
+	# Check if UI elements are ready
+	if not enemy_name_label or not level_label or not type_label or not health_bar or not health_value or not mana_bar or not mana_value:
+		print("ERROR: Cannot set enemy - UI elements not initialized yet!")
 		return
 	
 	current_enemy = enemy
@@ -44,6 +112,14 @@ func set_enemy(enemy: Node):
 	if enemy.has_signal("mana_changed"):
 		enemy.mana_changed.connect(_on_enemy_mana_changed)
 	
+	# Also try to connect to enemy behavior component signals if they exist
+	var enemy_behavior = _get_enemy_behavior_component()
+	if enemy_behavior and enemy_behavior != enemy:
+		if enemy_behavior.has_signal("health_changed"):
+			enemy_behavior.health_changed.connect(_on_enemy_health_changed)
+		if enemy_behavior.has_signal("mana_changed"):
+			enemy_behavior.mana_changed.connect(_on_enemy_mana_changed)
+	
 	# Initial update
 	update_health_display()
 	update_mana_display()
@@ -55,11 +131,19 @@ func set_enemy(enemy: Node):
 func clear_enemy():
 	"""Clear the current enemy and hide the panel"""
 	if current_enemy:
-		# Disconnect signals
+		# Disconnect signals from main enemy
 		if current_enemy.has_signal("health_changed"):
 			current_enemy.health_changed.disconnect(_on_enemy_health_changed)
 		if current_enemy.has_signal("mana_changed"):
 			current_enemy.mana_changed.disconnect(_on_enemy_mana_changed)
+		
+		# Also disconnect from enemy behavior component if it exists
+		var enemy_behavior = _get_enemy_behavior_component()
+		if enemy_behavior and enemy_behavior != current_enemy:
+			if enemy_behavior.has_signal("health_changed"):
+				enemy_behavior.health_changed.disconnect(_on_enemy_health_changed)
+			if enemy_behavior.has_signal("mana_changed"):
+				enemy_behavior.mana_changed.disconnect(_on_enemy_mana_changed)
 		
 		current_enemy = null
 	
@@ -74,8 +158,21 @@ func update_health_display():
 	if not current_enemy or not is_instance_valid(current_enemy):
 		return
 	
-	var current_health = current_enemy.current_health
-	var max_health = current_enemy.max_health
+	# Safety check for UI elements
+	if not health_bar or not health_value:
+		return
+	
+	# Try to find the enemy behavior component for stats
+	var enemy_behavior = _get_enemy_behavior_component()
+	if not enemy_behavior:
+		return
+	
+	# Safety check for stats
+	if not enemy_behavior.has_method("get") or not enemy_behavior.get("stats"):
+		return
+	
+	var current_health = enemy_behavior.stats.health
+	var max_health = enemy_behavior.stats.max_health
 	
 	# Update health bar
 	health_bar.max_value = max_health
@@ -98,12 +195,25 @@ func update_mana_display():
 	if not current_enemy or not is_instance_valid(current_enemy):
 		return
 	
-	var current_mana = current_enemy.current_mana
-	var max_mana = current_enemy.max_mana
+	# Safety check for UI elements
+	if not mana_bar or not mana_value:
+		return
+	
+	# Try to find the enemy behavior component for stats
+	var enemy_behavior = _get_enemy_behavior_component()
+	if not enemy_behavior:
+		return
+	
+	# Safety check for stats
+	if not enemy_behavior.has_method("get") or not enemy_behavior.get("stats"):
+		return
+	
+	var current_mana = enemy_behavior.stats.mana
+	var max_mana = enemy_behavior.stats.max_mana
 	
 	# Update mana bar
-	mana_bar.max_value = max_mana
 	mana_bar.value = current_mana
+	mana_bar.max_value = max_mana
 	
 	# Update mana value text
 	mana_value.text = str(current_mana) + "/" + str(max_mana)
@@ -205,9 +315,33 @@ func refresh_display():
 		update_mana_display()
 		update_status_effects()
 
+func _get_enemy_behavior_component() -> Node:
+	"""Get the enemy behavior component that contains stats and methods"""
+	if not current_enemy:
+		return null
+	
+	# Try to find the enemy behavior component (for composed enemies like BigRat)
+	var enemy_behavior = null
+	if current_enemy.has_method("get_level") and current_enemy.has_method("get_effective_enemy_type"):
+		# Enemy has the methods directly
+		enemy_behavior = current_enemy
+	else:
+		# Look for enemy behavior component in children
+		for child in current_enemy.get_children():
+			if child.has_method("get_level") and child.has_method("get_effective_enemy_type"):
+				enemy_behavior = child
+				break
+	
+	return enemy_behavior
+
 func update_enemy_info(enemy: Node) -> void:
 	"""Update the panel with current enemy information"""
 	if not enemy:
+		return
+	
+	# Safety check for UI elements
+	if not enemy_name_label or not level_label or not type_label:
+		print("ERROR: UI labels not initialized!")
 		return
 	
 	# Get proper enemy display name
@@ -221,13 +355,20 @@ func update_enemy_info(enemy: Node) -> void:
 	
 	enemy_name_label.text = enemy_display_name
 
-	# Update level and type
+	# Update level and type using the helper function
+	var enemy_behavior = _get_enemy_behavior_component()
+	
 	var level = "Lvl. ?"
-	if enemy.has_method("get_level"):
-		level = "Lvl. " + str(enemy.get_level())
+	if enemy_behavior and enemy_behavior.has_method("get_level"):
+		var level_value = enemy_behavior.get_level()
+		level = "Lvl. " + str(level_value)
 	level_label.text = level
 
 	var type = "(Unknown)"
-	if enemy.has_method("get_effective_enemy_type"):
-		type = "(" + enemy.get_effective_enemy_type().capitalize() + ")"
+	if enemy_behavior and enemy_behavior.has_method("get_effective_enemy_type"):
+		var type_value = enemy_behavior.get_effective_enemy_type()
+		type = "(" + type_value.capitalize() + ")"
+		print("DEBUG: Got type: ", type_value, " - Setting type label to: ", type)
 	type_label.text = type
+	
+	print("DEBUG: Final enemy info - Name: ", enemy_display_name, ", Level: ", level, ", Type: ", type)

@@ -18,6 +18,8 @@ class_name CombatUI
 @onready var icicle_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/IcicleButton
 @onready var smite_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/SmiteButton
 @onready var earthquake_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/EarthquakeButton
+@onready var whirlpool_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/WhirlpoolButton
+@onready var bubble_burst_button: Button = $SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer/BubbleBurstButton
 @onready var special_attacks_close_button: Button = $SpecialAttacksPopup/VBoxContainer/CloseButton
 @onready var spells_close_button: Button = $SpellsPopup/VBoxContainer/CloseButton
 
@@ -36,8 +38,8 @@ class_name CombatUI
 @onready var combat_log_text: RichTextLabel = $CombatLogPanel/VBoxContainer/CombatLogText
 @onready var combat_log_panel: Panel = $CombatLogPanel
 
-# Enemy status panel (new top-screen display)
-# @onready var enemy_status_panel: Panel = $EnemyStatusPanel # REMOVED
+# Enemy status panel (new top-screen display) - REMOVED
+# @onready var enemy_status_panel: Panel = $EnemyStatusPanel
 
 # Multi-Enemy Panel System
 # @onready var enemy_panels_container: HBoxContainer = $EnemyPanelsContainer # REMOVED
@@ -66,7 +68,13 @@ func _ready():
 	set_process_input(true)
 	
 	# Initialize UI elements
+	# Enemy status panel removed - now using HUD enemy panels
 	# enemy_status_panel = $EnemyStatusPanel
+	# print("DEBUG: enemy_status_panel assignment: ", enemy_status_panel)
+	# if enemy_status_panel:
+	# 	print("DEBUG: Enemy status panel found successfully")
+	# else:
+	# 	print("ERROR: Enemy status panel not found!")
 	# enemy_name_label = $EnemyStatusPanel/VBoxContainer/EnemyNameLabel
 	# health_bar = $EnemyStatusPanel/VBoxContainer/HealthBar
 	# health_value = $EnemyStatusPanel/VBoxContainer/HealthValue
@@ -82,8 +90,8 @@ func _ready():
 	# Start hidden
 	hide()
 	
-	# Hide enemy status panel initially
-	# hide_enemy_status_panel() # REMOVED
+	# Hide enemy status panel initially - REMOVED
+	# hide_enemy_status_panel()
 	
 	# Hide queued action indicator initially
 	if queued_action_label:
@@ -188,6 +196,20 @@ func _ready():
 		print("Earthquake button connected!")
 	else:
 		print("WARNING: Earthquake button not found, AOE indicator will not be shown.")
+		
+	if whirlpool_button:
+		whirlpool_button.mouse_entered.connect(_on_whirlpool_button_mouse_entered)
+		whirlpool_button.mouse_exited.connect(_on_whirlpool_button_mouse_exited)
+		whirlpool_button.pressed.connect(_on_whirlpool_pressed)
+		print("Whirlpool button connected!")
+	else:
+		print("ERROR: Whirlpool button not found!")
+		
+	if bubble_burst_button:
+		bubble_burst_button.pressed.connect(_on_bubble_burst_pressed)
+		print("Bubble Burst button connected!")
+	else:
+		print("ERROR: Bubble Burst button not found!")
 		
 	# Connect close buttons
 	if special_attacks_close_button:
@@ -330,8 +352,8 @@ func update_player_status(_player: Node):
 func _on_combat_ended():
 	print("Combat UI: Combat ended!")
 	hide()
-	# Hide enemy status panel
-	# hide_enemy_status_panel() # REMOVED
+	# Hide enemy status panel - REMOVED
+	# hide_enemy_status_panel()
 	# Hide any open popups
 	special_attacks_popup.hide()
 	spells_popup.hide()
@@ -383,23 +405,23 @@ func _on_fireball_pressed():
 		print("ERROR: No combat manager found!")
 
 func _on_earthquake_button_mouse_entered():
-    if combat_manager:
-        var spell_data = combat_manager.get_spell_data("earthquake")
-        if "aoe" in spell_data.get("tags", []):
-            var radius = spell_data.get("aoe_radius", 3.0)
-            var target = combat_manager.get_focused_enemy()
-            if target:
-                combat_manager.show_aoe_indicator(target.global_position, radius)
+	if combat_manager:
+		var spell_data = combat_manager.get_spell_data("earthquake")
+		if "aoe" in spell_data.get("tags", []):
+			var radius = spell_data.get("aoe_radius", 3.0)
+			var target = combat_manager.get_focused_enemy()
+			if target:
+				combat_manager.show_aoe_indicator(target.global_position, radius)
 
 func _on_earthquake_button_mouse_exited():
-    if combat_manager:
-        combat_manager.hide_aoe_indicator()
+	if combat_manager:
+		combat_manager.hide_aoe_indicator()
 
 func _on_earthquake_button_pressed():
-    if combat_manager:
-        combat_manager.player_cast_spell("earthquake")
-        spells_popup.hide()
-        combat_manager.hide_aoe_indicator() # Hide after casting
+	if combat_manager:
+		combat_manager.player_cast_spell("earthquake")
+		spells_popup.hide()
+		combat_manager.hide_aoe_indicator() # Hide after casting
 
 func _on_lightning_bolt_pressed():
 	print("⚡ Lightning Bolt button pressed!")
@@ -432,6 +454,38 @@ func _on_smite_pressed():
 	if combat_manager:
 		# Always call the combat manager - it will handle queuing if needed
 		combat_manager.player_cast_spell("smite")
+		spells_popup.hide()  # Close popup after selection
+	else:
+		print("ERROR: No combat manager found!")
+
+func _on_whirlpool_button_mouse_entered():
+	if combat_manager:
+		var spell_data = combat_manager.get_spell_data("whirlpool")
+		if "aoe" in spell_data.get("tags", []):
+			var radius = spell_data.get("aoe_radius", 3.5)
+			var target = combat_manager.get_focused_enemy()
+			if target:
+				combat_manager.show_aoe_indicator(target.global_position, radius)
+
+func _on_whirlpool_button_mouse_exited():
+	if combat_manager:
+		combat_manager.hide_aoe_indicator()
+
+func _on_whirlpool_pressed():
+	print("💧 Whirlpool button pressed!")
+	if combat_manager:
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_cast_spell("whirlpool")
+		spells_popup.hide()  # Close popup after selection
+		combat_manager.hide_aoe_indicator() # Hide after casting
+	else:
+		print("ERROR: No combat manager found!")
+
+func _on_bubble_burst_pressed():
+	print("💧 Bubble Burst button pressed!")
+	if combat_manager:
+		# Always call the combat manager - it will handle queuing if needed
+		combat_manager.player_cast_spell("bubble_burst")
 		spells_popup.hide()  # Close popup after selection
 	else:
 		print("ERROR: No combat manager found!")
@@ -495,8 +549,6 @@ func _on_atb_bar_updated(player_progress: float, enemy_progress: float):
 		else:
 			player_atb_bar.modulate = Color.WHITE
 			atb_status_label.text = "⏳ ATB bar filling... (" + str(int(player_progress * 100)) + "%)"
-	
-
 
 func _on_turn_changed(current_actor: Node, turn_type: String):
 	"""Update turn system display when turn changes"""
@@ -549,16 +601,12 @@ func add_combat_log_entry(message: String):
 		return
 	
 	# Get current time for timestamp
-	var current_time = Time.get_datetime_string_from_system()
 	var time_stamp = "00:00:00"  # Default fallback
-	var time_parts = current_time.split(" ")
-	if time_parts.size() > 1:
-		time_stamp = time_parts[1]  # Get just the time part
+	# Note: Time.get_datetime_string_from_system() might not be available in all Godot versions
+	# Using default timestamp for now
 	
 	# Apply color coding to damage numbers in the message
 	var colored_message = _apply_damage_color_coding(message)
-	
-	
 	
 	# Format the log entry with better visual separation
 	var log_entry = "[" + time_stamp + "] " + colored_message + "\n"
@@ -587,10 +635,6 @@ func add_combat_log_entry(message: String):
 	
 	# Set the text with BBCode formatting
 	combat_log_text.text = all_text
-	
-	
-	
-
 	
 	# Auto-scroll to top to show newest entry
 	combat_log_text.scroll_to_line(0)
@@ -933,6 +977,18 @@ func _update_button_texts():
 		if smite_button and "smite" in spells:
 			var cost = spells["smite"]["mana_cost"]
 			smite_button.text = "Smite (" + str(cost) + " MP)"
+		
+		if earthquake_button and "earthquake" in spells:
+			var cost = spells["earthquake"]["mana_cost"]
+			earthquake_button.text = "Earthquake (" + str(cost) + " MP)"
+		
+		if whirlpool_button and "whirlpool" in spells:
+			var cost = spells["whirlpool"]["mana_cost"]
+			whirlpool_button.text = "Whirlpool (" + str(cost) + " MP)"
+		
+		if bubble_burst_button and "bubble_burst" in spells:
+			var cost = spells["bubble_burst"]["mana_cost"]
+			bubble_burst_button.text = "Bubble Burst (" + str(cost) + " MP)"
 	
 	# Update other button texts
 	if haymaker_button:
@@ -1034,30 +1090,53 @@ func _clear_all_button_highlights():
 	currently_queued_action = ""
 
 # Enemy Status Panel Methods - REMOVED
-# func show_enemy_status_panel(): # REMOVED
-# 	"""Show the enemy status panel""" # REMOVED
-# 	print("DEBUG: show_enemy_status_panel called") # REMOVED
-# 	if not enemy_panels_container: # REMOVED
-# 		print("ERROR: Enemy panels container is null!") # REMOVED
-# 		return # REMOVED
-# 		
-# 	print("DEBUG: Enemy panels container found, showing it...") # REMOVED
-# 	enemy_panels_container.show() # REMOVED
-# 	print("DEBUG: Enemy panels container shown, visible: ", enemy_panels_container.visible) # REMOVED
-# 	print("DEBUG: Enemy panels container position: ", enemy_panels_container.position) # REMOVED
-# 	print("DEBUG: Enemy panels container size: ", enemy_panels_container.size) # REMOVED
-# 	print("DEBUG: Enemy panels container global position: ", enemy_panels_container.global_position) # REMOVED
-# 	print("DEBUG: Enemy panels container has ", enemy_panels_container.get_child_count(), " children") # REMOVED
-# 	print("Combat UI: Enemy panels container shown") # REMOVED
-
-# func hide_enemy_status_panel(): # REMOVED
-# 	"""Hide the enemy status panel""" # REMOVED
-# 	if not enemy_panels_container: # REMOVED
-# 		print("ERROR: Enemy panels container is null!") # REMOVED
-# 		return # REMOVED
-# 		
-# 	enemy_panels_container.hide() # REMOVED
-# 	print("Combat UI: Enemy panels container hidden") # REMOVED
+# func show_enemy_status_panel():
+# 	"""Show the enemy status panel"""
+# 	print("DEBUG: show_enemy_status_panel called")
+# 	if enemy_status_panel:
+# 		enemy_status_panel.show()
+# 		print("DEBUG: Enemy status panel shown, visible: ", enemy_status_panel.visible)
+# 		print("DEBUG: Panel position: ", enemy_status_panel.position)
+# 		print("DEBUG: Panel global position: ", enemy_status_panel.global_position)
+# 		print("DEBUG: Panel size: ", enemy_status_panel.size)
+# 		print("DEBUG: Panel is on screen: ", enemy_status_panel.is_on_screen())
+# 		print("DEBUG: Panel parent: ", enemy_status_panel.get_parent())
+# 		print("DEBUG: Panel parent name: ", enemy_status_panel.get_parent().name if enemy_status_panel.get_parent() else "null")
+# 	else:
+# 		print("ERROR: Enemy status panel not found!")
+# 
+# func hide_enemy_status_panel():
+# 	"""Hide the enemy status panel"""
+# 	print("DEBUG: hide_enemy_status_panel called")
+# 	if enemy_status_panel:
+# 		enemy_status_panel.hide()
+# 		print("DEBUG: Enemy status panel hidden")
+# 	else:
+# 		print("ERROR: Enemy status panel not found!")
+# 
+# func update_enemy_status_panel(enemy: Node):
+# 	"""Update the enemy status panel with enemy information"""
+# 	print("DEBUG: update_enemy_status_panel called with enemy: ", enemy.name if enemy else "null")
+# 	print("DEBUG: enemy_status_panel reference: ", enemy_status_panel)
+# 	print("DEBUG: enemy_status_panel is valid: ", is_instance_valid(enemy_status_panel) if enemy_status_panel else "null")
+# 	if enemy_status_panel:
+# 		print("DEBUG: enemy_status_panel has set_enemy method: ", enemy_status_panel.has_method("set_enemy"))
+# 		if enemy_status_panel.has_method("set_enemy"):
+# 			enemy_status_panel.set_enemy(enemy)
+# 			show_enemy_status_panel()
+# 		else:
+# 			print("ERROR: Enemy status panel missing set_enemy method!")
+# 	else:
+# 		print("ERROR: Enemy status panel not found!")
+# 
+# func clear_enemy_status_panel():
+# 	"""Clear the enemy status panel"""
+# 	print("DEBUG: clear_enemy_status_panel called")
+# 	if enemy_status_panel and enemy_status_panel.has_method("clear_enemy"):
+# 		enemy_status_panel.clear_enemy()
+# 		hide_enemy_status_panel()
+# 	else:
+# 		print("ERROR: Enemy status panel not found or missing clear_enemy method!")
 
 # Multi-Enemy Panel System - REMOVED
 # func create_and_add_enemy_panel(enemy: Node): # REMOVED
@@ -1445,11 +1524,13 @@ func _clear_all_button_highlights():
 # 		print("ERROR: Enemy panels container is null!") # REMOVED
 # 		return # REMOVED
 # 		
-# 	remove_enemy_panel(enemy) # REMOVED
+# 	# remove_enemy_panel(enemy) # REMOVED
 # 	# Refresh highlighting # REMOVED
-# 	highlight_focused_enemy() # REMOVED
+# 	# highlight_focused_enemy() # REMOVED
 
-
+func _log_to_combat(message: String):
+	"""Log a message to the combat log - delegates to add_combat_log_entry"""
+	add_combat_log_entry(message)
 
 func toggle_combat_log_visibility():
 	"""Toggle the combat log panel visibility"""

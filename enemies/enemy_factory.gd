@@ -116,7 +116,7 @@ var enemy_categories = {
 
 func create_enemy(enemy_data: Dictionary) -> Node:
 	"""Create a new enemy with the given data"""
-			var enemy = preload("enemy.gd").new()
+	var enemy = load("res://enemies/enemy.gd").new()
 	
 	# Apply basic properties
 	if enemy_data.has("name"):

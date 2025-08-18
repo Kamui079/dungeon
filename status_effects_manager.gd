@@ -551,7 +551,7 @@ class EntityStatusEffects:
 		# Create a pulsing animation effect using the entity's create_tween
 		if entity.has_method("create_tween"):
 			var tween = entity.create_tween()
-			tween.set_loops()  # Loop indefinitely
+			tween.set_loops(0)  # Loop indefinitely (0 = infinite)
 			tween.tween_property(paralysis_sprite, "modulate:a", 0.3, 0.5)
 			tween.tween_property(paralysis_sprite, "modulate:a", 0.8, 0.5)
 		else:
@@ -1093,3 +1093,10 @@ func refresh_visual_effects(entity: Node):
 			if effect.is_active and effect.visual_effect == null:
 				# Recreate visual effect if it's missing
 				effects._create_visual_effect(effect)
+
+func _log_to_combat(message: String):
+	"""Log message to combat log if available - main class version"""
+	# Try to find combat manager
+	var combat_manager = get_tree().get_first_node_in_group("CombatManager")
+	if combat_manager and combat_manager.has_method("_log_combat_event"):
+		combat_manager._log_combat_event(message)

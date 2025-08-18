@@ -31,6 +31,8 @@ func use(user) -> bool:
 			match custom_effect:
 				"throw_damage":
 					return _handle_throwable_weapon(user)
+				"level_up":
+					return _handle_level_up(user)
 				_:
 					return true
 	
@@ -60,3 +62,44 @@ func _handle_throwable_weapon(user) -> bool:
 	# For now, just return true to indicate successful use
 	# The actual damage application will be handled by the combat system
 	return true
+
+func _handle_level_up(user) -> bool:
+	"""Handle level up potion effect"""
+	print("🎯 Level Up Potion used!")
+	
+	# Try to find player stats
+	var player_stats = null
+	if user.has_method("get_stats"):
+		player_stats = user.get_stats()
+	elif user.has_method("get_player_stats"):
+		player_stats = user.get_player_stats()
+	elif user.has("stats"):
+		player_stats = user.stats
+	
+	if not player_stats:
+		print("ERROR: Could not find player stats for level up!")
+		return false
+	
+	# Try experience method first, then fall back to force level up
+	if player_stats.has_method("gain_experience"):
+		# Grant enough experience to level up
+		var current_exp = player_stats.experience
+		var exp_needed = player_stats.experience_to_next_level
+		
+		# Give exactly the amount needed to level up
+		var exp_to_give = exp_needed - current_exp
+		if exp_to_give > 0:
+			player_stats.gain_experience(exp_to_give)
+			print("🎉 Level Up Potion granted ", exp_to_give, " experience!")
+			return true
+		else:
+			print("Player already has enough experience to level up!")
+			return true
+	elif player_stats.has_method("force_level_up"):
+		# Fall back to direct level up
+		player_stats.force_level_up()
+		print("🎉 Level Up Potion used force_level_up method!")
+		return true
+	else:
+		print("ERROR: Player stats missing both gain_experience and force_level_up methods!")
+		return false

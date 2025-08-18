@@ -296,8 +296,6 @@ func _level_up():
 	health = max_health  # Restore health on level up
 	mana = max_mana      # Restore mana on level up
 	
-
-	
 	# Calculate new experience requirement
 	_calculate_exp_requirement()
 	
@@ -305,6 +303,8 @@ func _level_up():
 	level_up.emit(level)
 	emit_signal("health_changed", health, max_health)
 	emit_signal("mana_changed", mana, max_mana)
+	
+	print("🎉 Level up! You are now level ", level, " with ", stat_points_available, " stat points to allocate")
 
 # Stat point spending methods
 func spend_stat_point(stat_name: String) -> bool:
@@ -344,14 +344,62 @@ func set_level(new_level: int):
 	if new_level < 1:
 		new_level = 1
 	
+	# If level is decreasing, we need to reset and recalculate stats
+	var level_decreased = new_level < level
+	
 	level = new_level
 	var total_stat_points = (level - 1) * stat_points_per_level
 	stat_points_available = total_stat_points
 	
+	# If level decreased, reset all stat investments and recalculate
+	if level_decreased:
+		print("Level decreased from ", level, " to ", new_level, " - resetting stats")
+		# Reset all invested stats to base values
+		health = 10  # Base health
+		mana = 10    # Base mana
+		strength = 1
+		intelligence = 1
+		spell_power = 1
+		dexterity = 1
+		cunning = 1
+		speed = 1
+		# Recalculate max stats
+		_recalculate_max_stats()
+		# Set current health/mana to max
+		health = max_health
+		mana = max_mana
+	else:
+		# For leveling up, keep existing stat investments and just add new points
+		var existing_investment = (health - 10) + (mana - 10) + (strength - 1) + (intelligence - 1) + (spell_power - 1) + (dexterity - 1) + (cunning - 1) + (speed - 1)
+		var new_points = total_stat_points - existing_investment
+		stat_points_available = max(0, new_points)  # Don't go negative
+		print("Level set to ", level, " - keeping existing stats, ", new_points, " new points available")
+	
 	# Calculate experience requirement for this level
 	_calculate_exp_requirement()
+
+func force_level_up():
+	"""Force a level up for testing purposes"""
+	var old_level = level
+	level += 1
 	
-	print("Level set to ", level, " with ", total_stat_points, " stat points to distribute")
+	# Give stat points for this level
+	stat_points_available += stat_points_per_level
+	
+	# Recalculate max stats based on current stat investments
+	_recalculate_max_stats()
+	health = max_health  # Restore health on level up
+	mana = max_mana      # Restore mana on level up
+	
+	# Calculate new experience requirement
+	_calculate_exp_requirement()
+	
+	# Emit signals
+	level_up.emit(level)
+	emit_signal("health_changed", health, max_health)
+	emit_signal("mana_changed", mana, max_mana)
+	
+	print("🎉 FORCED Level up! You are now level ", level, " with ", stat_points_available, " stat points to allocate")
 
 func take_damage(amount: int, _damage_type: String = "physical") -> void:
 	health = max(0, health - amount)
@@ -645,7 +693,7 @@ func debug_stat_allocation():
 	print("Health: ", health, " (each point gives +3 HP + strength bonus)")
 	print("Mana: ", mana, " (each point gives +4 MP + intelligence bonus)")
 	print("Strength: ", strength, " (each point gives +5 HP + melee damage)")
-	print("Intelligence: ", mana, " (each point gives +8 MP + spell power)")
+	print("Intelligence: ", intelligence, " (each point gives +8 MP + spell power)")
 	print("Spell Power: ", spell_power, " (each point gives +spell damage)")
 	print("Dexterity: ", dexterity, " (each point gives +dodge +crit chance)")
 	print("Cunning: ", cunning, " (each point gives +parry +spell crit)")

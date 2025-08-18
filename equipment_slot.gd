@@ -15,8 +15,8 @@ func _ready():
 	# Add to group for tooltip cleanup system
 	add_to_group("EquipmentSlot")
 	
-	# Set mouse filter to pass to receive input events
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	# Set mouse filter to stop to receive input events
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	
 	# Try to get player_inventory from scene tree if not set
 	if not player_inventory:
@@ -267,9 +267,9 @@ func _handle_mouse_motion(event: InputEventMouseMotion):
 
 func _show_tooltip():
 	"""Show tooltip when mouse enters the slot"""
-	# Check if equipment UI is visible
-	var equipment_ui = get_tree().get_first_node_in_group("EquipmentUI")
-	if equipment_ui and not equipment_ui.visible:
+	
+	# Check if equipment UI is open by checking mouse mode
+	if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
 		return
 	
 	# Check if we have an item and are not being dragged from

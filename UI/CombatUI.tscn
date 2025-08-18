@@ -422,6 +422,38 @@ theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_font_sizes/font_size = 14
 text = "Icicle (18 MP)"
 
+[node name="SmiteButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "A holy spell that deals holy damage and may smite undead enemies"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Smite (25 MP)"
+
+[node name="EarthquakeButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "An earth spell that deals physical damage and may stun enemies"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Earthquake (30 MP)"
+
+[node name="WhirlpoolButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Summons a whirlpool that slows and damages enemies for 3 turns"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Whirlpool (30 MP)"
+
+[node name="BubbleBurstButton" type="Button" parent="SpellsPopup/VBoxContainer/ScrollContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Traps an enemy in a bubble for 1 turn, which then bursts, dealing splash damage"
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Bubble Burst (25 MP)"
+
 [node name="HSeparator2" type="HSeparator" parent="SpellsPopup/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 4

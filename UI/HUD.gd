@@ -137,7 +137,7 @@ func _on_enemy_damaged(enemy: Node, attack_type: String, damage: int):
 func create_enemy_panel(enemy: Node) -> void:
 	"""Create a simple enemy info panel"""
 	var panel = Panel.new()
-	panel.custom_minimum_size = Vector2(200, 80)
+	panel.custom_minimum_size = Vector2(200, 90)  # Adjusted height to 90 for perfect fit
 	
 	# Use proper enemy name for panel identification, not internal node name
 	var enemy_display_name = "Unknown Enemy"
@@ -180,6 +180,27 @@ func create_enemy_panel(enemy: Node) -> void:
 	name_label.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(name_label)
 	
+	# Enemy level and type info
+	var info_container = HBoxContainer.new()
+	info_container.add_theme_constant_override("separation", 8)
+	vbox.add_child(info_container)
+	
+	# Level label
+	var level_label = Label.new()
+	level_label.text = "Lvl. 1"  # Default, will be updated
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 1))
+	level_label.add_theme_font_size_override("font_size", 10)
+	info_container.add_child(level_label)
+	
+	# Type label
+	var type_label = Label.new()
+	type_label.text = "(Creature)"  # Default, will be updated
+	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	type_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 1))
+	type_label.add_theme_font_size_override("font_size", 10)
+	info_container.add_child(type_label)
+	
 	# Health bar
 	var enemy_health_bar = ProgressBar.new()
 	enemy_health_bar.custom_minimum_size = Vector2(0, 16)
@@ -220,6 +241,8 @@ func create_enemy_panel(enemy: Node) -> void:
 	panel.set_meta("mana_bar", enemy_mana_bar)
 	panel.set_meta("health_value", enemy_health_value)
 	panel.set_meta("mana_value", enemy_mana_value)
+	panel.set_meta("level_label", level_label)
+	panel.set_meta("type_label", type_label)
 	
 	enemy_panels_container.add_child(panel)
 	update_enemy_panel(panel, enemy)
@@ -258,6 +281,31 @@ func update_enemy_panel(panel: Control, enemy: Node) -> void:
 		enemy_mana_bar.max_value = max_mana
 		enemy_mana_bar.value = current_mana
 		enemy_mana_value.text = str(current_mana) + "/" + str(max_mana)
+	
+	# Update level and type information
+	var level_label = panel.get_meta("level_label")
+	var type_label = panel.get_meta("type_label")
+	
+	if level_label and type_label:
+		# Get enemy level
+		var enemy_level = 1  # Default
+		if enemy.has_method("get_level"):
+			enemy_level = enemy.get_level()
+		elif "level" in enemy:
+			enemy_level = enemy.level
+		
+		# Get enemy type
+		var enemy_type = "Creature"  # Default
+		if enemy.has_method("get_effective_enemy_type"):
+			enemy_type = enemy.get_effective_enemy_type()
+		elif enemy.has_method("enemy_type"):
+			enemy_type = enemy.enemy_type()
+		elif "enemy_type" in enemy:
+			enemy_type = enemy.enemy_type
+		
+		# Update labels
+		level_label.text = "Lvl. " + str(enemy_level)
+		type_label.text = "(" + enemy_type + ")"
 
 func remove_enemy_panel(enemy: Node) -> void:
 	"""Remove enemy panel when enemy is defeated"""

@@ -61,6 +61,11 @@ var damage_calculator: DamageCalculator
 # Animation manager reference
 var animation_manager: AnimationManager = null
 
+# Movement tracking variables
+var all_movements_complete: int = 0
+var total_movements: int = 0
+var enemy_safety_timer: Timer = null
+
 # Getter method to expose animation_manager to external scripts
 func get_animation_manager() -> AnimationManager:
 	return animation_manager
@@ -94,7 +99,7 @@ func get_spell_damage(spell_id: String) -> int:
 		return base_damage
 	
 	var player_stats = current_player.get_stats()
-	var player_level = player_stats.level if player_stats else 1
+	var player_level = player_stats.level if player_stats != null else 1
 	
 	# Calculate level bonus (level 1 = no bonus, level 2 = +1 bonus, etc.)
 	var level_bonus = (player_level - 1) * level_scaling
@@ -104,7 +109,7 @@ func get_spell_damage(spell_id: String) -> int:
 func get_spell_mana_cost(spell_id: String) -> int:
 	"""Get mana cost for a spell"""
 	var spell_data = get_spell_data(spell_id)
-	return spell_data.get("mana_cost", 0) if spell_data else 0
+	return spell_data.get("mana_cost", 0) if spell_data != null else 0
 
 func get_available_spells() -> Dictionary:
 	"""Get all available spells"""
@@ -129,6 +134,15 @@ func _get_animation_type_for_spell(animation_name: String) -> int:
 		"earth_magic":
 			print("🎬 DEBUG: Returning EARTH_MAGIC")
 			return AnimationManager.ANIMATION_TYPE.EARTH_MAGIC
+		"water_magic":
+			print("🎬 DEBUG: Returning WATER_MAGIC")
+			return AnimationManager.ANIMATION_TYPE.WATER_MAGIC
+		"arcane_magic":
+			print("🎬 DEBUG: Returning ARCANE_MAGIC")
+			return AnimationManager.ANIMATION_TYPE.ARCANE_MAGIC
+		"dark_magic":
+			print("🎬 DEBUG: Returning DARK_MAGIC")
+			return AnimationManager.ANIMATION_TYPE.DARK_MAGIC
 		_:
 			print("🎬 DEBUG: No match found, defaulting to FIRE_MAGIC")
 			return AnimationManager.ANIMATION_TYPE.FIRE_MAGIC  # Default fallback
@@ -247,7 +261,7 @@ var available_spells: Dictionary = {
 		"base_damage": 30,
 		"mana_cost": 22,
 		"level_scaling": 3.8,
-		"animation": "fire_magic", # Placeholder animation
+		"animation": "arcane_magic",
 		"status_effects": ["magic_vulnerability"],
 		"tags": ["single target"],
 		"description": "A bolt of pure magic that can make targets more susceptible to further spells."
@@ -258,7 +272,7 @@ var available_spells: Dictionary = {
 		"base_damage": 15, # Lower base damage due to powerful DoT
 		"mana_cost": 35,
 		"level_scaling": 2.5,
-		"animation": "fire_magic", # Placeholder animation
+		"animation": "dark_magic",
 		"status_effects": ["corruption"],
 		"tags": ["aoe", "self"], # Self-centered AOE
 		"aoe_radius": 5.0,
@@ -270,7 +284,7 @@ var available_spells: Dictionary = {
 		"base_damage": 10,
 		"mana_cost": 30,
 		"level_scaling": 2.0,
-		"animation": "fire_magic", # Placeholder
+		"animation": "water_magic",
 		"status_effects": ["slow"],
 		"duration": 3, # For the slow effect
 		"tags": ["aoe"],
@@ -283,7 +297,7 @@ var available_spells: Dictionary = {
 		"base_damage": 0, # Initial cast does no damage, only stuns
 		"mana_cost": 25,
 		"level_scaling": 0,
-		"animation": "fire_magic", # Placeholder
+		"animation": "water_magic",
 		"status_effects": ["stun"],
 		"duration": 1, # For the stun effect
 		"tags": ["single target", "multi-cast"],
@@ -295,7 +309,7 @@ var available_spells: Dictionary = {
 		"base_damage": 20,
 		"mana_cost": 0, # No cost for the explosion part
 		"level_scaling": 3.0,
-		"animation": "fire_magic", # Placeholder
+		"animation": "water_magic",
 		"status_effects": [],
 		"tags": ["aoe"],
 		"aoe_radius": 2.5,
@@ -322,17 +336,8 @@ func _ready():
 	# Test the animation system
 	if animation_manager:
 		animation_manager.test_animation_system()
-		# Connect to animation signals
-		print("🔌 Connecting to animation signals...")
-		animation_manager.animation_damage_ready.connect(_on_animation_damage_ready)
-		animation_manager.animation_started.connect(_on_animation_started)
-		animation_manager.animation_finished.connect(_on_animation_finished)
-		print("🔌 Signal connections successful!")
-		
-		# Test if the connections are working
-		print("🔌 Testing signal connections...")
-		print("🔌 Animation manager has signal: ", animation_manager.has_signal("animation_damage_ready"))
-		print("🔌 Signal connections count: ", animation_manager.get_signal_connection_list("animation_damage_ready").size())
+		# Delay signal connections to ensure animation manager is fully ready
+		call_deferred("_connect_to_animation_signals")
 	else:
 		print("⚠️ Animation manager is null after initialization!")
 	
@@ -340,7 +345,11 @@ func _ready():
 	safety_timer = Timer.new()
 	add_child(safety_timer)
 	safety_timer.wait_time = 1.0  # Check every second
-	safety_timer.timeout.connect(_on_safety_timer_timeout)
+	if safety_timer.has_signal("timeout"):
+		safety_timer.timeout.connect(_on_safety_timer_timeout)
+		print("🔌 Connected safety timer timeout signal")
+	else:
+		print("⚠️ Safety timer missing timeout signal")
 	safety_timer.start()
 
 func show_aoe_indicator(position: Vector3, radius: float):
@@ -369,6 +378,46 @@ func is_valid_3d_node(node: Node) -> bool:
 
 
 
+
+func _connect_to_animation_signals():
+	"""Connect to animation manager signals with safety checks"""
+	if not animation_manager:
+		print("⚠️ Cannot connect to animation signals - animation manager is null")
+		return
+	
+	print("🔌 Connecting to animation signals...")
+	
+	# Wait a frame to ensure animation manager is fully ready
+	await get_tree().process_frame
+	
+	# Connect to animation signals with safety checks
+	if animation_manager.has_signal("animation_damage_ready"):
+		animation_manager.animation_damage_ready.connect(_on_animation_damage_ready)
+		print("🔌 Connected to animation_damage_ready")
+	else:
+		print("⚠️ Animation manager missing animation_damage_ready signal")
+		
+	if animation_manager.has_signal("animation_started"):
+		animation_manager.animation_started.connect(_on_animation_started)
+		print("🔌 Connected to animation_started")
+	else:
+		print("⚠️ Animation manager missing animation_started signal")
+		
+	if animation_manager.has_signal("animation_finished"):
+		animation_manager.animation_finished.connect(_on_animation_finished)
+		print("🔌 Connected to animation_finished")
+	else:
+		print("⚠️ Animation manager missing animation_finished signal")
+	
+	print("🔌 Signal connections completed!")
+	
+	# Test if the connections are working
+	print("🔌 Testing signal connections...")
+	if animation_manager.has_signal("animation_damage_ready"):
+		print("🔌 Animation manager has signal: ", animation_manager.has_signal("animation_damage_ready"))
+		print("🔌 Signal connections count: ", animation_manager.get_signal_connection_list("animation_damage_ready").size())
+	else:
+		print("⚠️ Animation manager missing animation_damage_ready signal")
 
 func _get_entity_name(entity: Node) -> String:
 	"""Get a readable name for an entity"""
@@ -421,7 +470,7 @@ func _add_to_turn_queue_dynamic(entity: Node) -> void:
 	print("  - Queue size: ", turn_queue.size())
 	print("  - Queue contents: ", _get_queue_names())
 	print("  - Turn in progress: ", turn_in_progress)
-	print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+	print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 	
 	# Add to completion order tracking
 	atb_completion_order.append(entity)
@@ -464,7 +513,7 @@ func _allow_entity_to_act(entity: Node) -> void:
 	print("  - Has take_turn method: ", entity.has_method("take_turn"))
 	print("  - Turn in progress: ", turn_in_progress)
 	print("  - Action in progress: ", action_in_progress)
-	print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+	print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 	
 	if not _can_entity_act(entity):
 		print("⚠️ Cannot allow entity to act: ", _get_entity_name(entity))
@@ -501,8 +550,8 @@ func _start_enemy_turn_dynamic(enemy: Node) -> void:
 	
 	# Safety check: make sure enemy is still alive
 	if enemy.has_method("get_stats") and enemy.get_stats().health <= 0:
-		var enemy_name = _get_entity_name(enemy)
-		print("🎯 Enemy ", enemy_name, " is dead, skipping turn")
+		var dead_enemy_name = _get_entity_name(enemy)
+		print("🎯 Enemy ", dead_enemy_name, " is dead, skipping turn")
 		_end_enemy_turn_for(enemy)
 		return
 	
@@ -549,15 +598,11 @@ func _start_enemy_turn_dynamic(enemy: Node) -> void:
 	_switch_camera_to_attacking_enemy(enemy)
 	
 	# Set up a safety timer to force turn end if something goes wrong
-	var enemy_safety_timer = Timer.new()
+	enemy_safety_timer = Timer.new()
 	enemy_safety_timer.name = "enemy_turn_safety_timer_" + str(enemy.get_instance_id())
 	enemy_safety_timer.wait_time = 10.0  # 10 second timeout
 	enemy_safety_timer.one_shot = true
-	enemy_safety_timer.timeout.connect(func():
-		print("⚠️ Safety timeout for ", enemy_name, " - forcing turn end")
-		_end_enemy_turn_for(enemy)
-		enemy_safety_timer.queue_free()
-	)
+	enemy_safety_timer.timeout.connect(_on_enemy_safety_timeout.bind(enemy, enemy_name))
 	add_child(enemy_safety_timer)
 	enemy_safety_timer.start()
 	
@@ -629,7 +674,7 @@ func _finish_entity_turn(entity: Node) -> void:
 		print("  - Has take_turn method: ", next_entity.has_method("take_turn"))
 		print("  - Turn in progress: ", turn_in_progress)
 		print("  - Action in progress: ", action_in_progress)
-		print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+		print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 		
 		# If the next entity is the player and they have no action queued, check if they should be skipped
 		if next_entity == current_player and not player_action_queued:
@@ -828,7 +873,7 @@ func _end_enemy_turn_for(enemy: Node) -> void:
 	# Restore camera to player's target after enemy turn ends
 	_restore_camera_to_player_target()
 
-async func start_combat(enemy: Node, player: Node):
+func start_combat(enemy: Node, player: Node):
 	"""Start a new combat encounter"""
 	if in_combat or not enemy or not player:
 		return
@@ -933,8 +978,8 @@ async func start_combat(enemy: Node, player: Node):
 		current_enemy.on_combat_start()
 
 	# Reorient camera before positioning enemies
-	if player.has_method("check_and_reorient_camera"):
-		await player.check_and_reorient_camera(enemy)
+	if current_player.has_method("check_and_reorient_camera"):
+		await current_player.check_and_reorient_camera(enemy)
 
 	# Orient player and camera toward the enemy
 	_orient_player_toward_enemy()
@@ -942,7 +987,7 @@ async func start_combat(enemy: Node, player: Node):
 	# Position enemies and start combat
 	_position_enemy_at_combat_distance()
 
-async func add_enemy_to_combat(enemy: Node):
+func add_enemy_to_combat(enemy: Node):
 	"""Add an additional enemy to an existing combat encounter"""
 	if not in_combat or not enemy:
 		return
@@ -1006,18 +1051,16 @@ async func add_enemy_to_combat(enemy: Node):
 	if current_player and current_player is Node3D:
 		if current_player.has_method("is_on_floor") and not current_player.is_on_floor():
 			print("🎯 Player is in the air - delaying combat start until landing...")
-			# Wait for player to land naturally before freezing
-			var landing_check_timer = Timer.new()
-			landing_check_timer.name = "combat_landing_check_timer"
-			landing_check_timer.wait_time = 0.1  # Check every 0.1 seconds
-			landing_check_timer.timeout.connect(func():
-				_check_player_landing_and_freeze()
-			)
-			add_child(landing_check_timer)
-			landing_check_timer.start()
-			return  # Exit early, don't freeze yet
-		else:
-			print("🎯 Player is on ground - proceeding with combat freeze")
+					# Wait for player to land naturally before freezing
+		var landing_check_timer = Timer.new()
+		landing_check_timer.name = "combat_landing_check_timer"
+		landing_check_timer.wait_time = 0.1  # Check every 0.1 seconds
+		landing_check_timer.timeout.connect(_on_landing_check_timeout)
+		add_child(landing_check_timer)
+		landing_check_timer.start()
+		return  # Exit early, don't freeze yet
+	else:
+		print("🎯 Player is on ground - proceeding with combat freeze")
 	
 	# If we get here, player is grounded, so position at combat distance then freeze
 	# Wait for camera reorientation to complete before positioning enemies
@@ -1052,7 +1095,7 @@ func _check_player_landing_and_freeze():
 func _cleanup_landing_timer():
 	"""Clean up the landing check timer"""
 	var landing_timer = get_node_or_null("combat_landing_check_timer")
-	if landing_timer:
+	if landing_timer and is_instance_valid(landing_timer):
 		landing_timer.stop()
 		landing_timer.queue_free()
 		print("🎯 Cleaned up landing check timer")
@@ -1061,14 +1104,14 @@ func _cleanup_positioning_timer():
 	"""Clean up the positioning timers"""
 	# Clean up old single enemy positioning timer
 	var positioning_timer = get_node_or_null("combat_positioning_timer")
-	if positioning_timer:
+	if positioning_timer and is_instance_valid(positioning_timer):
 		positioning_timer.stop()
 		positioning_timer.queue_free()
 		print("🎯 Cleaned up old positioning timer")
 	
 	# Clean up new cone positioning safety timer
 	var cone_timer = get_node_or_null("cone_positioning_safety_timer")
-	if cone_timer:
+	if cone_timer and is_instance_valid(cone_timer):
 		cone_timer.stop()
 		cone_timer.queue_free()
 		print("🎯 Cleaned up cone positioning safety timer")
@@ -1097,13 +1140,17 @@ func _position_enemy_at_combat_distance():
 	var total_enemies = enemies_to_position.size()
 	var cone_angle = 75.0  # 75 degree cone
 	var base_distance = 3.0  # Base distance from player
+	var max_enemies_per_row = 3  # Maximum enemies per row
+	var row_distance = base_distance  # Current row distance
+	var current_row = 0  # Current row number
+	var enemy_positions = []  # Array to store enemy positioning data
 	
 	print("🎯 Positioning ", total_enemies, " enemies in cone")
 	
 	# Simple cone positioning - all enemies in one row
 	var angle_spacing = cone_angle / (total_enemies + 1)
-	var all_movements_complete = 0
-	var total_movements = total_enemies
+	all_movements_complete = 0
+	total_movements = total_enemies
 	
 	# Create a single tween for all enemies
 	var group_tween = create_tween()
@@ -1133,17 +1180,13 @@ func _position_enemy_at_combat_distance():
 		group_tween.parallel().tween_property(enemy, "global_position", target_pos, 1.0)
 	
 	# Add callback after all movements complete
-	group_tween.tween_callback(func():
-		print("🎯 All enemies positioned - freezing entities")
-		_freeze_entities()
-	)
+	group_tween.tween_callback(_on_group_tween_complete)
 	
 	print("🎯 All enemies moving to cone positions")
 	
-<<<<<<< Updated upstream
 	while enemies_to_position.size() > 0:
 		var enemies_in_row = min(max_enemies_per_row, enemies_to_position.size())
-		var angle_spacing = cone_angle / (enemies_in_row + 1)  # +1 for spacing
+		angle_spacing = cone_angle / (enemies_in_row + 1)  # +1 for spacing
 		
 		for i in range(enemies_in_row):
 			var enemy = enemies_to_position.pop_front()
@@ -1159,7 +1202,7 @@ func _position_enemy_at_combat_distance():
 			target_pos.y = enemy.global_position.y  # Keep current height
 			
 			# NEW: Wall collision check
-			var space_state = get_world_3d().direct_space_state
+			var space_state = current_player.get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.new()
 			query.from = player_pos
 			query.to = target_pos
@@ -1197,9 +1240,10 @@ func _position_enemy_at_combat_distance():
 		print("🎯 ", enemy_name, " -> Row ", row, " at ", target_pos)
 	
 	# Move all enemies to their positions simultaneously
-	var all_movements_complete = 0
-	var total_movements = enemy_positions.size()
+	all_movements_complete = 0
+	total_movements = enemy_positions.size()
 	
+	var movement_index = 0
 	for enemy_data in enemy_positions:
 		var enemy = enemy_data.enemy
 		var target_pos = enemy_data.target_pos
@@ -1210,28 +1254,92 @@ func _position_enemy_at_combat_distance():
 		# Create movement tween for this enemy
 		var move_tween = create_tween()
 		move_tween.tween_property(enemy, "global_position", target_pos, 1.2)  # Slower, more natural movement
-		move_tween.tween_callback(func():
-			all_movements_complete += 1
-			print("✅ Enemy movement complete (", all_movements_complete, "/", total_movements, ")")
-			
-			# Check if all movements are complete
-			if all_movements_complete >= total_movements:
-				print("🎯 All enemies positioned - now freezing entities")
-				_freeze_entities()
-		)
+		move_tween.tween_callback(_create_movement_callback.bind(movement_index, total_movements))
+		movement_index += 1
 	
 	# Safety timer in case callbacks fail
-	var safety_timer = Timer.new()
+	safety_timer = Timer.new()
 	safety_timer.name = "positioning_safety_timer"
 	safety_timer.wait_time = 3.0  # 3 second timeout
 	safety_timer.one_shot = true
-	safety_timer.timeout.connect(func():
-		print("⚠️ Positioning safety timeout - forcing freeze")
-		_freeze_entities()
-		safety_timer.queue_free()
-	)
+	safety_timer.timeout.connect(_on_positioning_safety_timeout)
 	add_child(safety_timer)
 	safety_timer.start()
+
+func _create_movement_callback(_movement_index: int, total_movements_param: int):
+	"""Callback function for enemy movement completion"""
+	all_movements_complete += 1
+	print("✅ Enemy movement complete (", all_movements_complete, "/", total_movements_param, ")")
+	
+	# Check if all movements are complete
+	if all_movements_complete >= total_movements_param:
+		print("🎯 All enemies positioned - now freezing entities")
+		_freeze_entities()
+
+func _on_positioning_safety_timeout():
+	"""Handle positioning safety timer timeout"""
+	print("⚠️ Positioning safety timeout - forcing freeze")
+	_freeze_entities()
+	if safety_timer and is_instance_valid(safety_timer):
+		safety_timer.queue_free()
+		safety_timer = null
+
+func _on_enemy_safety_timeout(enemy: Node, enemy_name: String):
+	"""Handle enemy safety timer timeout"""
+	print("⚠️ Safety timeout for ", enemy_name, " - forcing turn end")
+	_end_enemy_turn_for(enemy)
+	if enemy_safety_timer and is_instance_valid(enemy_safety_timer):
+		enemy_safety_timer.queue_free()
+		enemy_safety_timer = null
+
+func _on_landing_check_timeout():
+	"""Handle landing check timer timeout"""
+	_check_player_landing_and_freeze()
+
+func _on_skip_check_timeout():
+	"""Handle skip check timer timeout"""
+	# Only check for skip if player still has no action queued
+	if not player_action_queued:
+		print("⏰ Delayed skip check - player still has no action")
+		_check_and_skip_player_if_no_action()
+	else:
+		print("⏰ Player queued action during delay, no skip needed")
+
+func _on_camera_restore_timeout(target_to_restore: Node):
+	"""Handle camera restore timer timeout"""
+	if current_player and current_player.has_method("orient_camera_toward"):
+		current_player.orient_camera_toward(target_to_restore)
+		print("🎥 Camera restored to player target after delay")
+	else:
+		print("⚠️ Cannot restore camera - player missing orient_camera_toward method")
+
+func _on_enemy_animation_finished(_anim_type, actor: Node, enemy: Node, enemy_name: String):
+	"""Handle enemy animation finished for turn ending"""
+	if actor == enemy:
+		print("🎬 Animation finished for ", enemy_name, ", ending turn")
+		# Reset movement attempts for next turn
+		if enemy.has_method("movement_attempts"):
+			enemy.movement_attempts = 0
+		# End the enemy turn
+		_end_enemy_turn_for(enemy)
+
+func _on_turn_end_safety_timeout(enemy: Node, enemy_name: String):
+	"""Handle turn end safety timer timeout"""
+	print("⚠️ Turn end safety timeout for ", enemy_name, ", forcing turn end")
+	# Reset movement attempts for next turn
+	if enemy.has_method("movement_attempts"):
+		enemy.movement_attempts = 0
+	# End the enemy turn
+	_end_enemy_turn_for(enemy)
+
+func _on_camera_height_reset_complete():
+	"""Handle camera height reset completion"""
+	print("🎥 DEBUG: Camera height after orientation: ", get_viewport().get_camera_3d().rotation.x if get_viewport().get_camera_3d() != null else 0.0, " (", rad_to_deg(get_viewport().get_camera_3d().rotation.x if get_viewport().get_camera_3d() != null else 0.0), " degrees)")
+
+func _on_group_tween_complete():
+	"""Handle group tween completion for enemy positioning"""
+	print("🎯 All enemies positioned - freezing entities")
+	_freeze_entities()
 
 func _freeze_entities():
 	"""Freeze both player and enemy entities"""
@@ -1240,7 +1348,7 @@ func _freeze_entities():
 	
 	# Clean up the freeze timer since we're about to freeze
 	var freeze_timer = get_node_or_null("combat_freeze_timer")
-	if freeze_timer:
+	if freeze_timer and is_instance_valid(freeze_timer):
 		freeze_timer.queue_free()
 	
 	# Freeze both entities
@@ -1388,15 +1496,7 @@ func _start_player_turn() -> void:
 		skip_check_timer.name = "skip_check_timer"
 		skip_check_timer.wait_time = 0.1  # 100ms delay
 		skip_check_timer.one_shot = true
-		skip_check_timer.timeout.connect(func():
-			# Only check for skip if player still has no action queued
-			if not player_action_queued:
-				print("⏰ Delayed skip check - player still has no action")
-				_check_and_skip_player_if_no_action()
-			else:
-				print("⏰ Player queued action during delay, no skip needed")
-			skip_check_timer.queue_free()
-		)
+		skip_check_timer.timeout.connect(_on_skip_check_timeout)
 		add_child(skip_check_timer)
 		skip_check_timer.start()
 
@@ -1660,35 +1760,35 @@ func end_combat():
 	
 	# Stop and clean up camera orientation timer
 	var orientation_timer = get_node_or_null("camera_orientation_timer")
-	if orientation_timer:
+	if orientation_timer and is_instance_valid(orientation_timer):
 		orientation_timer.stop()
 		orientation_timer.queue_free()
 		print("🎥 Stopped camera orientation checks")
 	
 	# Stop and clean up any freeze timers
 	var freeze_timer = get_node_or_null("combat_freeze_timer")
-	if freeze_timer:
+	if freeze_timer and is_instance_valid(freeze_timer):
 		freeze_timer.stop()
 		freeze_timer.queue_free()
 		print("🎯 Cleaned up combat freeze timer")
 	
 	# Stop and clean up any landing check timers
 	var landing_timer = get_node_or_null("combat_landing_check_timer")
-	if landing_timer:
+	if landing_timer and is_instance_valid(landing_timer):
 		landing_timer.stop()
 		landing_timer.queue_free()
 		print("🎯 Cleaned up landing check timer")
 	
 	# Stop and clean up any positioning timers
 	var positioning_timer = get_node_or_null("combat_positioning_timer")
-	if positioning_timer:
+	if positioning_timer and is_instance_valid(positioning_timer):
 		positioning_timer.stop()
 		positioning_timer.queue_free()
 		print("🎯 Cleaned up positioning timer")
 	
 	# Stop and clean up cone positioning safety timer
 	var cone_timer = get_node_or_null("cone_positioning_safety_timer")
-	if cone_timer:
+	if cone_timer and is_instance_valid(cone_timer):
 		cone_timer.stop()
 		cone_timer.queue_free()
 		print("🎯 Cleaned up cone positioning safety timer")
@@ -1788,14 +1888,7 @@ func _restore_camera_to_player_target():
 	restore_timer.name = "camera_restore_timer"
 	restore_timer.wait_time = 0.5  # 0.5 second delay
 	restore_timer.one_shot = true
-	restore_timer.timeout.connect(func():
-		if current_player and current_player.has_method("orient_camera_toward"):
-			current_player.orient_camera_toward(target_to_restore)
-			print("🎥 Camera restored to player target after delay")
-		else:
-			print("⚠️ Cannot restore camera - player missing orient_camera_toward method")
-		restore_timer.queue_free()
-	)
+	restore_timer.timeout.connect(_on_camera_restore_timeout.bind(target_to_restore))
 	add_child(restore_timer)
 	restore_timer.start()
 
@@ -1861,6 +1954,9 @@ func player_basic_attack():
 	if target_enemy and target_enemy.has_method("take_damage"):
 		target_enemy.take_damage(final_damage, "physical")  # Basic attack is physical damage
 		_log_damage_dealt(current_player, target_enemy, final_damage, "attack")
+		
+		# Check for innate elemental effects from basic attack
+		_check_elemental_status_effects(final_damage, "basic_attack")
 		
 		# Emit signal for UI updates
 		enemy_damaged.emit(target_enemy, "basic_attack", final_damage)
@@ -1944,7 +2040,7 @@ func player_special_attack():
 	# target_enemy is already declared at the beginning of the function
 	
 	# Apply damage and get armor reduction information
-	var damage_result = _apply_damage_to_enemy(final_damage, target_enemy)
+	var damage_result = _apply_damage_to_enemy(final_damage, target_enemy, "special_attack")
 	var actual_damage = damage_result.final_damage
 	var armor_reduction = damage_result.armor_reduction
 	
@@ -2171,9 +2267,9 @@ func _execute_throwable_weapon_effects(item: Resource) -> bool:
 	
 	# Get item properties
 	var custom_stats = item.custom_stats if "custom_stats" in item else {}
-	var damage = custom_stats.get("damage", 0) if custom_stats else 0
-	var damage_type = custom_stats.get("damage_type", "physical") if custom_stats else "physical"
-	var armor_penetration = custom_stats.get("armor_penetration", 0) if custom_stats else 0
+	var damage = custom_stats.get("damage", 0) if custom_stats != null else 0
+	var damage_type = custom_stats.get("damage_type", "physical") if custom_stats != null else "physical"
+	var armor_penetration = custom_stats.get("armor_penetration", 0) if custom_stats != null else 0
 	
 	if damage <= 0:
 		print("⚠️ Throwable weapon has no damage!")
@@ -2792,8 +2888,8 @@ func _process_attack_damage(base_damage: int, _damage_type: String, _attack_type
 	
 	return final_damage
 
-func _apply_damage_to_enemy(damage: int, target_enemy: Node = null) -> Dictionary:
-	"""Apply damage to enemy with armor calculations"""
+func _apply_damage_to_enemy(damage: int, target_enemy: Node = null, attack_type: String = "basic_attack") -> Dictionary:
+	"""Apply damage to enemy with armor calculations and innate effect checks"""
 	# Use provided target enemy or fall back to focused enemy
 	if not target_enemy:
 		target_enemy = get_focused_enemy()
@@ -2813,6 +2909,9 @@ func _apply_damage_to_enemy(damage: int, target_enemy: Node = null) -> Dictionar
 	
 	# Apply damage
 	target_enemy.take_damage(final_damage, "physical")  # Basic attack is physical damage
+	
+	# Check for innate elemental effects
+	_check_elemental_status_effects(final_damage, attack_type)
 	
 	# Emit signal for UI updates
 	enemy_damaged.emit(target_enemy, "attack", final_damage)
@@ -3006,7 +3105,7 @@ func _execute_special_attack_directly():
 	print("Player performs Haymaker! Deals ", final_damage, " damage!")
 	
 	# Apply damage and get armor reduction information
-	var damage_result = _apply_damage_to_enemy(final_damage, target_enemy)
+	var damage_result = _apply_damage_to_enemy(final_damage, target_enemy, "special_attack")
 	var actual_damage = damage_result.final_damage
 	var armor_reduction = damage_result.armor_reduction
 	
@@ -3206,61 +3305,7 @@ func _process_haymaker_attack(base_damage: int, _damage_type: String) -> int:
 	
 	return final_damage
 
-func _check_fire_ignite(_initial_damage: int, _attack_type: String):
-	"""Check if fire attack should ignite the target"""
-	if not current_enemy:
-		return
-	
-	# Check if enemy can be ignited through the enemy behavior system
-	if not current_enemy.has_method("can_receive_status_effect"):
-		return
-	
-	if not current_enemy.can_receive_status_effect("ignite"):
-		return
-	
-	var ignite_chance = 25.0  # Base 25% chance
-	if current_player and current_player.has_method("get_fire_ignite_chance"):
-		ignite_chance = current_player.get_fire_ignite_chance()
-	
-	var roll = randf() * 100.0
-	print("Fire ignite check: ", roll, " vs ", ignite_chance, "% chance")
-	
-	if roll <= ignite_chance:
-		print("Fire attack ignited target!")
-		# Apply ignite status effect
-		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
-		if status_manager:
-			status_manager.apply_ignite(current_enemy, int(_initial_damage * 0.2), 3, current_player)
-	else:
-		print("Fire attack did not ignite target")
 
-func _check_lightning_paralysis(_initial_damage: int, _attack_type: String):
-	"""Check if lightning attack should paralyze the target"""
-	if not current_enemy:
-		return
-	
-	# Check if enemy can be paralyzed through the enemy behavior system
-	if not current_enemy.has_method("can_receive_status_effect"):
-		return
-	
-	if not current_enemy.can_receive_status_effect("paralysis"):
-		return
-	
-	var paralysis_chance = 30.0  # Base 30% chance
-	if current_player and current_player.has_method("get_lightning_paralysis_chance"):
-		paralysis_chance = current_player.get_lightning_paralysis_chance()
-	
-	var roll = randf() * 100.0
-	print("Lightning paralysis check: ", roll, " vs ", paralysis_chance, "% chance")
-	
-	if roll <= paralysis_chance:
-		print("Lightning attack paralyzed target!")
-		# Apply paralysis status effect
-		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
-		if status_manager:
-			status_manager.apply_paralysis(current_enemy, 2, current_player)
-	else:
-		print("Lightning attack did not paralyze target")
 
 func _check_enemy_lightning_paralysis(_initial_damage: int, _attack_type: String):
 	"""Check if enemy lightning attack should paralyze the player"""
@@ -3307,9 +3352,23 @@ func _check_elemental_status_effects(_initial_damage: int, _attack_type: String)
 	if current_player.has_method("is_lightning_attack") and current_player.is_lightning_attack(_attack_type):
 		_check_lightning_paralysis(_initial_damage, _attack_type)
 	
-	# Future elemental effects can be added here
-	# if current_player.has_method("is_ice_attack") and current_player.is_ice_attack(_attack_type):
-	#     _check_ice_freeze(_initial_damage, _attack_type)
+	# Check for ice frostbite (no innate freeze effect)
+	
+	# Check for earth petrify
+	if current_player.has_method("is_earth_attack") and current_player.is_earth_attack(_attack_type):
+		_check_earth_petrify(_initial_damage, _attack_type)
+	
+	# Check for water buff removal
+	if current_player.has_method("is_water_attack") and current_player.is_water_attack(_attack_type):
+		_check_water_buff_removal(_initial_damage, _attack_type)
+	
+	# Check for arcane magic vulnerability
+	if current_player.has_method("is_arcane_attack") and current_player.is_arcane_attack(_attack_type):
+		_check_arcane_magic_vulnerability(_initial_damage, _attack_type)
+	
+	# Check for dark corruption
+	if current_player.has_method("is_dark_attack") and current_player.is_dark_attack(_attack_type):
+		_check_dark_corruption(_initial_damage, _attack_type)
 
 func _check_enemy_elemental_status_effects(_initial_damage: int, _attack_type: String):
 	"""Generic method to check for all enemy elemental status effects"""
@@ -3324,37 +3383,206 @@ func _check_enemy_elemental_status_effects(_initial_damage: int, _attack_type: S
 	if current_enemy_acting and current_enemy_acting.has_method("is_lightning_attack") and current_enemy_acting.is_lightning_attack(_attack_type):
 		_check_enemy_lightning_paralysis(_initial_damage, _attack_type)
 	
-	# Future enemy elemental effects can be added here
-	# if current_enemy_acting and current_enemy_acting.has_method("is_fire_attack") and current_enemy_acting.is_fire_attack(_attack_type):
-	#     _check_enemy_fire_ignite(_initial_damage, _attack_type)
+	# Check for fire ignite from enemies
+	if current_enemy_acting and current_enemy_acting.has_method("is_fire_attack") and current_enemy_acting.is_fire_attack(_attack_type):
+		_check_enemy_fire_ignite(_initial_damage, _attack_type)
+	
+	# Check for ice freeze from enemies
+	if current_enemy_acting and current_enemy_acting.has_method("is_ice_attack") and current_enemy_acting.is_ice_attack(_attack_type):
+		_check_enemy_ice_freeze(_initial_damage, _attack_type)
+	
+	# Check for earth stun from enemies
+	if current_enemy_acting and current_enemy_acting.has_method("is_earth_attack") and current_enemy_acting.is_earth_attack(_attack_type):
+		_check_enemy_earth_stun(_initial_damage, _attack_type)
 
-func _check_ice_freeze(_initial_damage: int, _attack_type: String):
-	"""Check if ice attack should freeze the target"""
+func _check_water_buff_removal(_initial_damage: int, _attack_type: String):
+	"""Check if water attack should remove enemy buffs and apply waterlogged"""
 	if not current_enemy:
 		return
 	
-	# Check if enemy can be frozen through the enemy behavior system
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# 30% chance to remove all beneficial enemy buffs
+	var roll = randf() * 100.0
+	if roll <= 30.0:
+		var buffs_removed = 0
+		var effects_manager = status_manager.get_entity_effects(current_enemy)
+		if effects_manager:
+			# Remove all buff effects
+			for effect in effects_manager.effects:
+				if effect.effect_category == "buff":
+					effects_manager.remove_effect(effect.type)
+					buffs_removed += 1
+		
+		if buffs_removed > 0:
+			print("💧 Water attack removed ", buffs_removed, " buffs from enemy!")
+			# Apply waterlogged stacks equal to buffs removed
+			status_manager.apply_waterlogged(current_enemy, current_player, buffs_removed)
+			_log_combat_event("💧 Water attack removed " + str(buffs_removed) + " buffs and applied " + str(buffs_removed) + " waterlogged stacks!")
+	else:
+		print("💧 Water attack did not remove any buffs")
+
+func _check_dark_corruption(_initial_damage: int, _attack_type: String):
+	"""Check if dark attack should apply corruption DoT"""
+	if not current_enemy:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Apply corruption effect (DoT that can apply random debuffs)
+	var corruption_damage = int(_initial_damage * 0.2)  # 20% of initial damage as DoT
+	var corruption_duration = 3  # 3 turns
+	status_manager.apply_corruption(current_enemy, corruption_damage, corruption_duration, current_player)
+	print("🖤 Dark attack applied corruption DoT!")
+
+func _check_arcane_magic_vulnerability(_initial_damage: int, _attack_type: String):
+	"""Check if arcane attack should increase magic vulnerability"""
+	if not current_enemy:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Apply magic vulnerability for 2 turns (refreshes on reapplication)
+	status_manager.apply_magic_vulnerability(current_enemy, 2, current_player)
+	print("🔮 Arcane attack increased magic vulnerability!")
+
+func _check_earth_petrify(_initial_damage: int, _attack_type: String):
+	"""Check if earth attack should apply petrify effect"""
+	if not current_enemy:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Check if target is already petrified for shatter effect
+	var effects_manager = status_manager.get_entity_effects(current_enemy)
+	if effects_manager:
+		for effect in effects_manager.effects:
+			if effect.type == status_manager.EFFECT_TYPE.PETRIFY and effect.is_petrified:
+				# Target is petrified - shatter for massive damage
+				var shatter_damage = _initial_damage * 3  # Triple damage
+				current_enemy.take_damage(shatter_damage, "earth")
+				_log_combat_event("💎 Petrified enemy shattered for " + str(shatter_damage) + " damage!")
+				# Remove petrify effect after shattering
+				effects_manager.remove_effect(effect.type)
+				return
+	
+	# Apply petrify effect (gradual slow, then full petrification)
+	status_manager.apply_petrify(current_enemy, 2, current_player)
+	print("🪨 Earth attack applied petrify effect!")
+
+func _check_fire_ignite(_initial_damage: int, _attack_type: String):
+	"""Check if fire attack should ignite the target"""
+	if not current_enemy:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Check if enemy can receive status effects
 	if not current_enemy.has_method("can_receive_status_effect"):
 		return
 	
-	if not current_enemy.can_receive_status_effect("freeze"):
+	if not current_enemy.can_receive_status_effect("ignite"):
 		return
 	
-	var freeze_chance = 20.0  # Base 20% chance
-	if current_player and current_player.has_method("get_ice_freeze_chance"):
-		freeze_chance = current_player.get_ice_freeze_chance()
+	var ignite_chance = 35.0  # Base 35% chance
+	if current_player and current_player.has_method("get_fire_ignite_chance"):
+		ignite_chance = current_player.get_fire_ignite_chance()
 	
 	var roll = randf() * 100.0
-	print("Ice freeze check: ", roll, " vs ", freeze_chance, "% chance")
+	print("Fire ignite check: ", roll, " vs ", ignite_chance, "% chance")
 	
-	if roll <= freeze_chance:
-		print("Ice attack froze target!")
-		# Apply freeze status effect
-		var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
-		if status_manager:
-			status_manager.apply_effect(current_enemy, status_manager.EFFECT_TYPE.FREEZE, int(_initial_damage * 0.15), 2, current_player)
+	if roll <= ignite_chance:
+		print("🔥 Fire attack ignited target!")
+		# Apply ignite status effect
+		var ignite_damage = int(_initial_damage * 0.2)  # 20% of initial damage as DoT
+		status_manager.apply_ignite(current_enemy, ignite_damage, 3, current_player)
 	else:
-		print("Ice attack did not freeze target")
+		print("Fire attack did not ignite target")
+
+func _check_lightning_paralysis(_initial_damage: int, _attack_type: String):
+	"""Check if lightning attack should paralyze the target"""
+	if not current_enemy:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Check if enemy can receive status effects
+	if not current_enemy.has_method("can_receive_status_effect"):
+		return
+	
+	if not current_enemy.can_receive_status_effect("paralysis"):
+		return
+	
+	var paralysis_chance = 30.0  # Base 30% chance
+	if current_player and current_player.has_method("get_lightning_paralysis_chance"):
+		paralysis_chance = current_player.get_lightning_paralysis_chance()
+	
+	var roll = randf() * 100.0
+	print("Lightning paralysis check: ", roll, " vs ", paralysis_chance, "% chance")
+	
+	if roll <= paralysis_chance:
+		print("⚡ Lightning attack paralyzed target!")
+		# Apply paralysis status effect
+		status_manager.apply_paralysis(current_enemy, 2, current_player)
+	else:
+		print("Lightning attack did not paralyze target")
+
+# Duplicate water function removed - this is defined earlier in the file
+
+# Duplicate dark and arcane functions removed - these are defined earlier in the file
+
+func _check_enemy_fire_ignite(_initial_damage: int, _attack_type: String):
+	"""Check if enemy fire attack should ignite the player"""
+	if not current_player:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Apply ignite effect to player
+	var ignite_damage = int(_initial_damage * 0.15)  # 15% of initial damage as DoT
+	var ignite_duration = 2  # 2 turns
+	status_manager.apply_ignite(current_player, ignite_damage, ignite_duration, current_enemy_acting)
+	print("🔥 Enemy fire attack ignited player!")
+
+func _check_enemy_ice_freeze(_initial_damage: int, _attack_type: String):
+	"""Check if enemy ice attack should freeze the player"""
+	if not current_player:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Apply freeze effect to player
+	status_manager.apply_freeze(current_player, 2, current_enemy_acting)
+	print("❄️ Enemy ice attack froze player!")
+
+func _check_enemy_earth_stun(_initial_damage: int, _attack_type: String):
+	"""Check if enemy earth attack should stun the player"""
+	if not current_player:
+		return
+	
+	var status_manager = get_tree().get_first_node_in_group("StatusEffectsManager")
+	if not status_manager:
+		return
+	
+	# Apply stun effect to player
+	status_manager.apply_stun(current_player, 1, current_enemy_acting)
+	print("🪨 Enemy earth attack stunned player!")
 
 func _gain_spirit_from_damage(_amount: int):
 	"""Gain spirit when taking damage - REMOVED: only defense gives spirit now"""
@@ -3401,7 +3629,7 @@ func _apply_damage_to_player(damage: int):
 		var reflected_damage = int(damage * 0.25)
 		if reflected_damage > 0:
 			print("Player reflects ", reflected_damage, " damage back!")
-			_apply_damage_to_enemy(reflected_damage)
+			_apply_damage_to_enemy(reflected_damage, null, "reflected_damage")
 		return
 	
 	# Apply damage to player
@@ -3473,7 +3701,8 @@ func handle_player_damage(damage: int, attack_type: String = "attack"):
 	if animation_manager:
 		var animation_type = _get_animation_type_for_attack(attack_type)
 		print("🎬 Playing enemy animation: ", animation_type, " for attack type: ", attack_type)
-		print("🎬 Current enemy acting: ", current_enemy_acting.name if current_enemy_acting else "null")
+		var enemy_name = current_enemy_acting.name if current_enemy_acting != null else "null"
+		print("🎬 Current enemy acting: ", enemy_name)
 		animation_manager.play_attack_animation(current_enemy_acting, animation_type)
 	else:
 		print("⚠️ No animation manager available for enemy attack")
@@ -3578,7 +3807,7 @@ func check_and_execute_queued_actions():
 		print("🔍 Turn queue debug:")
 		print("  - Queue size: ", turn_queue.size())
 		print("  - Queue contents: ", _get_queue_names())
-		print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+		print("  - Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 		print("  - Turn in progress: ", turn_in_progress)
 		
 		# Only execute queued actions when it's the player's turn in the queue
@@ -3646,8 +3875,8 @@ func end_current_turn():
 	if not in_combat:
 		return
 	
-	print("🎯 end_current_turn() called for ", _get_entity_name(current_actor) if current_actor else "Unknown")
-	print("  Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+	print("🎯 end_current_turn() called for ", _get_entity_name(current_actor) if current_actor != null else "Unknown")
+	print("  Current turn entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 	print("  Turn type: ", turn_type)
 	print("  Turn in progress: ", turn_in_progress)
 	print("  Action in progress: ", action_in_progress)
@@ -3715,7 +3944,7 @@ func _on_safety_timer_timeout():
 	# For now, we'll just ensure the safety timer keeps running
 	# This prevents the function from causing crashes
 
-func _orient_player_toward_enemy(target_enemy: Node = null):
+func _orient_player_toward_enemy(_target_enemy: Node = null):
 	"""Simple function - no camera rotation needed"""
 	print("🎯 No camera rotation needed - keeping current direction")
 
@@ -3776,9 +4005,7 @@ func _orient_camera_toward_enemy(camera: Camera3D, target_enemy: Node):
 	var camera_tween = create_tween()
 	camera_tween.parallel().tween_property(camera, "rotation:y", 0.0, 0.8)  # Face forward
 	camera_tween.parallel().tween_property(camera, "rotation:x", 0.0, 0.8)  # Reset to level height
-	camera_tween.tween_callback(func():
-		print("🎥 DEBUG: Camera height after orientation: ", camera.rotation.x, " (", rad_to_deg(camera.rotation.x), " degrees)")
-	)
+	camera_tween.tween_callback(_on_camera_height_reset_complete)
 	
 	# Rotate the player to face the enemy
 	var player_tween = create_tween()
@@ -3930,7 +4157,7 @@ func _check_camera_orientation():
 	if not in_combat or not current_player or not current_enemy:
 		# Stop the timer if combat ended
 		var timer = get_node_or_null("camera_orientation_timer")
-		if timer:
+		if timer and is_instance_valid(timer):
 			timer.queue_free()
 		return
 	
@@ -4143,8 +4370,16 @@ func cycle_target():
 	_force_camera_movement_to_enemy(focused_enemy)
 	
 	# Update UI elements
-	if combat_ui and combat_ui.has_method("update_enemy_status_panel"):
-		combat_ui.update_enemy_status_panel(focused_enemy)
+			# Enemy status panel removed - now using HUD enemy panels
+		# print("DEBUG: cycle_target - About to call update_enemy_status_panel")
+		# print("DEBUG: cycle_target - combat_ui: ", combat_ui)
+		# print("DEBUG: cycle_target - combat_ui has method: ", combat_ui.has_method("update_enemy_status_panel") if combat_ui else "null")
+		# if combat_ui and combat_ui.has_method("update_enemy_status_panel"):
+		# 	print("DEBUG: cycle_target - Calling update_enemy_status_panel with enemy: ", focused_enemy.name if focused_enemy else "null")
+		# 	combat_ui.update_enemy_status_panel(focused_enemy)
+		# 	print("DEBUG: cycle_target - update_enemy_status_panel call completed")
+		# else:
+		# 	print("ERROR: cycle_target - Cannot call update_enemy_status_panel!")
 	
 	# Highlight the focused enemy in the HUD
 	if hud and hud.has_method("highlight_focused_enemy"):
@@ -4183,9 +4418,9 @@ func set_focused_enemy(enemy: Node):
 	# Force camera movement to the new target
 	_force_camera_movement_to_enemy(focused_enemy)
 	
-	# Update UI elements
-	if combat_ui and combat_ui.has_method("update_enemy_status_panel"):
-		combat_ui.update_enemy_status_panel(focused_enemy)
+	# Update UI elements - REMOVED
+	# if combat_ui and combat_ui.has_method("update_enemy_status_panel"):
+	# 	combat_ui.update_enemy_status_panel(focused_enemy)
 	
 	# Highlight the focused enemy in the HUD
 	if hud and hud.has_method("highlight_focused_enemy"):
@@ -4284,30 +4519,14 @@ func wait_for_animation_then_end_turn(enemy: Node) -> void:
 		# Connect to animation finished signal
 		# Capture enemy_name for the lambda function
 		var captured_enemy_name = enemy_name
-		animation_manager.animation_finished.connect(func(_anim_type, actor):
-			if actor == enemy:
-				print("🎬 Animation finished for ", captured_enemy_name, ", ending turn")
-				# Reset movement attempts for next turn
-				if enemy.has_method("movement_attempts"):
-					enemy.movement_attempts = 0
-				# End the enemy turn
-				_end_enemy_turn_for(enemy)
-		, CONNECT_ONE_SHOT)
+		animation_manager.animation_finished.connect(_on_enemy_animation_finished.bind(enemy, captured_enemy_name), CONNECT_ONE_SHOT)
 		
 		# Add a safety timeout here too
 		var turn_end_safety_timer = Timer.new()
 		turn_end_safety_timer.name = "turn_end_safety_timer_" + str(enemy.get_instance_id())
 		turn_end_safety_timer.wait_time = 8.0  # 8 second timeout for turn ending
 		turn_end_safety_timer.one_shot = true
-		turn_end_safety_timer.timeout.connect(func():
-			print("⚠️ Turn end safety timeout for ", captured_enemy_name, ", forcing turn end")
-			# Reset movement attempts for next turn
-			if enemy.has_method("movement_attempts"):
-				enemy.movement_attempts = 0
-			# End the enemy turn
-			_end_enemy_turn_for(enemy)
-			turn_end_safety_timer.queue_free()
-		)
+		turn_end_safety_timer.timeout.connect(_on_turn_end_safety_timeout.bind(enemy, captured_enemy_name))
 		add_child(turn_end_safety_timer)
 		turn_end_safety_timer.start()
 	else:
@@ -4584,6 +4803,10 @@ func _execute_spell_logic(spell_id: String, caster: Node, target: Node, damage_m
 
 		_log_attack(caster, t, final_damage, spell_data.get("name", spell_id))
 		_apply_spell_status_effects(spell_data, final_damage)
+		
+		# Check for innate elemental effects from spell damage
+		if caster == current_player:  # Only check innate effects for player spells
+			_check_elemental_status_effects(final_damage, spell_id)
 
 
 func _process_recast_effects(actor: Node):
@@ -4642,7 +4865,7 @@ func _check_and_skip_player_if_no_action():
 		# If another entity is ready, skip the player and re-queue them after that entity
 		if other_entity_ready and next_ready_entity:
 			print("⏰ Skipping player - ", _get_entity_name(next_ready_entity), " is ready to act")
-			print("⏰ DEBUG: Before skip - turn_in_progress: ", turn_in_progress, " current_turn_entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+			print("⏰ DEBUG: Before skip - turn_in_progress: ", turn_in_progress, " current_turn_entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 			
 			# First, end the player's current turn since we're skipping them
 			if turn_in_progress and current_turn_entity == current_player:
@@ -4651,7 +4874,7 @@ func _check_and_skip_player_if_no_action():
 				current_turn_entity = null
 				action_in_progress = false
 			
-			print("⏰ DEBUG: After ending turn - turn_in_progress: ", turn_in_progress, " current_turn_entity: ", _get_entity_name(current_turn_entity) if current_turn_entity else "None")
+			print("⏰ DEBUG: After ending turn - turn_in_progress: ", turn_in_progress, " current_turn_entity: ", _get_entity_name(current_turn_entity) if current_turn_entity != null else "None")
 			
 			# Remove player from front of queue
 			turn_queue.pop_front()

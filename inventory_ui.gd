@@ -4,6 +4,9 @@ extends Control
 @export var items_container: GridContainer
 
 var player_inventory: Node
+var player_stats: Node
+
+# Regular inventory UI - no stat allocation here
 
 func _ready():
 	# We need to wait a frame for player_inventory to be set by the player.
@@ -43,6 +46,8 @@ func _initialize_inventory_slots():
 		# Also set the slot_index if the method exists
 		if slot_node.has_method("set_slot_index"):
 			slot_node.set_slot_index(i)
+
+# Stat allocation moved to equipment UI
 
 func _input(_event):
 	if Input.is_action_just_pressed("toggle_inventory"):
@@ -159,3 +164,5 @@ func update_display():
 				quantity_label.text = ""
 				quantity_label.visible = false
 				quantity_label.modulate.a = 0.0
+
+# Stat allocation functions moved to equipment UI
